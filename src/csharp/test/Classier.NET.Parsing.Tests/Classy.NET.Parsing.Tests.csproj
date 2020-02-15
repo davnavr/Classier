@@ -3,14 +3,12 @@
   Copyright (c) 2020, David Navarro. All rights reserved.
   Licensed under the MIT license. For more information, see the 'LICENSE' file in the project root.
 -->
-<Project>
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Common properties -->
+  <!-- Assembly information -->
   <PropertyGroup>
-    <LangVersion>7.2</LangVersion>
-    <NeutralLanguage>en-US</NeutralLanguage>
-    <Product>Classier.NET</Product>
-    <CSharpRootDirectory>$(MSBuildThisFileDirectory)</CSharpRootDirectory>
+    <TestProjectFor>$(Product).Parsing</TestProjectFor>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
 
 </Project>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020, David Navarro. All rights reserved.
+  Licensed under the MIT license. For more information, see the 'LICENSE' file in the project root.
+-->
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..\'))" />
+
+  <!-- Test project properties -->
+  <PropertyGroup>
+    <AssemblyName>$(TestProjectFor).Tests</AssemblyName>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);SA0001;SA1600</NoWarn>
+  </PropertyGroup>
+
+</Project>
