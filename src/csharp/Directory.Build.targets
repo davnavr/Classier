@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020, David Navarro. All rights reserved.
+  Licensed under the MIT license. For more information, see the 'LICENSE' file in the project root.
+-->
+<Project>
+
+  <!-- Code analysis files -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(RootCSharpDirectory)\stylecop.json" Link="stylecop.json" />
+    <PackageReference Include="Microsoft.DotNet.Analyzers.Compatibility" Version="0.2.12-alpha" PrivateAssets="all" />
+    <PackageReference Include="StyleCop.Analyzers" Version="1.1.118" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>
