@@ -6,29 +6,45 @@
 namespace Classier.NET.Parsing
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
 
     /// <summary>
-    /// Represents a sequence of tokens originating from a <see cref="TextReader"/>.
+    /// Represents a collection of tokens originating from a <see cref="TextReader"/>.
     /// </summary>
-    public class TextTokenSequence
+    public class TextTokenCollection : IEnumerable<Token>
     {
         private readonly Func<TextReader> source;
 
         private readonly List<ITokenDefinition> tokenDefinitions;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="TextTokenSequence"/> class.
+        /// Initializes a new instance of the <see cref="TextTokenCollection"/> class.
         /// </summary>
         /// <param name="source">Provides the <see cref="TextReader"/> used to read the tokens.</param>
         /// <param name="tokenDefinitions">A collection containing the token definitions used to generate the tokens.</param>
         /// <exception cref="ArgumentNullException"><paramref name="source"/> or<paramref name="tokenDefinitions"/> is <see langword="null"/>.</exception>
-        public TextTokenSequence(Func<TextReader> source, IEnumerable<ITokenDefinition> tokenDefinitions)
+        public TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition> tokenDefinitions)
         {
             this.source = source ?? throw new ArgumentNullException(nameof(source));
             this.tokenDefinitions = tokenDefinitions.ToList();
         }
+
+        /// <inheritdoc/>
+        public IEnumerator<Token> GetEnumerator()
+        {
+            int lineNumber = 0;
+
+            using (TextReader reader = this.source())
+            {
+            }
+
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc/>
+        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
     }
 }
