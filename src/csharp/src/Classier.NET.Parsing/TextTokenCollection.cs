@@ -54,15 +54,15 @@ namespace Classier.NET.Parsing
                     while (line.Length > 0)
                     {
                         // Gets the token definition with the longest match, and the length of the match.
-                        Tuple<int, ITokenDefinition> match = this.tokenDefinitions
-                            .Select(def => Tuple.Create(def.GetTokenLength(line), def))
-                            .Where(pair => pair.Item1 > 0)
-                            .Aggregate((current, next) => next.Item1 > current.Item1 ? next : current);
+                        var match = this.tokenDefinitions
+                            .Select(def => new { Definition = def, Length = def.GetTokenLength(line) })
+                            .Where(pair => pair.Length > 0)
+                            .Aggregate((current, next) => next.Length > current.Length ? next : current);
 
                         //// TODO: Make an unknown token definition.
                         //// yield return new Token();
-                        line = line.Substring(match.Item1);
-                        linePos += match.Item1;
+                        line = line.Substring(match.Length);
+                        linePos += match.Length;
                     }
 
                     lineNum++;
