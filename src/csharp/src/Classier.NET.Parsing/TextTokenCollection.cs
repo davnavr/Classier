@@ -59,8 +59,9 @@ namespace Classier.NET.Parsing
                             .Where(pair => pair.Length > 0)
                             .Aggregate((current, next) => next.Length > current.Length ? next : current);
 
-                        //// TODO: Make an unknown token definition.
-                        //// yield return new Token();
+                        //// TODO: Make an unknown token definition if a match was not found.
+
+                        yield return new Token(line.Substring(0, match.Length), match.Definition); // TODO: Determine whether the line number and position should be included.
                         line = line.Substring(match.Length);
                         linePos += match.Length;
                     }
@@ -68,8 +69,6 @@ namespace Classier.NET.Parsing
                     lineNum++;
                 }
             }
-
-            throw new NotImplementedException();
         }
 
         /// <inheritdoc/>

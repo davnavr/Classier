@@ -12,6 +12,7 @@
     <AssemblyName>$(TestProjectFor).Tests</AssemblyName>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);SA0001;SA1600</NoWarn>
+    <RootNamespace>$(TestProjectFor)</RootNamespace>
   </PropertyGroup>
 
 </Project>

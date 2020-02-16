@@ -12,6 +12,23 @@ namespace Classier.NET.Parsing
     /// </summary>
     public readonly struct Token
     {
+        private readonly string content;
+
+        private readonly ITokenDefinition definition;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Token"/> struct.
+        /// </summary>
+        /// <param name="content">The content of the token.</param>
+        /// <param name="definition">The <see cref="ITokenDefinition"/> that matched this token.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="definition"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="content"/> is <see langword="null"/> or empty.</exception>
+        public Token(string content, ITokenDefinition definition)
+        {
+            this.content = !string.IsNullOrEmpty(content) ? content : throw new ArgumentException("The content of the token must not be empty.", nameof(content));
+            this.definition = definition ?? throw new ArgumentNullException(nameof(definition));
+        }
+
         /// <summary>
         /// Returns the content of the token.
         /// </summary>
