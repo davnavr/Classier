@@ -35,10 +35,28 @@ namespace Classier.NET.Parsing
         /// <inheritdoc/>
         public IEnumerator<Token> GetEnumerator()
         {
-            int lineNumber = 0;
+            int lineNum = 0;
 
             using (TextReader reader = this.source())
             {
+                while (true)
+                {
+                    string line = reader.ReadLine();
+                    int linePos = 0;
+
+                    // Check if the end of the file was reached.
+                    if (line == null)
+                    {
+                        break;
+                    }
+
+                    // Find tokens from left to right, preferring longer tokens.
+                    while (line.Length > 0)
+                    {
+                    }
+
+                    lineNum++;
+                }
             }
 
             throw new NotImplementedException();
