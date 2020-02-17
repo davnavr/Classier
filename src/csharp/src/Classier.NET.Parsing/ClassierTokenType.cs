@@ -16,14 +16,14 @@ namespace Classier.NET.Parsing
         Unknown,
 
         /// <summary>
-        /// The token is a closing parenthesis.
-        /// </summary>
-        CloseParen,
-
-        /// <summary>
         /// The token is a closing curly bracket.
         /// </summary>
         CloseCurlyBracket,
+
+        /// <summary>
+        /// The token is a closing parenthesis.
+        /// </summary>
+        CloseParen,
 
         /// <summary>
         /// The token is a comment.
@@ -64,6 +64,11 @@ namespace Classier.NET.Parsing
         /// The token separates method parameters (a comma).
         /// </summary>
         ParamSeparator,
+
+        /// <summary>
+        /// The token is a preprocessor directive.
+        /// </summary>
+        PreprocessorDir,
 
         /// <summary>
         /// The token indicates the end of a statement (a semicolon).
