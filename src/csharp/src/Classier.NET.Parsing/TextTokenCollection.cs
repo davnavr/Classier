@@ -14,26 +14,27 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Represents a collection of tokens originating from a <see cref="TextReader"/>.
     /// </summary>
-    public class TextTokenCollection : IEnumerable<Token>
+    /// <typeparam name="T">The type of the token.</typeparam>
+    public class TextTokenCollection<T> : IEnumerable<Token<T>>
     {
         private readonly Func<TextReader> source;
 
-        private readonly List<ITokenDefinition> tokenDefinitions;
+        private readonly List<ITokenDefinition<T>> tokenDefinitions;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="TextTokenCollection"/> class.
+        /// Initializes a new instance of the <see cref="TextTokenCollection{T}"/> class.
         /// </summary>
         /// <param name="source">Provides the <see cref="TextReader"/> used to read the tokens.</param>
         /// <param name="tokenDefinitions">A collection containing the token definitions used to generate the tokens.</param>
         /// <exception cref="ArgumentNullException"><paramref name="source"/> or<paramref name="tokenDefinitions"/> is <see langword="null"/>.</exception>
-        public TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition> tokenDefinitions)
+        public TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition<T>> tokenDefinitions)
         {
             this.source = source ?? throw new ArgumentNullException(nameof(source));
             this.tokenDefinitions = tokenDefinitions?.ToList() ?? throw new ArgumentNullException(nameof(tokenDefinitions));
         }
 
         /// <inheritdoc/>
-        public IEnumerator<Token> GetEnumerator()
+        public IEnumerator<Token<T>> GetEnumerator()
         {
             int lineNum = 0;
 
@@ -61,7 +62,7 @@ namespace Classier.NET.Parsing
 
                         //// TODO: Make an unknown token definition if a match was not found.
 
-                        yield return new Token(line.Substring(0, match.Length), match.Definition); // TODO: Determine whether the line number and position should be included.
+                        yield return new Token<T>(line.Substring(0, match.Length), match.Definition); // TODO: Determine whether the line number and position should be included.
                         line = line.Substring(match.Length);
                         linePos += match.Length;
                     }

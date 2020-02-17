@@ -14,9 +14,9 @@ namespace Classier.NET.Parsing
         /// <summary>
         /// Gets the length of a token if it was to be created, beginning from the first character in the line.
         /// </summary>
-        /// <param name="line">The line containing the token.</param>
-        /// <returns>The length of the token beginning from the first character in the line; or <c>0</c> if a token cannot be created.</returns>
-        int GetTokenLength(string line);
+        /// <param name="content">The <see cref="string"/> containing the token.</param>
+        /// <returns>The length of the token beginning from the first character of the <see cref="string"/>; or <c>0</c> if a token cannot be created.</returns>
+        int GetTokenLength(string content);
 
         /// <summary>
         /// Gets the type of the token.
