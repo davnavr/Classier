@@ -30,7 +30,7 @@ namespace Classier.NET.Parsing
         public TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition<T>> tokenDefinitions)
         {
             this.source = source ?? throw new ArgumentNullException(nameof(source));
-            this.tokenDefinitions = tokenDefinitions?.ToList() ?? throw new ArgumentNullException(nameof(tokenDefinitions));
+            this.tokenDefinitions = tokenDefinitions?.ToList() ?? throw new ArgumentNullException(nameof(tokenDefinitions)); // TODO: Check for any null elements.
         }
 
         /// <inheritdoc/>
