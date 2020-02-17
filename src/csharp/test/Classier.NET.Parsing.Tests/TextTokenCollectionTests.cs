@@ -10,24 +10,21 @@ namespace Classier.NET.Parsing.Tests
     using System.IO;
     using System.Linq;
     using Xunit;
+    using ClassierToken = Classier.NET.Parsing.Token<Classier.NET.Parsing.ClassierTokenType>;
 
     public class TextTokenCollectionTests
     {
-        /*
         [Theory]
-        [InlineData("1 + 1")]
-        [InlineData("1 + 1 * 3 - 4 / 5")]
-        public void TokensForMathExpressionAreValid(string statement)
+        [InlineData(" public class", ClassierTokenType.Whitespace, ClassierTokenType.Keyword, ClassierTokenType.Whitespace, ClassierTokenType.Keyword)]
+        [InlineData("public class MyClass", ClassierTokenType.Keyword, ClassierTokenType.Whitespace, ClassierTokenType.Keyword, ClassierTokenType.Whitespace, ClassierTokenType.Identifier)]
+        [InlineData("() abstract{}", ClassierTokenType.OpenParen, ClassierTokenType.CloseParen, ClassierTokenType.Whitespace, ClassierTokenType.Keyword, ClassierTokenType.OpenCurlyBracket, ClassierTokenType.CloseCurlyBracket)]
+        public void TokensForClassierSourceAreValid(string source, params ClassierTokenType[] expectedTokenTypes)
         {
-            // Arrange
-            List<ITokenDefinition> definitions = null;
-
             // Act
-            List<Token> tokenList = new TextTokenCollection(() => new StringReader(statement), definitions).ToList();
+            List<ClassierToken> tokenList = new TextTokenCollection<ClassierTokenType>(() => new StringReader(source), new ClassierTokenCollection()).ToList();
 
             // Assert
-            throw new NotImplementedException();
+            Assert.Equal(expectedTokenTypes, tokenList.Select(token => token.TokenType));
         }
-        */
     }
 }

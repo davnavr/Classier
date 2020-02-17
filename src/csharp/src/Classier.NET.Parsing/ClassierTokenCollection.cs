@@ -24,8 +24,9 @@ namespace Classier.NET.Parsing
 
             // TODO: Add other keywords.
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "class|interface|extends|implements");
-            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "abstract|virtual|mutable|var");
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "abstract|virtual|mutable|var|void");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "public|private");
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "if|while");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.OpenCurlyBracket, "{");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.OpenParen, "(");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Operator, "\\+|-|\\*|\\/|%"); // TODO: Add other operators.
