@@ -6,7 +6,7 @@
 namespace Classier.NET.Parsing
 {
     /// <summary>
-    /// Generates tokens from source code.
+    /// Determines whether tokens can be created.
     /// </summary>
     public interface ITokenDefinition
     {

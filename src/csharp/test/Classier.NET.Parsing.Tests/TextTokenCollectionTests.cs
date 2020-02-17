@@ -13,6 +13,7 @@ namespace Classier.NET.Parsing.Tests
 
     public class TextTokenCollectionTests
     {
+        /*
         [Theory]
         [InlineData("1 + 1")]
         [InlineData("1 + 1 * 3 - 4 / 5")]
@@ -27,5 +28,6 @@ namespace Classier.NET.Parsing.Tests
             // Assert
             throw new NotImplementedException();
         }
+        */
     }
 }

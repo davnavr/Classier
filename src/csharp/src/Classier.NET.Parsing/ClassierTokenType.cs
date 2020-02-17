@@ -21,14 +21,49 @@ namespace Classier.NET.Parsing
         CloseParen,
 
         /// <summary>
+        /// The token is a closing curly bracket.
+        /// </summary>
+        CloseCurlyBracket,
+
+        /// <summary>
+        /// The token is a comment.
+        /// </summary>
+        Comment,
+
+        /// <summary>
+        /// The token represents the name of a variable, class, method, etc.
+        /// </summary>
+        Identifier,
+
+        /// <summary>
         /// The token is an integer literal.
         /// </summary>
         IntegerLiteral,
 
         /// <summary>
+        /// The token is a keyword.
+        /// </summary>
+        Keyword,
+
+        /// <summary>
+        /// The token is an opening curly bracket.
+        /// </summary>
+        OpenCurlyBracket,
+
+        /// <summary>
         /// The token is a opening parenthesis.
         /// </summary>
         OpenParen,
+
+        /// <summary>
+        /// The token is an operator.
+        /// </summary>
+        Operator,
+
+        /// <summary>
+        /// The token separates method parameters (a comma).
+        /// </summary>
+        ParamSeparator,
 
         /// <summary>
         /// The token indicates the end of a statement (a semicolon).
@@ -39,5 +74,10 @@ namespace Classier.NET.Parsing
         /// The token is a string.
         /// </summary>
         StringLiteral,
+
+        /// <summary>
+        /// The token represents whitespace.
+        /// </summary>
+        Whitespace,
     }
 }

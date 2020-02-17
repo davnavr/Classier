@@ -29,7 +29,7 @@ namespace Classier.NET.Parsing
         public TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition> tokenDefinitions)
         {
             this.source = source ?? throw new ArgumentNullException(nameof(source));
-            this.tokenDefinitions = tokenDefinitions.ToList();
+            this.tokenDefinitions = tokenDefinitions?.ToList() ?? throw new ArgumentNullException(nameof(tokenDefinitions));
         }
 
         /// <inheritdoc/>
