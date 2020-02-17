@@ -8,15 +8,16 @@ namespace Classier.NET.Parsing
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using ClassierTokenDefinition = ITokenDefinition<ClassierTokenType>;
 
     /// <summary>
     /// Represents a collection of the tokens in the Classier language.
     /// This class cannot be inherited.
     /// </summary>
-    public sealed class ClassierTokenCollection : IEnumerable<ITokenDefinition>
+    public sealed class ClassierTokenCollection : IEnumerable<ClassierTokenDefinition>
     {
         /// <inheritdoc/>
-        public IEnumerator<ITokenDefinition> GetEnumerator()
+        public IEnumerator<ClassierTokenDefinition> GetEnumerator()
         {
             ////yield return new
             throw new NotImplementedException();
