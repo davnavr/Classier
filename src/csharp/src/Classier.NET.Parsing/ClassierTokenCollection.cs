@@ -30,11 +30,10 @@ namespace Classier.NET.Parsing
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.OpenParen, "(");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Operator, "\\+|-|\\*|\\/|%"); // TODO: Add other operators.
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.ParamSeparator, ",");
-
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.PreprocessorDir, "#[a-z]+");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.StatementEnd, ";");
 
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Whitespace, "\\s+");
-            throw new NotImplementedException();
         }
 
         /// <inheritdoc/>
