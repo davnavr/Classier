@@ -16,6 +16,11 @@ namespace Classier.NET.Parsing
         Unknown,
 
         /// <summary>
+        /// The token is a binary literal.
+        /// </summary>
+        BinaryLiteral,
+
+        /// <summary>
         /// The token is a closing curly bracket.
         /// </summary>
         CloseCurlyBracket,
@@ -31,12 +36,17 @@ namespace Classier.NET.Parsing
         Comment,
 
         /// <summary>
+        /// The token is a hexadecimal literal.
+        /// </summary>
+        HexLiteral,
+
+        /// <summary>
         /// The token represents the name of a variable, class, method, etc.
         /// </summary>
         Identifier,
 
         /// <summary>
-        /// The token is an integer literal.
+        /// The token is an integer (base 10) literal.
         /// </summary>
         IntegerLiteral,
 

@@ -19,10 +19,14 @@ namespace Classier.NET.Parsing
         /// <inheritdoc/>
         public IEnumerator<ClassierTokenDefinition> GetEnumerator()
         {
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.BinaryLiteral, "0[bB][01]([01_]*[01])?");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.CloseCurlyBracket, "}");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.CloseParen, "\\)");
 
-            // TODO: Add other keywords.
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.HexLiteral, "0[xX][0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?");
+
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.IntegerLiteral, "[0-9]([0-9_]*[0-9])?");
+            //// TODO: Add other keywords.
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "class|interface|extends|implements");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "abstract|virtual|mutable|var|void");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "public|private");
