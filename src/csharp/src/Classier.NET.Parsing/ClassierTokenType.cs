@@ -36,6 +36,16 @@ namespace Classier.NET.Parsing
         CloseParen,
 
         /// <summary>
+        /// The token indicates the end of a multi-line comment.
+        /// </summary>
+        CommentEnd,
+
+        /// <summary>
+        /// The token indicates the start of a multi-line comment.
+        /// </summary>
+        CommentStart,
+
+        /// <summary>
         /// The token is a period.
         /// </summary>
         Delimiter,
