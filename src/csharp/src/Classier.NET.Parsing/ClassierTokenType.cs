@@ -41,19 +41,19 @@ namespace Classier.NET.Parsing
         HexLiteral,
 
         /// <summary>
-        /// The token represents the name of a variable, class, method, etc.
+        /// The token represents the name of a variable, class, method, namespace, etc.
         /// </summary>
         Identifier,
-
-        /// <summary>
-        /// The token is an integer (base 10) literal.
-        /// </summary>
-        IntegerLiteral,
 
         /// <summary>
         /// The token is a keyword.
         /// </summary>
         Keyword,
+
+        /// <summary>
+        /// The token is an integer (base 10) literal.
+        /// </summary>
+        NumberLiteral,
 
         /// <summary>
         /// The token is an opening curly bracket.
@@ -89,6 +89,11 @@ namespace Classier.NET.Parsing
         /// The token is a string.
         /// </summary>
         StringLiteral,
+
+        /// <summary>
+        /// The token separates the name of a namespace and the name of a type (a period).
+        /// </summary>
+        TypeDelimiter,
 
         /// <summary>
         /// The token represents whitespace.

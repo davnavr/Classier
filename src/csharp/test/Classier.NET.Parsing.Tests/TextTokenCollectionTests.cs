@@ -19,7 +19,7 @@ namespace Classier.NET.Parsing.Tests
         [InlineData(" public class", ClassierTokenType.Whitespace, ClassierTokenType.Keyword, ClassierTokenType.Whitespace, ClassierTokenType.Keyword)]
         [InlineData("public class MyClass", ClassierTokenType.Keyword, ClassierTokenType.Whitespace, ClassierTokenType.Keyword, ClassierTokenType.Whitespace, ClassierTokenType.Identifier)]
         [InlineData("() abstract{}", ClassierTokenType.OpenParen, ClassierTokenType.CloseParen, ClassierTokenType.Whitespace, ClassierTokenType.Keyword, ClassierTokenType.OpenCurlyBracket, ClassierTokenType.CloseCurlyBracket)]
-        [InlineData("1+2/3", ClassierTokenType.IntegerLiteral, ClassierTokenType.Operator, ClassierTokenType.IntegerLiteral, ClassierTokenType.Operator, ClassierTokenType.IntegerLiteral)]
+        [InlineData("1+2/3", ClassierTokenType.NumberLiteral, ClassierTokenType.Operator, ClassierTokenType.NumberLiteral, ClassierTokenType.Operator, ClassierTokenType.NumberLiteral)]
         //// TODO: Add test data for hex and binary numbers.
         public void TokensForClassierSourceAreValid(string source, params ClassierTokenType[] expectedTokenTypes)
         {
