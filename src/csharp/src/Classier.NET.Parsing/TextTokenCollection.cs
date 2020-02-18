@@ -54,14 +54,12 @@ namespace Classier.NET.Parsing
                     // Find tokens from left to right, preferring longer tokens.
                     while (line.Length > 0)
                     {
-                        // Gets the token definition with the longest match, and the length of the match.
-                        var match = this.tokenDefinitions
+                        var matches = this.tokenDefinitions
                             .Select(def => new { Definition = def, Length = def.GetTokenLength(line) })
-                            .Where(pair => pair.Length > 0)
-                            .Aggregate((current, next) => next.Length > current.Length ? next : current);
+                            .Where(pair => pair.Length > 0);
 
-                        // Checks if no token definition found a match.
-                        match = match ?? new { Definition = (ITokenDefinition<T>)new UnknownTokenDefinition<T>(), line.Length };
+                        // Gets the token definition with the longest match, and the length of the match.
+                        var match = matches.Any() ? matches.Aggregate((current, next) => next.Length > current.Length ? next : current) : new { Definition = (ITokenDefinition<T>)new UnknownTokenDefinition<T>(), line.Length };
 
                         yield return new Token<T>(line.Substring(0, match.Length), match.Definition); // TODO: Determine whether the line number and position should be included.
                         line = line.Substring(match.Length);

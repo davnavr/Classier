@@ -41,7 +41,7 @@ namespace Classier.NET.Parsing
         /// <returns>A <see cref="string"/> containing the content of the token.</returns>
         public override string ToString()
         {
-            throw new NotImplementedException();
+            return this.content;
         }
     }
 }

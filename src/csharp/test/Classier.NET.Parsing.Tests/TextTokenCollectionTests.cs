@@ -41,7 +41,7 @@ namespace Classier.NET.Parsing.Tests
             List<Token<int>> tokenList = new TextTokenCollection<int>(() => new StringReader(content), new ITokenDefinition<int>[] { definition }).ToList();
 
             // Assert
-            Assert.IsType<UnknownTokenDefinition<int>>(tokenList.First());
+            Assert.Equal(tokenList.First().ToString(), content);
         }
     }
 }
