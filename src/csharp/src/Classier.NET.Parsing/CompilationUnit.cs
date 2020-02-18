@@ -10,7 +10,7 @@ namespace Classier.NET.Parsing
 
     public class CompilationUnit
     {
-        public CompilationUnit(IEnumerable<Token<ClassierTokenType>> tokens)
+        public CompilationUnit(IEnumerable<Token> tokens)
         {
         }
     }

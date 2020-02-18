@@ -11,19 +11,19 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Creates tokens from a regular expression.
     /// </summary>
-    public class RegexTokenDefinition<T> : ITokenDefinition<T>
+    public class RegexTokenDefinition : ITokenDefinition
     {
         private readonly Regex expression;
 
-        private readonly T tokenType;
+        private readonly ClassierTokenType tokenType;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="RegexTokenDefinition{T}"/> class from the regular expression pattern.
+        /// Initializes a new instance of the <see cref="RegexTokenDefinition"/> class from the regular expression pattern.
         /// </summary>
         /// <param name="tokenType">The type of the token.</param>
         /// <param name="pattern">The regular expression pattern used to match the tokens.</param>
         /// <exception cref="ArgumentException"><paramref name="pattern"/> is <see langword="null"/> or empty.</exception>
-        public RegexTokenDefinition(T tokenType, string pattern)
+        public RegexTokenDefinition(ClassierTokenType tokenType, string pattern)
         {
             if (string.IsNullOrEmpty(pattern))
             {
@@ -45,6 +45,6 @@ namespace Classier.NET.Parsing
         /// </summary>
         /// <param name="token">This parameter is ignored.</param>
         /// <returns>The type of the token.</returns>
-        public T GetTokenType(Token<T> token) => this.tokenType;
+        public ClassierTokenType GetTokenType(Token token) => this.tokenType;
     }
 }

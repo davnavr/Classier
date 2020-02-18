@@ -11,7 +11,6 @@ namespace Classier.NET.Parsing.Tests
     using System.Linq;
     using FakeItEasy;
     using Xunit;
-    using ClassierToken = Classier.NET.Parsing.Token<Classier.NET.Parsing.ClassierTokenType>;
 
     public class TextTokenCollectionTests
     {
@@ -25,7 +24,7 @@ namespace Classier.NET.Parsing.Tests
         public void TokensForClassierSourceAreValid(string source, params ClassierTokenType[] expectedTokenTypes)
         {
             // Act
-            List<ClassierToken> tokenList = new TextTokenCollection<ClassierTokenType>(() => new StringReader(source), new ClassierTokenCollection()).ToList();
+            List<Token> tokenList = new TextTokenCollection(() => new StringReader(source), new ClassierTokenCollection()).ToList();
 
             // Assert
             Assert.Equal(expectedTokenTypes, tokenList.Select(token => token.TokenType));
@@ -36,11 +35,11 @@ namespace Classier.NET.Parsing.Tests
         {
             // Arrange
             string content = "This is a test.";
-            ITokenDefinition<int> definition = A.Fake<ITokenDefinition<int>>(); // The generic argument does not matter.
+            ITokenDefinition definition = A.Fake<ITokenDefinition>();
             A.CallTo(() => definition.GetTokenLength(content)).Returns(0);
 
             // Act
-            List<Token<int>> tokenList = new TextTokenCollection<int>(() => new StringReader(content), new ITokenDefinition<int>[] { definition }).ToList();
+            List<Token> tokenList = new TextTokenCollection(() => new StringReader(content), new ITokenDefinition[] { definition }).ToList();
 
             // Assert
             Assert.Equal(tokenList.First().ToString(), content);

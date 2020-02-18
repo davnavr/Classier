@@ -11,7 +11,7 @@ namespace Classier.NET.Parsing
     /// The token definition used when no other token definition had a match.
     /// This class cannot be inherited.
     /// </summary>
-    public class UnknownTokenDefinition<T> : ITokenDefinition<T>
+    public class UnknownTokenDefinition : ITokenDefinition
     {
         /// <summary>
         /// Returns the length of the content.
@@ -34,6 +34,6 @@ namespace Classier.NET.Parsing
         /// </summary>
         /// <param name="token">This parameter is ignored.</param>
         /// <returns>The default value of <typeparamref name="T"/>.</returns>
-        public T GetTokenType(Token<T> token) => default;
+        public ClassierTokenType GetTokenType(Token token) => default;
     }
 }

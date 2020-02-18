@@ -14,27 +14,26 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Represents a collection of tokens originating from a <see cref="TextReader"/>.
     /// </summary>
-    /// <typeparam name="T">The type of the token.</typeparam>
-    public class TextTokenCollection<T> : IEnumerable<Token<T>>
+    public class TextTokenCollection : IEnumerable<Token>
     {
         private readonly Func<TextReader> source;
 
-        private readonly List<ITokenDefinition<T>> tokenDefinitions;
+        private readonly List<ITokenDefinition> tokenDefinitions;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="TextTokenCollection{T}"/> class.
+        /// Initializes a new instance of the <see cref="TextTokenCollection"/> class.
         /// </summary>
         /// <param name="source">Provides the <see cref="TextReader"/> used to read the tokens.</param>
         /// <param name="tokenDefinitions">A collection containing the token definitions used to generate the tokens.</param>
         /// <exception cref="ArgumentNullException"><paramref name="source"/> or<paramref name="tokenDefinitions"/> is <see langword="null"/>.</exception>
-        public TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition<T>> tokenDefinitions)
+        public TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition> tokenDefinitions)
         {
             this.source = source ?? throw new ArgumentNullException(nameof(source));
             this.tokenDefinitions = tokenDefinitions?.ToList() ?? throw new ArgumentNullException(nameof(tokenDefinitions)); // TODO: Check for any null elements.
         }
 
         /// <inheritdoc/>
-        public IEnumerator<Token<T>> GetEnumerator()
+        public IEnumerator<Token> GetEnumerator()
         {
             int lineNum = 0;
 
@@ -59,9 +58,9 @@ namespace Classier.NET.Parsing
                             .Where(pair => pair.Length > 0);
 
                         // Gets the token definition with the longest match, and the length of the match.
-                        var match = matches.Any() ? matches.Aggregate((current, next) => next.Length > current.Length ? next : current) : new { Definition = (ITokenDefinition<T>)new UnknownTokenDefinition<T>(), line.Length };
+                        var match = matches.Any() ? matches.Aggregate((current, next) => next.Length > current.Length ? next : current) : new { Definition = (ITokenDefinition)new UnknownTokenDefinition(), line.Length };
 
-                        yield return new Token<T>(line.Substring(0, match.Length), match.Definition); // TODO: Determine whether the line number and position should be included.
+                        yield return new Token(line.Substring(0, match.Length), match.Definition); // TODO: Determine whether the line number and position should be included.
                         line = line.Substring(match.Length);
                         linePos += match.Length;
                     }

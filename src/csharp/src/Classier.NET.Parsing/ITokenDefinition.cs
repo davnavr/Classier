@@ -8,8 +8,7 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Determines whether tokens can be created.
     /// </summary>
-    /// <typeparam name="T">The type of the value indicating the type of the token.</typeparam>
-    public interface ITokenDefinition<T>
+    public interface ITokenDefinition
     {
         /// <summary>
         /// Gets the length of a token if it was to be created, beginning from the first character in the line.
@@ -23,6 +22,6 @@ namespace Classier.NET.Parsing
         /// </summary>
         /// <param name="token">The token.</param>
         /// <returns>The type of the token.</returns>
-        T GetTokenType(Token<T> token);
+        ClassierTokenType GetTokenType(Token token); // TODO: Replace with a property.
     }
 }

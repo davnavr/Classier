@@ -10,21 +10,20 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Represents a token.
     /// </summary>
-    /// <typeparam name="T">The type of the value used to indicate the type of the token.</typeparam>
-    public readonly struct Token<T>
+    public readonly struct Token
     {
         private readonly string content;
 
-        private readonly ITokenDefinition<T> definition;
+        private readonly ITokenDefinition definition;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Token{T}"/> struct.
+        /// Initializes a new instance of the <see cref="Token"/> struct.
         /// </summary>
         /// <param name="content">The content of the token.</param>
-        /// <param name="definition">The <see cref="ITokenDefinition{T}"/> that matched this token.</param>
+        /// <param name="definition">The <see cref="ITokenDefinition"/> that matched this token.</param>
         /// <exception cref="ArgumentNullException"><paramref name="definition"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="content"/> is <see langword="null"/> or empty.</exception>
-        public Token(string content, ITokenDefinition<T> definition)
+        public Token(string content, ITokenDefinition definition)
         {
             this.content = !string.IsNullOrEmpty(content) ? content : throw new ArgumentException("The content of the token must not be empty.", nameof(content));
             this.definition = definition ?? throw new ArgumentNullException(nameof(definition));
@@ -33,7 +32,7 @@ namespace Classier.NET.Parsing
         /// <summary>
         /// Gets the type of the token.
         /// </summary>
-        public T TokenType => this.definition.GetTokenType(this);
+        public ClassierTokenType TokenType => this.definition.GetTokenType(this);
 
         /// <summary>
         /// Returns the content of the token.
