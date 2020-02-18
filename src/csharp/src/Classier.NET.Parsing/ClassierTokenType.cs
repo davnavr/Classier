@@ -16,6 +16,11 @@ namespace Classier.NET.Parsing
         Unknown,
 
         /// <summary>
+        /// The token is an access modifier.
+        /// </summary>
+        AccessModifier,
+
+        /// <summary>
         /// The token is a binary literal.
         /// </summary>
         BinaryLiteral,
@@ -36,14 +41,19 @@ namespace Classier.NET.Parsing
         Comment,
 
         /// <summary>
+        /// The token is a period.
+        /// </summary>
+        Delimiter,
+
+        /// <summary>
         /// The token is a hexadecimal literal.
         /// </summary>
         HexLiteral,
 
         /// <summary>
-        /// The token represents the name of a variable, class, method, namespace, etc.
+        /// The token represents the name of a local variable, class, method, namespace, etc.
         /// </summary>
-        Identifier,
+        Identifier, // TODO: Should the different types of identifiers be separate types?
 
         /// <summary>
         /// The token is a keyword.
@@ -89,11 +99,6 @@ namespace Classier.NET.Parsing
         /// The token is a string.
         /// </summary>
         StringLiteral,
-
-        /// <summary>
-        /// The token separates the name of a namespace and the name of a type (a period).
-        /// </summary>
-        TypeDelimiter,
 
         /// <summary>
         /// The token represents whitespace.
