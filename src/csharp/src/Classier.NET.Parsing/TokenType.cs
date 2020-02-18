@@ -6,9 +6,9 @@
 namespace Classier.NET.Parsing
 {
     /// <summary>
-    /// Represents the type of a token in the Classier language.
+    /// Represents the type of a token.
     /// </summary>
-    public enum ClassierTokenType // TODO: Remove Classier prefix.
+    public enum TokenType
     {
         /// <summary>
         /// The token is of an unknown type.

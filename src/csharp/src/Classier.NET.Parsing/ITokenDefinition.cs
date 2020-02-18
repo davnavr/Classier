@@ -22,6 +22,6 @@ namespace Classier.NET.Parsing
         /// </summary>
         /// <param name="token">The token.</param>
         /// <returns>The type of the token.</returns>
-        ClassierTokenType GetTokenType(Token token); // TODO: Replace with a property.
+        TokenType GetTokenType(Token token); // TODO: Replace with a property.
     }
 }

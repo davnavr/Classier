@@ -23,7 +23,7 @@ namespace Classier.NET.Parsing
         /// <param name="definition">The <see cref="ITokenDefinition"/> that matched this token.</param>
         /// <exception cref="ArgumentNullException"><paramref name="definition"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="content"/> is <see langword="null"/> or empty.</exception>
-        public Token(string content, ITokenDefinition definition)
+        internal Token(string content, ITokenDefinition definition)
         {
             this.content = !string.IsNullOrEmpty(content) ? content : throw new ArgumentException("The content of the token must not be empty.", nameof(content));
             this.definition = definition ?? throw new ArgumentNullException(nameof(definition));
@@ -32,7 +32,7 @@ namespace Classier.NET.Parsing
         /// <summary>
         /// Gets the type of the token.
         /// </summary>
-        public ClassierTokenType TokenType => this.definition.GetTokenType(this);
+        public TokenType TokenType => this.definition.GetTokenType(this);
 
         /// <summary>
         /// Returns the content of the token.

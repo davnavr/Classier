@@ -34,6 +34,6 @@ namespace Classier.NET.Parsing
         /// </summary>
         /// <param name="token">This parameter is ignored.</param>
         /// <returns>The default value of <typeparamref name="T"/>.</returns>
-        public ClassierTokenType GetTokenType(Token token) => default;
+        public TokenType GetTokenType(Token token) => default;
     }
 }

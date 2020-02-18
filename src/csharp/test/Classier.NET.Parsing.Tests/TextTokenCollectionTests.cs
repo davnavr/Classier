@@ -15,16 +15,16 @@ namespace Classier.NET.Parsing.Tests
     public class TextTokenCollectionTests
     {
         [Theory]
-        [InlineData(" public class", ClassierTokenType.Whitespace, ClassierTokenType.AccessModifier, ClassierTokenType.Whitespace, ClassierTokenType.Keyword)]
-        [InlineData("public class MyClass", ClassierTokenType.AccessModifier, ClassierTokenType.Whitespace, ClassierTokenType.Keyword, ClassierTokenType.Whitespace, ClassierTokenType.Identifier)]
-        [InlineData("() abstract{}", ClassierTokenType.OpenParen, ClassierTokenType.CloseParen, ClassierTokenType.Whitespace, ClassierTokenType.Keyword, ClassierTokenType.OpenCurlyBracket, ClassierTokenType.CloseCurlyBracket)]
-        [InlineData("1+2\n/3", ClassierTokenType.NumberLiteral, ClassierTokenType.Operator, ClassierTokenType.NumberLiteral, ClassierTokenType.Operator, ClassierTokenType.NumberLiteral)]
-        [InlineData("#if DEBUG // This is a comment", ClassierTokenType.PreprocessorDir, ClassierTokenType.Whitespace, ClassierTokenType.Identifier, ClassierTokenType.Whitespace, ClassierTokenType.SingleLineComment)]
+        [InlineData(" public class", TokenType.Whitespace, TokenType.AccessModifier, TokenType.Whitespace, TokenType.Keyword)]
+        [InlineData("public class MyClass", TokenType.AccessModifier, TokenType.Whitespace, TokenType.Keyword, TokenType.Whitespace, TokenType.Identifier)]
+        [InlineData("() abstract{}", TokenType.OpenParen, TokenType.CloseParen, TokenType.Whitespace, TokenType.Keyword, TokenType.OpenCurlyBracket, TokenType.CloseCurlyBracket)]
+        [InlineData("1+2\n/3", TokenType.NumberLiteral, TokenType.Operator, TokenType.NumberLiteral, TokenType.Operator, TokenType.NumberLiteral)]
+        [InlineData("#if DEBUG // This is a comment", TokenType.PreprocessorDir, TokenType.Whitespace, TokenType.Identifier, TokenType.Whitespace, TokenType.SingleLineComment)]
         //// TODO: Add test data for other things.
-        public void TokensForClassierSourceAreValid(string source, params ClassierTokenType[] expectedTokenTypes)
+        public void TokensForClassierSourceAreValid(string source, params TokenType[] expectedTokenTypes)
         {
             // Act
-            List<Token> tokenList = new TextTokenCollection(() => new StringReader(source), new ClassierTokenCollection()).ToList();
+            List<Token> tokenList = new TextTokenCollection(() => new StringReader(source)).ToList();
 
             // Assert
             Assert.Equal(expectedTokenTypes, tokenList.Select(token => token.TokenType));
