@@ -30,7 +30,7 @@ namespace Classier.NET.Parsing
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "abstract|get|mutable|set|var|virtual|void");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "public|private");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "if|using|while");
-            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.NumberLiteral, "-?([0-9]([0-9_]*[0-9])?)|([0-9]?.[0-9]([0-9_]*[0-9])?)");
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.NumberLiteral, "-?([0-9]([0-9_]*[0-9])?)|([0-9]?\\.[0-9]([0-9_]*[0-9])?)");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.OpenCurlyBracket, "{");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.OpenParen, "\\(");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Operator, "\\+|-|\\*|\\/|%"); // TODO: Add other operators.
