@@ -58,7 +58,7 @@ namespace Classier.NET.Parsing
         /// <summary>
         /// The token represents the name of a local variable, class, method, namespace, etc.
         /// </summary>
-        Identifier, // NOTE: Should the different types of identifiers be separate types?
+        Identifier, // TODO: Should the different types of identifiers be separate types?
 
         /// <summary>
         /// The token is a keyword.
