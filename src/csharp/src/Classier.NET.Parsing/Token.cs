@@ -32,7 +32,7 @@ namespace Classier.NET.Parsing
         /// <summary>
         /// Gets the type of the token.
         /// </summary>
-        public TokenType TokenType => this.definition.GetTokenType(this);
+        public TokenType TokenType => this.definition.Type;
 
         /// <summary>
         /// Returns the content of the token.

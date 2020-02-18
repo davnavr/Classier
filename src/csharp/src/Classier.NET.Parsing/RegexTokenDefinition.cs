@@ -15,15 +15,13 @@ namespace Classier.NET.Parsing
     {
         private readonly Regex expression;
 
-        private readonly TokenType tokenType;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="RegexTokenDefinition"/> class from the regular expression pattern.
         /// </summary>
         /// <param name="tokenType">The type of the token.</param>
         /// <param name="pattern">The regular expression pattern used to match the tokens.</param>
         /// <exception cref="ArgumentException"><paramref name="pattern"/> is <see langword="null"/> or empty.</exception>
-        public RegexTokenDefinition(TokenType tokenType, string pattern)
+        internal RegexTokenDefinition(TokenType tokenType, string pattern)
         {
             if (string.IsNullOrEmpty(pattern))
             {
@@ -31,20 +29,16 @@ namespace Classier.NET.Parsing
             }
 
             this.expression = new Regex(pattern);
-            this.tokenType = tokenType;
+            this.Type = tokenType;
         }
+
+        /// <inheritdoc/>
+        public TokenType Type { get; }
 
         public int GetTokenLength(string content)
         {
             Match match = this.expression.Match(content);
             return match.Index == 0 ? match.Length : 0;
         }
-
-        /// <summary>
-        /// Gets the type of the token.
-        /// </summary>
-        /// <param name="token">This parameter is ignored.</param>
-        /// <returns>The type of the token.</returns>
-        public TokenType GetTokenType(Token token) => this.tokenType;
     }
 }
