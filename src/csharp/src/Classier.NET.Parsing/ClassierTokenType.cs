@@ -36,11 +36,6 @@ namespace Classier.NET.Parsing
         CloseParen,
 
         /// <summary>
-        /// The token is a comment.
-        /// </summary>
-        Comment,
-
-        /// <summary>
         /// The token is a period.
         /// </summary>
         Delimiter,
@@ -53,7 +48,7 @@ namespace Classier.NET.Parsing
         /// <summary>
         /// The token represents the name of a local variable, class, method, namespace, etc.
         /// </summary>
-        Identifier, // TODO: Should the different types of identifiers be separate types?
+        Identifier, // NOTE: Should the different types of identifiers be separate types?
 
         /// <summary>
         /// The token is a keyword.
@@ -89,6 +84,11 @@ namespace Classier.NET.Parsing
         /// The token is a preprocessor directive.
         /// </summary>
         PreprocessorDir,
+
+        /// <summary>
+        /// The token is a single line comment.
+        /// </summary>
+        SingleLineComment,
 
         /// <summary>
         /// The token indicates the end of a statement (a semicolon).

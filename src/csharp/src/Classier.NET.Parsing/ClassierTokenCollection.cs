@@ -23,9 +23,7 @@ namespace Classier.NET.Parsing
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.BinaryLiteral, "-?0[bB][01]([01_]*[01])?");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.CloseCurlyBracket, "}");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.CloseParen, "\\)");
-
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Delimiter, "\\.");
-
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.HexLiteral, "-?0[xX][0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?");
             //// TODO: Add other keywords.
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Keyword, "class|extends|implements|interface|namespace");
@@ -37,8 +35,9 @@ namespace Classier.NET.Parsing
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Operator, "\\+|-|\\*|\\/|%"); // TODO: Add other operators.
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.ParamSeparator, ",");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.PreprocessorDir, "#[a-z]+");
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.SingleLineComment, "\\/\\/.*");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.StatementEnd, ";");
-
+            yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.StringLiteral, "\".*\"");
             yield return new RegexTokenDefinition<ClassierTokenType>(ClassierTokenType.Whitespace, "\\s+");
 
             // Lower priority, the lexer will prioritize the definitions above.
