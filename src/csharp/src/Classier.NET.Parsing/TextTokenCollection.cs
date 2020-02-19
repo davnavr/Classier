@@ -70,6 +70,7 @@ namespace Classier.NET.Parsing
                             .Select(def => new { Definition = def, Length = def.GetTokenLength(line) })
                             .Where(pair => pair.Length > 0);
 
+                        //// TODO: Should unknown token only extend until we find another match? Make method on definitions that also return the index of the match and pick the definition with the lowest index?
                         // Gets the token definition with the longest match, and the length of the match.
                         var match = matches.Any() ? matches.Aggregate((current, next) => next.Length > current.Length ? next : current) : new { Definition = (ITokenDefinition)new UnknownTokenDefinition(), line.Length };
 

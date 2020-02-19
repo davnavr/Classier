@@ -29,7 +29,7 @@ namespace Classier.NET.Parsing
 
             yield return new RegexTokenDefinition(TokenType.Keyword, "class|extends|implements|interface|namespace");
             yield return new RegexTokenDefinition(TokenType.Keyword, "abstract|get|mutable|override|set|var|virtual|void");
-            yield return new RegexTokenDefinition(TokenType.Keyword, "if|new|null|super|using|while");
+            yield return new RegexTokenDefinition(TokenType.Keyword, "catch|finally|if|new|null|super|this|try|using|while");
             yield return new RegexTokenDefinition(TokenType.NumberLiteral, "-?([0-9]([0-9_]*[0-9])?)|([0-9]?\\.[0-9]([0-9_]*[0-9])?)");
             yield return new RegexTokenDefinition(TokenType.OpenCurlyBracket, "{");
             yield return new RegexTokenDefinition(TokenType.OpenParen, "\\(");
