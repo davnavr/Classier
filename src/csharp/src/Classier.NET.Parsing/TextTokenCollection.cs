@@ -10,6 +10,7 @@ namespace Classier.NET.Parsing
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Text;
 
     /// <summary>
     /// Represents a collection of tokens originating from a <see cref="TextReader"/>.
@@ -48,40 +49,17 @@ namespace Classier.NET.Parsing
         /// <inheritdoc/>
         public IEnumerator<Token> GetEnumerator()
         {
-            int lineNum = 0;
-
-            using (TextReader reader = this.source())
+            using (TextReader reader = this.source.Invoke())
             {
-                while (true)
+                StringBuilder builder = new StringBuilder();
+
+                while (reader.Peek() >= 0) //// TODO: Instead of going line by line, check for longest match at index 0 instead. This may use lots of memory though, but could be avoided by consuming bytes until a match is found, and by also using a StringBuilder instead of creating a new string instance every time.
                 {
-                    string line = reader.ReadLine();
-                    int linePos = 0;
-
-                    // Check if the end of the file was reached.
-                    if (line == null)
-                    {
-                        break;
-                    }
-
-                    // Find tokens from left to right, preferring longer tokens.
-                    while (line.Length > 0)
-                    {
-                        var matches = this.tokenDefinitions
-                            .Select(def => new { Definition = def, Length = def.GetTokenLength(line) })
-                            .Where(pair => pair.Length > 0);
-
-                        //// TODO: Should unknown token only extend until we find another match? Make method on definitions that also return the index of the match and pick the definition with the lowest index?
-                        // Gets the token definition with the longest match, and the length of the match.
-                        var match = matches.Any() ? matches.Aggregate((current, next) => next.Length > current.Length ? next : current) : new { Definition = (ITokenDefinition)new UnknownTokenDefinition(), line.Length };
-
-                        yield return new Token(line.Substring(0, match.Length), match.Definition); // TODO: Determine whether the line number and position should be included.
-                        line = line.Substring(match.Length);
-                        linePos += match.Length;
-                    }
-
-                    lineNum++;
+                    builder.Append((char)reader.Read());
                 }
             }
+
+            throw new NotImplementedException();
         }
 
         /// <inheritdoc/>

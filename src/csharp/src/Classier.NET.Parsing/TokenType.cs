@@ -36,14 +36,9 @@ namespace Classier.NET.Parsing
         CloseParen,
 
         /// <summary>
-        /// The token indicates the end of a multi-line comment.
+        /// The token is a comment.
         /// </summary>
-        CommentEnd,
-
-        /// <summary>
-        /// The token indicates the start of a multi-line comment.
-        /// </summary>
-        CommentStart,
+        Comment,
 
         /// <summary>
         /// The token is a period.
@@ -94,11 +89,6 @@ namespace Classier.NET.Parsing
         /// The token is a preprocessor directive.
         /// </summary>
         PreprocessorDir,
-
-        /// <summary>
-        /// The token is a single line comment.
-        /// </summary>
-        SingleLineComment,
 
         /// <summary>
         /// The token indicates the end of a statement (a semicolon).

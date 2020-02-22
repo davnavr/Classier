@@ -16,14 +16,13 @@ namespace Classier.NET.Parsing
     internal sealed class DefaultTokenCollection : IEnumerable<ITokenDefinition>
     {
         /// <inheritdoc/>
-        public IEnumerator<ITokenDefinition> GetEnumerator()
+        public IEnumerator<ITokenDefinition> GetEnumerator() // TODO: Make this a static property or field instead.
         {
             yield return new RegexTokenDefinition(TokenType.AccessModifier, "public|private");
             yield return new RegexTokenDefinition(TokenType.BinaryLiteral, "-?0[bB][01]([01_]*[01])?");
             yield return new RegexTokenDefinition(TokenType.CloseCurlyBracket, "}");
             yield return new RegexTokenDefinition(TokenType.CloseParen, "\\)");
-            yield return new RegexTokenDefinition(TokenType.CommentEnd, "\\/\\*");
-            yield return new RegexTokenDefinition(TokenType.CommentStart, "\\*\\/");
+            yield return new RegexTokenDefinition(TokenType.Comment, "(\\/\\/.*)|(\\/\\*[\\s\\S]*?\\*\\/)");
             yield return new RegexTokenDefinition(TokenType.Delimiter, "\\.");
             yield return new RegexTokenDefinition(TokenType.HexLiteral, "-?0[xX][0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?");
 
@@ -37,7 +36,6 @@ namespace Classier.NET.Parsing
             yield return new RegexTokenDefinition(TokenType.Operator, "(\\|\\|)|&&"); // Boolean operators
             yield return new RegexTokenDefinition(TokenType.ParamSeparator, ",");
             yield return new RegexTokenDefinition(TokenType.PreprocessorDir, "#[a-z]+");
-            yield return new RegexTokenDefinition(TokenType.SingleLineComment, "\\/\\/.*");
             yield return new RegexTokenDefinition(TokenType.StatementEnd, ";");
             yield return new RegexTokenDefinition(TokenType.StringLiteral, "\".*\"");
             yield return new RegexTokenDefinition(TokenType.Whitespace, "\\s+");
