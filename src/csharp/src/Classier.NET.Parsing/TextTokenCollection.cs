@@ -67,6 +67,11 @@ namespace Classier.NET.Parsing
                 while (reader.Peek() >= 0) //// TODO: Instead of going line by line, check for longest match at index 0 instead. This may use lots of memory though, but could be avoided by consuming bytes until a match is found, and by also using a StringBuilder instead of creating a new string instance every time.
                 {
                     builder.Append((char)reader.Read());
+                    string content = builder.ToString();
+
+                    var matches = TokenDefinitionDictionary
+                        .Select(pair => new { Type = pair.Key, Match = pair.Value.Match(content) })
+                        .Where(pair => pair.Match.Success);
                 }
             }
 
