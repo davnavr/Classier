@@ -20,6 +20,8 @@ namespace Classier.NET.Parsing.Tests
         [InlineData("() abstract{}", TokenType.OpenParen, TokenType.CloseParen, TokenType.Whitespace, TokenType.Keyword, TokenType.OpenCurlyBracket, TokenType.CloseCurlyBracket)]
         [InlineData("1+2\n/3", TokenType.NumberLiteral, TokenType.Operator, TokenType.NumberLiteral, TokenType.Operator, TokenType.NumberLiteral)]
         [InlineData("#if DEBUG // This is a comment", TokenType.PreprocessorDir, TokenType.Whitespace, TokenType.Identifier, TokenType.Whitespace, TokenType.SingleLineComment)]
+        [InlineData("/*test*/", TokenType.CommentStart, TokenType.Identifier, TokenType.CommentEnd)]
+        [InlineData(" \u0000 ", TokenType.Whitespace, TokenType.Unknown, TokenType.Whitespace)]
         //// TODO: Add test data for other things.
         public void TokensForClassierSourceAreValid(string source, params TokenType[] expectedTokenTypes)
         {
@@ -34,15 +36,15 @@ namespace Classier.NET.Parsing.Tests
         public void NoMatchAlwaysReturnsUnknownToken()
         {
             // Arrange
-            string content = "This is a test.";
-            ITokenDefinition definition = A.Fake<ITokenDefinition>();
-            A.CallTo(() => definition.GetTokenLength(content)).Returns(0);
+            const string Content = "\u0000\u0001"; // A string that no token definition will recognize.
 
             // Act
-            List<Token> tokenList = new TextTokenCollection(() => new StringReader(content), new ITokenDefinition[] { definition }).ToList();
+            List<Token> tokenList = new TextTokenCollection(() => new StringReader(Content)).ToList();
 
             // Assert
-            Assert.Equal(tokenList.First().ToString(), content);
+            Token token = Assert.Single(tokenList);
+            Assert.Equal(token.ToString(), Content);
+            Assert.Equal(TokenType.Unknown, token.TokenType);
         }
     }
 }

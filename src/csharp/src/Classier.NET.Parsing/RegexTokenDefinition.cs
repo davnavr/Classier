@@ -11,6 +11,7 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Creates tokens from a regular expression.
     /// </summary>
+    [Obsolete]
     internal class RegexTokenDefinition : ITokenDefinition
     {
         private readonly Regex expression;

@@ -8,6 +8,7 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Determines whether tokens can be created.
     /// </summary>
+    [System.Obsolete]
     public interface ITokenDefinition
     {
         /// <summary>

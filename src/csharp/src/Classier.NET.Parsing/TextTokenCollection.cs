@@ -10,17 +10,46 @@ namespace Classier.NET.Parsing
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Text;
+    using System.Text.RegularExpressions;
 
     /// <summary>
     /// Represents a collection of tokens originating from a <see cref="TextReader"/>.
     /// </summary>
     public class TextTokenCollection : IEnumerable<Token>
     {
-        private static readonly List<ITokenDefinition> DefaultTokenDefinitions = new DefaultTokenCollection().ToList();
+        private static readonly Dictionary<TokenType, Regex> TokenDefinitionDictionary = new Dictionary<TokenType, Regex>();
 
         private readonly Func<TextReader> source;
 
-        private readonly List<ITokenDefinition> tokenDefinitions;
+        static TextTokenCollection()
+        {
+            TokenDefinitionDictionary.Add(TokenType.AccessModifier, new Regex("public|private"));
+            TokenDefinitionDictionary.Add(TokenType.BinaryLiteral, new Regex("-?0[bB][01]([01_]*[01])?"));
+            TokenDefinitionDictionary.Add(TokenType.CloseCurlyBracket, new Regex("}"));
+            TokenDefinitionDictionary.Add(TokenType.CloseParen, new Regex("\\)"));
+            TokenDefinitionDictionary.Add(TokenType.CommentEnd, new Regex("\\*\\/"));
+            TokenDefinitionDictionary.Add(TokenType.CommentStart, new Regex("\\/\\*"));
+            TokenDefinitionDictionary.Add(TokenType.Delimiter, new Regex("\\."));
+            TokenDefinitionDictionary.Add(TokenType.HexLiteral, new Regex("-?0[xX][0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?"));
+            TokenDefinitionDictionary.Add(TokenType.Keyword, new Regex(
+                "class|extends|implements|interface|namespace|" +
+                "abstract|get|mutable|override|set|var|virtual|void|" +
+                "catch|finally|if|new|null|super|this|try|using|while"));
+            TokenDefinitionDictionary.Add(TokenType.NumberLiteral, new Regex("-?([0-9]([0-9_]*[0-9])?)|([0-9]?\\.[0-9]([0-9_]*[0-9])?)"));
+            TokenDefinitionDictionary.Add(TokenType.OpenCurlyBracket, new Regex("{"));
+            TokenDefinitionDictionary.Add(TokenType.OpenParen, new Regex("\\("));
+            TokenDefinitionDictionary.Add(TokenType.Operator, new Regex("\\+|-|\\*|\\/|%|=|<|>|(\\|\\|)|&&")); // TODO: Add other operators.
+            TokenDefinitionDictionary.Add(TokenType.ParamSeparator, new Regex(","));
+            TokenDefinitionDictionary.Add(TokenType.PreprocessorDir, new Regex("#[a-z]+"));
+            TokenDefinitionDictionary.Add(TokenType.SingleLineComment, new Regex("\\/\\/.*"));
+            TokenDefinitionDictionary.Add(TokenType.StatementEnd, new Regex(";"));
+            TokenDefinitionDictionary.Add(TokenType.StringLiteral, new Regex("\".*\""));
+            TokenDefinitionDictionary.Add(TokenType.Whitespace, new Regex("\\s+"));
+
+            // Lower priority tokens, the lexer will ignore the ones below if matches are found above.
+            TokenDefinitionDictionary.Add(TokenType.Identifier, new Regex("[a-zA-Z][a-zA-Z0-9]*"));
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TextTokenCollection"/> class.
@@ -28,30 +57,17 @@ namespace Classier.NET.Parsing
         /// <param name="source">Provides the <see cref="TextReader"/> used to read the tokens.</param>
         /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
         public TextTokenCollection(Func<TextReader> source)
-            : this(source, DefaultTokenDefinitions)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TextTokenCollection"/> class with the specified token definitions.
-        /// </summary>
-        /// <param name="source">Provides the <see cref="TextReader"/> used to read the tokens.</param>
-        /// <param name="tokenDefinitions">A collection containing the token definitions used to generate the tokens.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="tokenDefinitions"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException">The <paramref name="tokenDefinitions"/> collection is empty.</exception>
-        internal TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition> tokenDefinitions)
         {
             this.source = source ?? throw new ArgumentNullException(nameof(source));
-            this.tokenDefinitions = tokenDefinitions.Any() ? tokenDefinitions.ToList() : throw new ArgumentException("The token definition collection cannot be empty.", nameof(tokenDefinitions));
         }
 
         /// <inheritdoc/>
         public IEnumerator<Token> GetEnumerator()
         {
-            int lineNum = 0;
-
             using (TextReader reader = this.source())
             {
+                int lineNum = 0;
+
                 while (true)
                 {
                     string line = reader.ReadLine();
@@ -66,17 +82,33 @@ namespace Classier.NET.Parsing
                     // Find tokens from left to right, preferring longer tokens.
                     while (line.Length > 0)
                     {
-                        var matches = this.tokenDefinitions
-                            .Select(def => new { Definition = def, Length = def.GetTokenLength(line) })
-                            .Where(pair => pair.Length > 0);
+                        var matches = TokenDefinitionDictionary
+                            .Select(pair => new { Type = pair.Key, Match = pair.Value.Match(line) })
+                            .Where(def => def.Match.Success);
 
-                        //// TODO: Should unknown token only extend until we find another match? Make method on definitions that also return the index of the match and pick the definition with the lowest index?
-                        // Gets the token definition with the longest match, and the length of the match.
-                        var match = matches.Any() ? matches.Aggregate((current, next) => next.Length > current.Length ? next : current) : new { Definition = (ITokenDefinition)new UnknownTokenDefinition(), line.Length };
+                        // No matches were found in this line at all.
+                        if (!matches.Any())
+                        {
+                            yield return new Token(line, lineNum, default);
+                            line = string.Empty;
+                            break;
+                        }
 
-                        yield return new Token(line.Substring(0, match.Length), match.Definition); // TODO: Determine whether the line number and position should be included.
-                        line = line.Substring(match.Length);
-                        linePos += match.Length;
+                        int minIndex = matches.Select(def => def.Match.Index).Min();
+                        var match = matches
+                            .Where(def => def.Match.Index == minIndex)
+                            .Aggregate((current, next) => next.Match.Length > current.Match.Length ? next : current);
+
+                        // Unknown token in between.
+                        if (minIndex > 0)
+                        {
+                            yield return new Token(line.Substring(0, minIndex), lineNum, default);
+                        }
+
+                        int totalLength = minIndex + match.Match.Length;
+                        yield return new Token(line.Substring(minIndex, match.Match.Length), lineNum, match.Type);
+                        line = line.Substring(totalLength);
+                        linePos += totalLength;
                     }
 
                     lineNum++;

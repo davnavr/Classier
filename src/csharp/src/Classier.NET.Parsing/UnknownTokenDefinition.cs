@@ -11,6 +11,7 @@ namespace Classier.NET.Parsing
     /// The token definition used when no other token definition had a match.
     /// This class cannot be inherited.
     /// </summary>
+    [Obsolete]
     internal sealed class UnknownTokenDefinition : ITokenDefinition
     {
         /// <inheritdoc/>
