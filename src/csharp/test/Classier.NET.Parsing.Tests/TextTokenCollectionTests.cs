@@ -34,15 +34,15 @@ namespace Classier.NET.Parsing.Tests
         public void NoMatchAlwaysReturnsUnknownToken()
         {
             // Arrange
-            string content = "This is a test.";
-            ITokenDefinition definition = A.Fake<ITokenDefinition>();
-            A.CallTo(() => definition.GetTokenLength(content)).Returns(0);
+            const string Content = "\u0000\u0001"; // A string that no token definition will recognize.
 
             // Act
-            List<Token> tokenList = new TextTokenCollection(() => new StringReader(content), new ITokenDefinition[] { definition }).ToList();
+            List<Token> tokenList = new TextTokenCollection(() => new StringReader(Content)).ToList();
 
             // Assert
-            Assert.Equal(tokenList.First().ToString(), content);
+            Token token = Assert.Single(tokenList);
+            Assert.Equal(token.ToString(), Content);
+            Assert.Equal(TokenType.Unknown, token.TokenType);
         }
     }
 }

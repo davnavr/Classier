@@ -11,17 +11,16 @@ namespace Classier.NET.Parsing
     using System.IO;
     using System.Linq;
     using System.Text;
+    using System.Text.RegularExpressions;
 
     /// <summary>
     /// Represents a collection of tokens originating from a <see cref="TextReader"/>.
     /// </summary>
     public class TextTokenCollection : IEnumerable<Token>
     {
-        private static readonly List<ITokenDefinition> DefaultTokenDefinitions = new DefaultTokenCollection().ToList();
+        private static readonly Dictionary<TokenType, Regex> TokenDefinitionDictionary;
 
         private readonly Func<TextReader> source;
-
-        private readonly List<ITokenDefinition> tokenDefinitions;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TextTokenCollection"/> class.
@@ -29,21 +28,8 @@ namespace Classier.NET.Parsing
         /// <param name="source">Provides the <see cref="TextReader"/> used to read the tokens.</param>
         /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
         public TextTokenCollection(Func<TextReader> source)
-            : this(source, DefaultTokenDefinitions)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TextTokenCollection"/> class with the specified token definitions.
-        /// </summary>
-        /// <param name="source">Provides the <see cref="TextReader"/> used to read the tokens.</param>
-        /// <param name="tokenDefinitions">A collection containing the token definitions used to generate the tokens.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="tokenDefinitions"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException">The <paramref name="tokenDefinitions"/> collection is empty.</exception>
-        internal TextTokenCollection(Func<TextReader> source, IEnumerable<ITokenDefinition> tokenDefinitions)
         {
             this.source = source ?? throw new ArgumentNullException(nameof(source));
-            this.tokenDefinitions = tokenDefinitions.Any() ? tokenDefinitions.ToList() : throw new ArgumentException("The token definition collection cannot be empty.", nameof(tokenDefinitions));
         }
 
         /// <inheritdoc/>

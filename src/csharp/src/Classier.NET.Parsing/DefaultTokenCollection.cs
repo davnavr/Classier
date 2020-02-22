@@ -13,6 +13,7 @@ namespace Classier.NET.Parsing
     /// Represents the default collection of the token definitions.
     /// This class cannot be inherited.
     /// </summary>
+    [Obsolete]
     internal sealed class DefaultTokenCollection : IEnumerable<ITokenDefinition>
     {
         /// <inheritdoc/>
