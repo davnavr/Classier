@@ -22,6 +22,31 @@ namespace Classier.NET.Parsing
 
         private readonly Func<TextReader> source;
 
+        static TextTokenCollection()
+        {
+            TokenDefinitionDictionary.Add(TokenType.AccessModifier, new Regex("public|private"));
+            TokenDefinitionDictionary.Add(TokenType.BinaryLiteral, new Regex("-?0[bB][01]([01_]*[01])?"));
+            TokenDefinitionDictionary.Add(TokenType.CloseCurlyBracket, new Regex("}"));
+            TokenDefinitionDictionary.Add(TokenType.CloseParen, new Regex("\\)"));
+            TokenDefinitionDictionary.Add(TokenType.Comment, new Regex("(\\/\\/.*)|(\\/\\*[\\s\\S]*?\\*\\/)"));
+            TokenDefinitionDictionary.Add(TokenType.Delimiter, new Regex("\\."));
+            TokenDefinitionDictionary.Add(TokenType.HexLiteral, new Regex("-?0[xX][0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?"));
+            TokenDefinitionDictionary.Add(TokenType.Identifier, new Regex("[a-zA-Z][a-zA-Z0-9]*"));
+            TokenDefinitionDictionary.Add(TokenType.Keyword, new Regex("class|extends|implements|interface|namespace"));
+            TokenDefinitionDictionary.Add(TokenType.Keyword, new Regex("abstract|get|mutable|override|set|var|virtual|void"));
+            TokenDefinitionDictionary.Add(TokenType.Keyword, new Regex("catch|finally|if|new|null|super|this|try|using|while"));
+            TokenDefinitionDictionary.Add(TokenType.NumberLiteral, new Regex("-?([0-9]([0-9_]*[0-9])?)|([0-9]?\\.[0-9]([0-9_]*[0-9])?)"));
+            TokenDefinitionDictionary.Add(TokenType.OpenCurlyBracket, new Regex("{"));
+            TokenDefinitionDictionary.Add(TokenType.OpenParen, new Regex("\\("));
+            TokenDefinitionDictionary.Add(TokenType.Operator, new Regex("\\+|-|\\*|\\/|%|=|<|>")); // TODO: Add other operators.
+            TokenDefinitionDictionary.Add(TokenType.Operator, new Regex("(\\|\\|)|&&")); // Boolean operators
+            TokenDefinitionDictionary.Add(TokenType.ParamSeparator, new Regex(","));
+            TokenDefinitionDictionary.Add(TokenType.PreprocessorDir, new Regex("#[a-z]+"));
+            TokenDefinitionDictionary.Add(TokenType.StatementEnd, new Regex(";"));
+            TokenDefinitionDictionary.Add(TokenType.StringLiteral, new Regex("\".*\""));
+            TokenDefinitionDictionary.Add(TokenType.Whitespace, new Regex("\\s+"));
+        }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="TextTokenCollection"/> class.
         /// </summary>
