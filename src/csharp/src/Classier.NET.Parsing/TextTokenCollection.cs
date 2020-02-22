@@ -28,10 +28,10 @@ namespace Classier.NET.Parsing
             TokenDefinitionDictionary.Add(TokenType.BinaryLiteral, new Regex("-?0[bB][01]([01_]*[01])?"));
             TokenDefinitionDictionary.Add(TokenType.CloseCurlyBracket, new Regex("}"));
             TokenDefinitionDictionary.Add(TokenType.CloseParen, new Regex("\\)"));
-            TokenDefinitionDictionary.Add(TokenType.Comment, new Regex("(\\/\\/.*)|(\\/\\*[\\s\\S]*?\\*\\/)")); // TODO: Separate comments into two types of tokens.
+            TokenDefinitionDictionary.Add(TokenType.CommentEnd, new Regex("\\*\\/"));
+            TokenDefinitionDictionary.Add(TokenType.CommentStart, new Regex("\\/\\*"));
             TokenDefinitionDictionary.Add(TokenType.Delimiter, new Regex("\\."));
             TokenDefinitionDictionary.Add(TokenType.HexLiteral, new Regex("-?0[xX][0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?"));
-            TokenDefinitionDictionary.Add(TokenType.Identifier, new Regex("[a-zA-Z][a-zA-Z0-9]*"));
             TokenDefinitionDictionary.Add(TokenType.Keyword, new Regex(
                 "class|extends|implements|interface|namespace|" +
                 "abstract|get|mutable|override|set|var|virtual|void|" +
@@ -42,9 +42,13 @@ namespace Classier.NET.Parsing
             TokenDefinitionDictionary.Add(TokenType.Operator, new Regex("\\+|-|\\*|\\/|%|=|<|>|(\\|\\|)|&&")); // TODO: Add other operators.
             TokenDefinitionDictionary.Add(TokenType.ParamSeparator, new Regex(","));
             TokenDefinitionDictionary.Add(TokenType.PreprocessorDir, new Regex("#[a-z]+"));
+            TokenDefinitionDictionary.Add(TokenType.SingleLineComment, new Regex("\\/\\/.*"));
             TokenDefinitionDictionary.Add(TokenType.StatementEnd, new Regex(";"));
             TokenDefinitionDictionary.Add(TokenType.StringLiteral, new Regex("\".*\""));
             TokenDefinitionDictionary.Add(TokenType.Whitespace, new Regex("\\s+"));
+
+            // Lower priority tokens, the lexer will ignore the ones below if matches are found above.
+            TokenDefinitionDictionary.Add(TokenType.Identifier, new Regex("[a-zA-Z][a-zA-Z0-9]*"));
         }
 
         /// <summary>
