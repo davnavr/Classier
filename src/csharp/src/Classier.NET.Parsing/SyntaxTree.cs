@@ -15,7 +15,7 @@ namespace Classier.NET.Parsing
     /// </summary>
     public class SyntaxTree : IReadOnlyCollection<ISyntaxNode>
     {
-        private readonly List<Token> tokenList;
+        private readonly TokenList tokenList;
 
         private readonly List<string> symbols;
 
@@ -51,7 +51,7 @@ namespace Classier.NET.Parsing
         public SyntaxTree(IEnumerable<Token> tokens, IEnumerable<string> symbols)
         {
             this.nodeEnumerator = new Lazy<IEnumerator<ISyntaxNode>>(this.GetEnumerator);
-            this.tokenList = tokens?.ToList() ?? throw new ArgumentNullException(nameof(tokens));
+            this.tokenList = new TokenList(tokens);
             this.symbols = symbols?.ToList() ?? throw new ArgumentNullException(nameof(symbols));
             throw new NotImplementedException();
         }
@@ -81,10 +81,23 @@ namespace Classier.NET.Parsing
                 return this.nodeEnumerator.Value;
             }
 
+            List<Token> tokens = new List<Token>(this.tokenList);
+
+            while (tokens.Count > 0)
+            {
+                throw new NotImplementedException();
+            }
+
             throw new NotImplementedException();
         }
 
         /// <inheritdoc/>
         IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+
+        /// <summary>
+        /// Returns the content of the <see cref="SyntaxTree"/>.
+        /// </summary>
+        /// <returns>A <see cref="string"/> containing the content of each token in the syntax tree.</returns>
+        public sealed override string ToString() => this.tokenList.ToString();
     }
 }

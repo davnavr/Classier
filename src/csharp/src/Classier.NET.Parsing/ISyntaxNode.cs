@@ -10,7 +10,7 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Represents a node in the syntax tree.
     /// </summary>
-    public interface ISyntaxNode : IReadOnlyList<Token>
+    public interface ISyntaxNode : IReadOnlyCollection<Token>
     {
     }
 }
