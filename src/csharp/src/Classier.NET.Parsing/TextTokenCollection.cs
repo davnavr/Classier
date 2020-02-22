@@ -28,7 +28,7 @@ namespace Classier.NET.Parsing
             TokenDefinitionDictionary.Add(TokenType.BinaryLiteral, new Regex("-?0[bB][01]([01_]*[01])?"));
             TokenDefinitionDictionary.Add(TokenType.CloseCurlyBracket, new Regex("}"));
             TokenDefinitionDictionary.Add(TokenType.CloseParen, new Regex("\\)"));
-            TokenDefinitionDictionary.Add(TokenType.Comment, new Regex("(\\/\\/.*)|(\\/\\*[\\s\\S]*?\\*\\/)"));
+            TokenDefinitionDictionary.Add(TokenType.Comment, new Regex("(\\/\\/.*)|(\\/\\*[\\s\\S]*?\\*\\/)")); // TODO: Separate comments into two types of tokens.
             TokenDefinitionDictionary.Add(TokenType.Delimiter, new Regex("\\."));
             TokenDefinitionDictionary.Add(TokenType.HexLiteral, new Regex("-?0[xX][0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?"));
             TokenDefinitionDictionary.Add(TokenType.Identifier, new Regex("[a-zA-Z][a-zA-Z0-9]*"));
@@ -60,22 +60,56 @@ namespace Classier.NET.Parsing
         /// <inheritdoc/>
         public IEnumerator<Token> GetEnumerator()
         {
-            using (TextReader reader = this.source.Invoke())
+            using (TextReader reader = this.source())
             {
-                StringBuilder builder = new StringBuilder();
+                int lineNum = 0;
 
-                while (reader.Peek() >= 0) //// TODO: Instead of going line by line, check for longest match at index 0 instead. This may use lots of memory though, but could be avoided by consuming bytes until a match is found, and by also using a StringBuilder instead of creating a new string instance every time.
+                while (true)
                 {
-                    builder.Append((char)reader.Read());
-                    string content = builder.ToString();
+                    string line = reader.ReadLine();
+                    int linePos = 0;
 
-                    var matches = TokenDefinitionDictionary
-                        .Select(pair => new { Type = pair.Key, Match = pair.Value.Match(content) })
-                        .Where(pair => pair.Match.Success);
+                    // Check if the end of the file was reached.
+                    if (line == null)
+                    {
+                        break;
+                    }
+
+                    // Find tokens from left to right, preferring longer tokens.
+                    while (line.Length > 0)
+                    {
+                        var matches = TokenDefinitionDictionary
+                            .Select(pair => new { Type = pair.Key, Match = pair.Value.Match(line) })
+                            .Where(def => def.Match.Success);
+
+                        // No matches were found in this line at all.
+                        if (!matches.Any())
+                        {
+                            yield return new Token(line, lineNum, default);
+                            line = string.Empty;
+                            break;
+                        }
+
+                        int minIndex = matches.Select(def => def.Match.Index).Min();
+                        var match = matches
+                            .Where(def => def.Match.Index == minIndex)
+                            .Aggregate((current, next) => next.Match.Length > current.Match.Length ? next : current);
+
+                        // Unknown token in between.
+                        if (minIndex > 0)
+                        {
+                            yield return new Token(line.Substring(0, minIndex), lineNum, default);
+                            line = line.Substring(minIndex + 1);
+                        }
+
+                        yield return new Token(line.Substring(minIndex, match.Match.Length), lineNum, match.Type);
+                        line = line.Substring(0, match.Match.Length);
+                        linePos += match.Match.Length;
+                    }
+
+                    lineNum++;
                 }
             }
-
-            throw new NotImplementedException();
         }
 
         /// <inheritdoc/>
