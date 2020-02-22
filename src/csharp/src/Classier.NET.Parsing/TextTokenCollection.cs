@@ -103,7 +103,7 @@ namespace Classier.NET.Parsing
                         }
 
                         yield return new Token(line.Substring(minIndex, match.Match.Length), lineNum, match.Type);
-                        line = line.Substring(0, match.Match.Length);
+                        line = line.Substring(match.Match.Length);
                         linePos += match.Match.Length;
                     }
 
