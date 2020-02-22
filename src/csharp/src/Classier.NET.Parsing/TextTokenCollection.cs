@@ -99,12 +99,12 @@ namespace Classier.NET.Parsing
                         if (minIndex > 0)
                         {
                             yield return new Token(line.Substring(0, minIndex), lineNum, default);
-                            line = line.Substring(minIndex + 1);
                         }
 
+                        int totalLength = minIndex + match.Match.Length;
                         yield return new Token(line.Substring(minIndex, match.Match.Length), lineNum, match.Type);
-                        line = line.Substring(match.Match.Length);
-                        linePos += match.Match.Length;
+                        line = line.Substring(totalLength);
+                        linePos += totalLength;
                     }
 
                     lineNum++;
