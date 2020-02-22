@@ -6,15 +6,20 @@
 namespace Classier.NET.Parsing
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
 
     /// <summary>
     /// Represents a single Classier source code file.
     /// </summary>
-    public class SyntaxTree
+    public class SyntaxTree : IReadOnlyCollection<ISyntaxNode>
     {
+        private readonly List<Token> tokenList;
+
         private readonly List<string> symbols;
+
+        private readonly Lazy<IEnumerator<ISyntaxNode>> nodeEnumerator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SyntaxTree"/> class from the specfiied tokens.
@@ -43,8 +48,10 @@ namespace Classier.NET.Parsing
         /// <param name="tokens">The tokens in the source code file.</param>
         /// <param name="symbols">A collection containing the conditional compilation symbols.</param>
         /// <exception cref="ArgumentNullException"><paramref name="tokens"/> or <paramref name="symbols"/> is <see langword="null"/>.</exception>
-        public SyntaxTree(IEnumerable<Token> tokens, IEnumerable<string> symbols) // TODO: Make enumerator class that wraps an enumerator for tokens and skips whitespace tokens and has other functionality.
+        public SyntaxTree(IEnumerable<Token> tokens, IEnumerable<string> symbols)
         {
+            this.nodeEnumerator = new Lazy<IEnumerator<ISyntaxNode>>(this.GetEnumerator);
+            this.tokenList = tokens?.ToList() ?? throw new ArgumentNullException(nameof(tokens));
             this.symbols = symbols?.ToList() ?? throw new ArgumentNullException(nameof(symbols));
             throw new NotImplementedException();
         }
@@ -60,5 +67,24 @@ namespace Classier.NET.Parsing
             : this(new TextTokenCollection(() => new System.IO.StreamReader(path, encoding)), symbols)
         {
         }
+
+        /// <summary>
+        /// Gets the total number of syntax nodes in this syntax tree.
+        /// </summary>
+        public int Count => throw new NotImplementedException();
+
+        /// <inheritdoc/>
+        public IEnumerator<ISyntaxNode> GetEnumerator()
+        {
+            if (this.nodeEnumerator.IsValueCreated)
+            {
+                return this.nodeEnumerator.Value;
+            }
+
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc/>
+        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
     }
 }
