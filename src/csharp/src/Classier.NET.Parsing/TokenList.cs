@@ -18,7 +18,12 @@ namespace Classier.NET.Parsing
     {
         private readonly List<Token> list;
 
-        public TokenList(IEnumerable<Token> tokens)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TokenList"/> class with the specified tokens.
+        /// </summary>
+        /// <param name="tokens">The tokens in the list.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="tokens"/> is <see langword="null"/>.</exception>
+        internal TokenList(IEnumerable<Token> tokens)
         {
             this.list = tokens?.ToList() ?? throw new ArgumentNullException(nameof(tokens));
         }
@@ -28,18 +33,42 @@ namespace Classier.NET.Parsing
         /// </summary>
         public int Count => this.list.Count;
 
+        /// <summary>
+        /// Gets the token at the specified index.
+        /// </summary>
+        /// <param name="index">The index of the token to retrieve.</param>
+        /// <returns>The <see cref="Token"/> at the specified index.</returns>
         public Token this[int index] => this.list[index];
 
         /// <inheritdoc/>
-        public IEnumerator<Token> GetEnumerator() => this.list.GetEnumerator(); // TODO: Should the tokens be filtered?
+        public IEnumerator<Token> GetEnumerator() => this.list.GetEnumerator();
 
         /// <summary>
         /// Returns the content of all of the tokens in the <see cref="TokenList"/>.
         /// </summary>
-        /// <returns>A <see cref="string"/> containing the content of all of the tokens in the list.</returns>
+        /// <returns>A <see cref="string"/> containing the content of all of the tokens in the list; or an empty string if the token list is empty.</returns>
         public override string ToString()
         {
-            throw new NotImplementedException();
+            if (this.list.Count <= 0)
+            {
+                return string.Empty;
+            }
+
+            var builder = new System.Text.StringBuilder();
+            int lineNumber = this.list.First().LineNumber;
+
+            foreach (Token token in this.list)
+            {
+                if (token.LineNumber > lineNumber)
+                {
+                    builder.Append(Environment.NewLine);
+                    lineNumber = token.LineNumber;
+                }
+
+                builder.Append(token.ToString());
+            }
+
+            return builder.ToString();
         }
 
         /// <inheritdoc/>
