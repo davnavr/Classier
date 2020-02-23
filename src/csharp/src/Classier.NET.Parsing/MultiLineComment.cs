@@ -15,8 +15,6 @@ namespace Classier.NET.Parsing
     /// </summary>
     public class MultiLineComment : ISyntaxNode
     {
-        private readonly TokenList tokenList;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiLineComment"/> class.
         /// </summary>
@@ -33,30 +31,26 @@ namespace Classier.NET.Parsing
             list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentStart));
             list.AddRange(tokens.TakeWhile(tok => tok.TokenType != TokenType.CommentEnd));
             list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentEnd));
-            this.tokenList = new TokenList(list);
+            this.Tokens = new TokenList(list);
         }
 
         /// <summary>
         /// Gets the token indicating the start of the multi-line comment.
         /// </summary>
-        public Token StartToken => this.tokenList[0];
+        public Token StartToken => this.Tokens[0];
 
         /// <summary>
         /// Gets the token indicating the end of the multi-line comment.
         /// </summary>
-        public Token EndToken => this.tokenList[this.tokenList.Count - 1];
+        public Token EndToken => this.Tokens[this.Tokens.Count - 1];
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Token> Tokens { get; }
 
         /// <summary>
-        /// Gets the number of tokens that make up this multi-line comment.
+        /// Gets the content of the multi-line comment.
         /// </summary>
-        public int Count => throw new NotImplementedException();
-
-        /// <inheritdoc/>
-        public IEnumerator<Token> GetEnumerator() => this.tokenList.GetEnumerator();
-
-        public sealed override string ToString() => this.tokenList.ToString();
-
-        /// <inheritdoc/>
-        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+        /// <returns>A <see cref="string"/> containing content of the multi-line comment, along with the symbols indicating the start and the end of the comment.</returns>
+        public sealed override string ToString() => this.Tokens.ToString();
     }
 }

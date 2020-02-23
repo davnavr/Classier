@@ -27,8 +27,9 @@ namespace Classier.NET.Parsing.Tests
             var ws = new Whitespace(tokens);
 
             // Assert
-            Assert.Equal(tokenCount, ws.Count);
+            Assert.Equal(tokenCount, ws.Tokens.Count);
             Assert.Equal(text, ws.ToString());
+            Assert.All(ws.Tokens, token => Assert.True(token.TokenType == TokenType.Whitespace));
         }
     }
 }
