@@ -15,9 +15,11 @@ namespace Classier.NET.Parsing.Tests
     {
         [Theory]
         [InlineData("    ", 1)]
-        [InlineData("    \t ", 1)]
-        [InlineData("  \n  ", 2)]
-        [InlineData("  \r\n  ", 2)]
+        [InlineData("   a ", 1)]
+        [InlineData("   \t ", 1)]
+        [InlineData(" \n", 1)]
+        [InlineData("      \n  ", 2)]
+        [InlineData("   \r\n  ", 2)]
         public void WhitespaceFromTokensIsValid(string text, int tokenCount)
         {
             // Arrange

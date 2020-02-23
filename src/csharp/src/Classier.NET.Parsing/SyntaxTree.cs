@@ -12,9 +12,8 @@ namespace Classier.NET.Parsing
 
     /// <summary>
     /// Represents a single Classier source code file.
-    /// This class cannot be inherited.
     /// </summary>
-    public sealed class SyntaxTree : ISyntaxNode
+    public class SyntaxTree : ISyntaxNode
     {
         private readonly List<string> symbols;
 
@@ -78,6 +77,6 @@ namespace Classier.NET.Parsing
         /// Returns the content of the <see cref="SyntaxTree"/>.
         /// </summary>
         /// <returns>A <see cref="string"/> containing the content of each token in the syntax tree.</returns>
-        public override string ToString() => this.Tokens.ToString();
+        public sealed override string ToString() => this.Tokens.ToString();
     }
 }

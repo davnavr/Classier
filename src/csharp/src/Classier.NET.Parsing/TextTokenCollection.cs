@@ -20,7 +20,7 @@ namespace Classier.NET.Parsing
     {
         private static readonly Dictionary<TokenType, Regex> TokenDefinitionDictionary = new Dictionary<TokenType, Regex>();
 
-        private readonly Func<TextReader> source;
+        private readonly TextLineCollection lines;
 
         static TextTokenCollection()
         {
@@ -58,19 +58,20 @@ namespace Classier.NET.Parsing
         /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
         public TextTokenCollection(Func<TextReader> source)
         {
-            this.source = source ?? throw new ArgumentNullException(nameof(source));
+            this.lines = new TextLineCollection(source);
         }
 
         /// <inheritdoc/>
         public IEnumerator<Token> GetEnumerator()
         {
+            /*
             using (TextReader reader = this.source())
             {
                 int lineNum = 0;
 
                 while (true)
                 {
-                    string line = reader.ReadLine();
+                    string line = reader.ReadLine(); // TODO: Make custom reader that reads a line, and includes the newline chars.
                     int linePos = 0;
 
                     // Check if the end of the file was reached.
@@ -114,6 +115,7 @@ namespace Classier.NET.Parsing
                     lineNum++;
                 }
             }
+            */
         }
 
         /// <inheritdoc/>
