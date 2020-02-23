@@ -12,14 +12,11 @@ namespace Classier.NET.Parsing
 
     /// <summary>
     /// Represents a single Classier source code file.
+    /// This class cannot be inherited.
     /// </summary>
-    public class SyntaxTree : IReadOnlyCollection<ISyntaxNode>
+    public sealed class SyntaxTree : ISyntaxNode
     {
-        private readonly TokenList tokenList;
-
         private readonly List<string> symbols;
-
-        private readonly Lazy<IEnumerator<ISyntaxNode>> nodeEnumerator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SyntaxTree"/> class from the specfiied tokens.
@@ -50,9 +47,8 @@ namespace Classier.NET.Parsing
         /// <exception cref="ArgumentNullException"><paramref name="tokens"/> or <paramref name="symbols"/> is <see langword="null"/>.</exception>
         public SyntaxTree(IEnumerable<Token> tokens, IEnumerable<string> symbols)
         {
-            this.nodeEnumerator = new Lazy<IEnumerator<ISyntaxNode>>(this.GetEnumerator);
-            this.tokenList = new TokenList(tokens);
             this.symbols = symbols?.ToList() ?? throw new ArgumentNullException(nameof(symbols));
+            this.Tokens = new TokenList(tokens);
             throw new NotImplementedException();
         }
 
@@ -69,35 +65,19 @@ namespace Classier.NET.Parsing
         }
 
         /// <summary>
-        /// Gets the total number of syntax nodes in this syntax tree.
+        /// Gets a list containing the tokens in this syntax tree.
         /// </summary>
-        public int Count => throw new NotImplementedException();
+        public IReadOnlyList<Token> Tokens { get; }
 
-        /// <inheritdoc/>
-        public IEnumerator<ISyntaxNode> GetEnumerator()
-        {
-            if (this.nodeEnumerator.IsValueCreated)
-            {
-                return this.nodeEnumerator.Value;
-            }
-
-            List<Token> tokens = new List<Token>(this.tokenList);
-
-            while (tokens.Count > 0)
-            {
-                throw new NotImplementedException();
-            }
-
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc/>
-        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+        /// <summary>
+        /// Gets a list containing the nodes in this syntax tree.
+        /// </summary>
+        public IReadOnlyList<ISyntaxNode> Nodes => throw new NotImplementedException();
 
         /// <summary>
         /// Returns the content of the <see cref="SyntaxTree"/>.
         /// </summary>
         /// <returns>A <see cref="string"/> containing the content of each token in the syntax tree.</returns>
-        public sealed override string ToString() => this.tokenList.ToString();
+        public override string ToString() => this.Tokens.ToString();
     }
 }

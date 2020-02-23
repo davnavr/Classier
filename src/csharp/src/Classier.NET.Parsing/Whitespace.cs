@@ -29,6 +29,11 @@ namespace Classier.NET.Parsing
         public IReadOnlyList<Token> Tokens { get; }
 
         /// <summary>
+        /// Gets an empty list of nodes.
+        /// </summary>
+        IReadOnlyList<ISyntaxNode> ISyntaxNode.Nodes { get; } = new List<ISyntaxNode>();
+
+        /// <summary>
         /// Returns the content of this <see cref="Whitespace"/> node.
         /// </summary>
         /// <returns>A <see cref="string"/> containing the whitespace.</returns>

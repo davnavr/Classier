@@ -48,6 +48,11 @@ namespace Classier.NET.Parsing
         public IReadOnlyList<Token> Tokens { get; }
 
         /// <summary>
+        /// Gets an empty list.
+        /// </summary>
+        IReadOnlyList<ISyntaxNode> ISyntaxNode.Nodes { get; } = new List<ISyntaxNode>();
+
+        /// <summary>
         /// Gets the content of the multi-line comment.
         /// </summary>
         /// <returns>A <see cref="string"/> containing content of the multi-line comment, along with the symbols indicating the start and the end of the comment.</returns>

@@ -16,5 +16,10 @@ namespace Classier.NET.Parsing
         /// Gets the tokens that make up this node.
         /// </summary>
         IReadOnlyList<Token> Tokens { get; }
+
+        /// <summary>
+        /// Gets a list containing the child nodes of this node.
+        /// </summary>
+        IReadOnlyList<ISyntaxNode> Nodes { get; }
     }
 }
