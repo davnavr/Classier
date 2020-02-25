@@ -10,6 +10,7 @@ namespace Classier.NET.Parsing
     using System.Collections.Generic;
     using System.IO;
     using System.Text;
+    using System.Text.RegularExpressions;
 
     /// <summary>
     /// Represents a collection of lines in a <see cref="TextReader"/>.
@@ -17,6 +18,8 @@ namespace Classier.NET.Parsing
     /// </summary>
     internal sealed class TextLineCollection : IEnumerable<string>
     {
+        private static readonly Regex NewlineRegex = new Regex("(\\r|\\n|\\r\\n)$");
+
         private readonly Func<TextReader> source;
 
         /// <summary>
@@ -42,10 +45,13 @@ namespace Classier.NET.Parsing
                 {
                     builder.Append((char)reader.Read());
 
-                    // Either the last character has been read, or the next character is not a newline character
-                    if (reader.Peek() < 0 || (IsNewLine(builder[builder.Length - 1]) && !IsNewLine((char)reader.Peek())))
+                    int nextChar = reader.Peek();
+                    string current = builder.ToString();
+
+                    // Either the last character has been read, or the line ends in a newline character.
+                    if (nextChar < 0 || (!IsNewLine((char)nextChar) && NewlineRegex.IsMatch(current))) //// TODO: Fix problem where '\r\n\n' is seen as one newline.
                     {
-                        yield return builder.ToString();
+                        yield return current;
                         builder = new StringBuilder();
                     }
                 }
