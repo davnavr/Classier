@@ -18,7 +18,7 @@ namespace Classier.NET.Parsing
     /// </summary>
     internal sealed class TextLineCollection : IEnumerable<string>
     {
-        private static readonly Regex NewlineRegex = new Regex("(\\r|\\n|\\r\\n)$");
+        private static readonly Regex NewlineRegex = new Regex("(\\r.|\\n.|\\r\\n)$");
 
         private readonly Func<TextReader> source;
 
@@ -45,11 +45,11 @@ namespace Classier.NET.Parsing
                 {
                     builder.Append((char)reader.Read());
 
-                    int nextChar = reader.Peek();
+                    int next = reader.Peek();
                     string current = builder.ToString();
 
-                    // Either the last character has been read, or the line ends in a newline character.
-                    if (nextChar < 0 || (!IsNewLine((char)nextChar) && NewlineRegex.IsMatch(current))) //// TODO: Fix problem where '\r\n\n' is seen as one newline.
+                    // Either the last character has been read, or the line ends in a newline.
+                    if (next < 0 || NewlineRegex.IsMatch(current))
                     {
                         yield return current;
                         builder = new StringBuilder();
@@ -60,10 +60,5 @@ namespace Classier.NET.Parsing
 
         /// <inheritdoc/>
         IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
-
-        private static bool IsNewLine(char c)
-        {
-            return c == '\r' || c == '\n';
-        }
     }
 }

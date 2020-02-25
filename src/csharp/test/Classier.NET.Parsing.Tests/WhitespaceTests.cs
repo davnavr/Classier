@@ -21,6 +21,8 @@ namespace Classier.NET.Parsing.Tests
         [InlineData("  \r\n  ", 2)]
         [InlineData("    \r\n  \n", 2)]
         [InlineData("   \r\n\n", 2)]
+        [InlineData("\n\n\n\n\n", 5)]
+        [InlineData("\n\n\r\n\n\n", 5)]
         public void WhitespaceFromTokensIsValid(string text, int tokenCount)
         {
             // Arrange
