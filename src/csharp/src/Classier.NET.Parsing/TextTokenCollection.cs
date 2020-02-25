@@ -68,7 +68,7 @@ namespace Classier.NET.Parsing
 
             foreach (string line in this.lines)
             {
-                StringBuilder builder = new StringBuilder(line);
+                var builder = new StringBuilder(line);
                 int linePos = 0;
 
                 while (builder.Length > 0)

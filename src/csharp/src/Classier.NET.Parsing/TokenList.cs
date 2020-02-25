@@ -55,18 +55,7 @@ namespace Classier.NET.Parsing
             }
 
             var builder = new System.Text.StringBuilder();
-            int lineNumber = this.list.First().LineNumber;
-
-            foreach (Token token in this.list)
-            {
-                if (token.LineNumber > lineNumber)
-                {
-                    builder.Append(Environment.NewLine);
-                    lineNumber = token.LineNumber;
-                }
-
-                builder.Append(token.ToString());
-            }
+            this.list.ForEach(token => builder.Append(token.ToString()));
 
             return builder.ToString();
         }

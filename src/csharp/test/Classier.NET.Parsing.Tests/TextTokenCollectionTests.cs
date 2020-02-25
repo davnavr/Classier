@@ -18,7 +18,7 @@ namespace Classier.NET.Parsing.Tests
         [InlineData(" public class", TokenType.Whitespace, TokenType.AccessModifier, TokenType.Whitespace, TokenType.Keyword)]
         [InlineData("public class MyClass", TokenType.AccessModifier, TokenType.Whitespace, TokenType.Keyword, TokenType.Whitespace, TokenType.Identifier)]
         [InlineData("() abstract{}", TokenType.OpenParen, TokenType.CloseParen, TokenType.Whitespace, TokenType.Keyword, TokenType.OpenCurlyBracket, TokenType.CloseCurlyBracket)]
-        [InlineData("1+2\n/3", TokenType.NumberLiteral, TokenType.Operator, TokenType.NumberLiteral, TokenType.Operator, TokenType.NumberLiteral)]
+        [InlineData("1+2\n/3", TokenType.NumberLiteral, TokenType.Operator, TokenType.NumberLiteral, TokenType.Whitespace, TokenType.Operator, TokenType.NumberLiteral)]
         [InlineData("#if DEBUG // This is a comment", TokenType.PreprocessorDir, TokenType.Whitespace, TokenType.Identifier, TokenType.Whitespace, TokenType.SingleLineComment)]
         [InlineData("/*test*/", TokenType.CommentStart, TokenType.Identifier, TokenType.CommentEnd)]
         [InlineData(" \u0000 ", TokenType.Whitespace, TokenType.Unknown, TokenType.Whitespace)]

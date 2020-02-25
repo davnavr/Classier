@@ -9,6 +9,7 @@ namespace Classier.NET.Parsing
     using System.Collections;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text;
 
     /// <summary>
     /// Represents a collection of lines in a <see cref="TextReader"/>.
@@ -33,15 +34,30 @@ namespace Classier.NET.Parsing
         /// <returns>An enumerator that iterates through the lines, including the newline characters at the end of each line.</returns>
         public IEnumerator<string> GetEnumerator()
         {
-            // TODO: Get all of the lines by reading the characters one by one.
             using (TextReader reader = this.source.Invoke())
             {
-            }
+                var builder = new StringBuilder();
 
-            throw new NotImplementedException();
+                while (reader.Peek() >= 0)
+                {
+                    builder.Append((char)reader.Read());
+
+                    // Either the last character has been read, or the next character is not a newline character
+                    if (reader.Peek() < 0 || (IsNewLine(builder[builder.Length - 1]) && !IsNewLine((char)reader.Peek())))
+                    {
+                        yield return builder.ToString();
+                        builder = new StringBuilder();
+                    }
+                }
+            }
         }
 
         /// <inheritdoc/>
         IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+
+        private static bool IsNewLine(char c)
+        {
+            return c == '\r' || c == '\n';
+        }
     }
 }
