@@ -64,58 +64,46 @@ namespace Classier.NET.Parsing
         /// <inheritdoc/>
         public IEnumerator<Token> GetEnumerator()
         {
-            /*
-            using (TextReader reader = this.source())
+            int lineNum = 0;
+
+            foreach (string line in this.lines)
             {
-                int lineNum = 0;
+                StringBuilder builder = new StringBuilder(line);
+                int linePos = 0;
 
-                while (true)
+                while (builder.Length > 0)
                 {
-                    string line = reader.ReadLine(); // TODO: Make custom reader that reads a line, and includes the newline chars.
-                    int linePos = 0;
+                    string remaining = builder.ToString();
+                    var matches = TokenDefinitionDictionary
+                        .Select(pair => new { Type = pair.Key, Match = pair.Value.Match(remaining) })
+                        .Where(def => def.Match.Success);
 
-                    // Check if the end of the file was reached.
-                    if (line == null)
+                    // No matches were found in this line at all.
+                    if (!matches.Any())
                     {
+                        yield return new Token(remaining, lineNum, default);
                         break;
                     }
 
-                    // Find tokens from left to right, preferring longer tokens.
-                    while (line.Length > 0)
+                    int minIndex = matches.Select(def => def.Match.Index).Min();
+                    var match = matches
+                        .Where(def => def.Match.Index == minIndex)
+                        .Aggregate((current, next) => next.Match.Length > current.Match.Length ? next : current);
+
+                    // Unknown token in between.
+                    if (minIndex > 0)
                     {
-                        var matches = TokenDefinitionDictionary
-                            .Select(pair => new { Type = pair.Key, Match = pair.Value.Match(line) })
-                            .Where(def => def.Match.Success);
-
-                        // No matches were found in this line at all.
-                        if (!matches.Any())
-                        {
-                            yield return new Token(line, lineNum, default);
-                            line = string.Empty;
-                            break;
-                        }
-
-                        int minIndex = matches.Select(def => def.Match.Index).Min();
-                        var match = matches
-                            .Where(def => def.Match.Index == minIndex)
-                            .Aggregate((current, next) => next.Match.Length > current.Match.Length ? next : current);
-
-                        // Unknown token in between.
-                        if (minIndex > 0)
-                        {
-                            yield return new Token(line.Substring(0, minIndex), lineNum, default);
-                        }
-
-                        int totalLength = minIndex + match.Match.Length;
-                        yield return new Token(line.Substring(minIndex, match.Match.Length), lineNum, match.Type);
-                        line = line.Substring(totalLength);
-                        linePos += totalLength;
+                        yield return new Token(remaining.Substring(0, minIndex), lineNum, default);
                     }
 
-                    lineNum++;
+                    int totalLength = minIndex + match.Match.Length;
+                    yield return new Token(remaining.Substring(minIndex, match.Match.Length), lineNum, match.Type);
+                    builder.Remove(0, totalLength);
+                    linePos += totalLength;
                 }
+
+                lineNum++;
             }
-            */
         }
 
         /// <inheritdoc/>
