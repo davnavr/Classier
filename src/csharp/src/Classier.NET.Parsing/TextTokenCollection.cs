@@ -69,7 +69,6 @@ namespace Classier.NET.Parsing
             foreach (string line in this.lines)
             {
                 var builder = new StringBuilder(line);
-                int linePos = 0;
 
                 while (builder.Length > 0)
                 {
@@ -99,7 +98,6 @@ namespace Classier.NET.Parsing
                     int totalLength = minIndex + match.Match.Length;
                     yield return new Token(remaining.Substring(minIndex, match.Match.Length), lineNum, match.Type);
                     builder.Remove(0, totalLength);
-                    linePos += totalLength;
                 }
 
                 lineNum++;

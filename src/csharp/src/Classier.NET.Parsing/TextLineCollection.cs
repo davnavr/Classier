@@ -10,7 +10,6 @@ namespace Classier.NET.Parsing
     using System.Collections.Generic;
     using System.IO;
     using System.Text;
-    using System.Text.RegularExpressions;
 
     /// <summary>
     /// Represents a collection of lines in a <see cref="TextReader"/>.
@@ -18,8 +17,6 @@ namespace Classier.NET.Parsing
     /// </summary>
     internal sealed class TextLineCollection : IEnumerable<string>
     {
-        private static readonly Regex NewlineRegex = new Regex("(\\r.|\\n.|\\r\\n)$");
-
         private readonly Func<TextReader> source;
 
         /// <summary>
@@ -46,12 +43,17 @@ namespace Classier.NET.Parsing
                     builder.Append((char)reader.Read());
 
                     int next = reader.Peek();
-                    string current = builder.ToString();
+                    char current = builder[builder.Length - 1];
 
                     // Either the last character has been read, or the line ends in a newline.
-                    if (next < 0 || NewlineRegex.IsMatch(current))
+                    if (next < 0 || current == '\n' || current == '\r')
                     {
-                        yield return current;
+                        if (current == '\r' && next == '\n')
+                        {
+                            continue;
+                        }
+
+                        yield return builder.ToString();
                         builder = new StringBuilder();
                     }
                 }
