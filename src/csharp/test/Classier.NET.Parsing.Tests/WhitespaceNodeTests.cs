@@ -11,7 +11,7 @@ namespace Classier.NET.Parsing.Tests
     using System.Linq;
     using Xunit;
 
-    public class WhitespaceTests
+    public class WhitespaceNodeTests
     {
         [Theory]
         [InlineData("    ", 1)]
@@ -29,7 +29,7 @@ namespace Classier.NET.Parsing.Tests
             var tokens = new TextTokenCollection(() => new StringReader(text));
 
             // Act
-            var ws = new Whitespace(tokens);
+            var ws = new WhitespaceNode(tokens);
 
             // Assert
             Assert.Equal(tokenCount, ws.Tokens.Count);

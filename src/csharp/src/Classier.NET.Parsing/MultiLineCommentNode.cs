@@ -13,14 +13,14 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Represents a multi-line comment.
     /// </summary>
-    public class MultiLineComment : ISyntaxNode
+    public class MultiLineCommentNode : ISyntaxNode
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiLineComment"/> class.
+        /// Initializes a new instance of the <see cref="MultiLineCommentNode"/> class.
         /// </summary>
         /// <param name="tokens">The tokens containing the multi-line comment.</param>
         /// <exception cref="ArgumentNullException"><paramref name="tokens"/> is <see langword="null"/>.</exception>
-        public MultiLineComment(IEnumerable<Token> tokens)
+        public MultiLineCommentNode(IEnumerable<Token> tokens)
         {
             if (tokens == null)
             {
