@@ -9,6 +9,7 @@ namespace Classier.NET.Parsing
     using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Text.RegularExpressions;
 
     /// <summary>
     /// Represents a collection of syntax nodes parsed from tokens.
@@ -16,15 +17,25 @@ namespace Classier.NET.Parsing
     /// </summary>
     internal sealed class ParsedTokenCollection : IEnumerable<ISyntaxNode>
     {
+        private static readonly Dictionary<Regex, Func<ISyntaxNode>> NodeDictionary = new Dictionary<Regex, Func<ISyntaxNode>>();
+
+        private readonly List<string> symbols;
+
         private readonly IEnumerable<Token> tokens;
+
+        static ParsedTokenCollection()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ParsedTokenCollection"/> class.
         /// </summary>
         /// <param name="tokens">The tokens to parse.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="tokens"/> is <see langword="null"/>.</exception>
-        internal ParsedTokenCollection(IEnumerable<Token> tokens)
+        /// <param name="symbols">A collection containing the conditional compilation symbols.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="symbols"/> or <paramref name="tokens"/> is <see langword="null"/>.</exception>
+        internal ParsedTokenCollection(IEnumerable<Token> tokens, IEnumerable<string> symbols)
         {
+            this.symbols = symbols?.ToList() ?? throw new ArgumentNullException(nameof(symbols));
             this.tokens = tokens ?? throw new ArgumentNullException(nameof(tokens));
         }
 
