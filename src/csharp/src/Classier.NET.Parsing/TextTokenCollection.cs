@@ -20,7 +20,7 @@ namespace Classier.NET.Parsing
     {
         private static readonly Dictionary<TokenType, Regex> TokenDefinitionDictionary = new Dictionary<TokenType, Regex>();
 
-        private readonly Func<TextReader> source;
+        private readonly TextLineCollection lines;
 
         static TextTokenCollection()
         {
@@ -34,7 +34,7 @@ namespace Classier.NET.Parsing
             TokenDefinitionDictionary.Add(TokenType.HexLiteral, new Regex("-?0[xX][0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?"));
             TokenDefinitionDictionary.Add(TokenType.Keyword, new Regex(
                 "class|extends|implements|interface|namespace|" +
-                "abstract|get|mutable|override|set|var|virtual|void|" +
+                "abstract|get|mutable|override|set|static|var|virtual|void|" +
                 "catch|finally|if|new|null|super|this|try|using|while"));
             TokenDefinitionDictionary.Add(TokenType.NumberLiteral, new Regex("-?([0-9]([0-9_]*[0-9])?)|([0-9]?\\.[0-9]([0-9_]*[0-9])?)"));
             TokenDefinitionDictionary.Add(TokenType.OpenCurlyBracket, new Regex("{"));
@@ -48,7 +48,7 @@ namespace Classier.NET.Parsing
             TokenDefinitionDictionary.Add(TokenType.Whitespace, new Regex("\\s+"));
 
             // Lower priority tokens, the lexer will ignore the ones below if matches are found above.
-            TokenDefinitionDictionary.Add(TokenType.Identifier, new Regex("[a-zA-Z][a-zA-Z0-9]*"));
+            TokenDefinitionDictionary.Add(TokenType.Identifier, new Regex("\\$?[a-zA-Z][a-zA-Z0-9]*"));
         }
 
         /// <summary>
@@ -58,61 +58,49 @@ namespace Classier.NET.Parsing
         /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
         public TextTokenCollection(Func<TextReader> source)
         {
-            this.source = source ?? throw new ArgumentNullException(nameof(source));
+            this.lines = new TextLineCollection(source);
         }
 
         /// <inheritdoc/>
         public IEnumerator<Token> GetEnumerator()
         {
-            using (TextReader reader = this.source())
+            int lineNum = 0;
+
+            foreach (string line in this.lines)
             {
-                int lineNum = 0;
+                var builder = new StringBuilder(line);
 
-                while (true)
+                while (builder.Length > 0)
                 {
-                    string line = reader.ReadLine();
-                    int linePos = 0;
+                    string remaining = builder.ToString();
+                    var matches = TokenDefinitionDictionary
+                        .Select(pair => new { Type = pair.Key, Match = pair.Value.Match(remaining) })
+                        .Where(def => def.Match.Success);
 
-                    // Check if the end of the file was reached.
-                    if (line == null)
+                    // No matches were found in this line at all.
+                    if (!matches.Any())
                     {
+                        yield return new Token(remaining, lineNum, default);
                         break;
                     }
 
-                    // Find tokens from left to right, preferring longer tokens.
-                    while (line.Length > 0)
+                    int minIndex = matches.Select(def => def.Match.Index).Min();
+                    var match = matches
+                        .Where(def => def.Match.Index == minIndex)
+                        .Aggregate((current, next) => next.Match.Length > current.Match.Length ? next : current);
+
+                    // Unknown token in between.
+                    if (minIndex > 0)
                     {
-                        var matches = TokenDefinitionDictionary
-                            .Select(pair => new { Type = pair.Key, Match = pair.Value.Match(line) })
-                            .Where(def => def.Match.Success);
-
-                        // No matches were found in this line at all.
-                        if (!matches.Any())
-                        {
-                            yield return new Token(line, lineNum, default);
-                            line = string.Empty;
-                            break;
-                        }
-
-                        int minIndex = matches.Select(def => def.Match.Index).Min();
-                        var match = matches
-                            .Where(def => def.Match.Index == minIndex)
-                            .Aggregate((current, next) => next.Match.Length > current.Match.Length ? next : current);
-
-                        // Unknown token in between.
-                        if (minIndex > 0)
-                        {
-                            yield return new Token(line.Substring(0, minIndex), lineNum, default);
-                        }
-
-                        int totalLength = minIndex + match.Match.Length;
-                        yield return new Token(line.Substring(minIndex, match.Match.Length), lineNum, match.Type);
-                        line = line.Substring(totalLength);
-                        linePos += totalLength;
+                        yield return new Token(remaining.Substring(0, minIndex), lineNum, default);
                     }
 
-                    lineNum++;
+                    int totalLength = minIndex + match.Match.Length;
+                    yield return new Token(remaining.Substring(minIndex, match.Match.Length), lineNum, match.Type);
+                    builder.Remove(0, totalLength);
                 }
+
+                lineNum++;
             }
         }
 
