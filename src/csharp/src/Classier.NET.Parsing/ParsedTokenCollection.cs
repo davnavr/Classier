@@ -17,8 +17,6 @@ namespace Classier.NET.Parsing
     /// </summary>
     internal sealed class ParsedTokenCollection : IEnumerable<ISyntaxNode>
     {
-        private static readonly Dictionary<Regex, Func<ISyntaxNode>> NodeDictionary = new Dictionary<Regex, Func<ISyntaxNode>>();
-
         private readonly List<string> symbols;
 
         private readonly IEnumerable<Token> tokens;

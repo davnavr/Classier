@@ -28,7 +28,7 @@ namespace Classier.NET.Parsing
             }
 
             List<Token> list = new List<Token>();
-            list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentStart));
+            list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentStart)); // TODO: Find way to throw exception if conditions aren't met.
             list.AddRange(tokens.TakeWhile(tok => tok.TokenType != TokenType.CommentEnd));
             list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentEnd));
             this.Tokens = new TokenList(list);
