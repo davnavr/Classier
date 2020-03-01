@@ -6,7 +6,6 @@
 namespace Classier.NET.Parsing
 {
     using System;
-    using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
 
@@ -15,8 +14,6 @@ namespace Classier.NET.Parsing
     /// </summary>
     public class SyntaxTree : ISyntaxNode
     {
-        private readonly List<string> symbols;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="SyntaxTree"/> class from the specfiied tokens.
         /// </summary>
@@ -46,9 +43,8 @@ namespace Classier.NET.Parsing
         /// <exception cref="ArgumentNullException"><paramref name="tokens"/> or <paramref name="symbols"/> is <see langword="null"/>.</exception>
         public SyntaxTree(IEnumerable<Token> tokens, IEnumerable<string> symbols)
         {
-            this.symbols = symbols?.ToList() ?? throw new ArgumentNullException(nameof(symbols));
             this.Tokens = new TokenList(tokens);
-            throw new NotImplementedException();
+            this.Nodes = new ParsedTokenCollection(this.Tokens, symbols).ToList().AsReadOnly(); // TODO: Instead of using just the tokens, filter out tokens depending on the conditional compilation symbols.
         }
 
         /// <summary>
@@ -71,7 +67,7 @@ namespace Classier.NET.Parsing
         /// <summary>
         /// Gets a list containing the nodes in this syntax tree.
         /// </summary>
-        public IReadOnlyList<ISyntaxNode> Nodes => throw new NotImplementedException();
+        public IReadOnlyList<ISyntaxNode> Nodes { get; }
 
         /// <summary>
         /// Returns the content of the <see cref="SyntaxTree"/>.

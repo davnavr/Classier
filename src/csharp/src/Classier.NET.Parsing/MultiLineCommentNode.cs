@@ -13,24 +13,20 @@ namespace Classier.NET.Parsing
     /// <summary>
     /// Represents a multi-line comment.
     /// </summary>
-    public class MultiLineComment : ISyntaxNode
+    public class MultiLineCommentNode : ISyntaxNode
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiLineComment"/> class.
+        /// Initializes a new instance of the <see cref="MultiLineCommentNode"/> class.
         /// </summary>
         /// <param name="tokens">The tokens containing the multi-line comment.</param>
         /// <exception cref="ArgumentNullException"><paramref name="tokens"/> is <see langword="null"/>.</exception>
-        public MultiLineComment(IEnumerable<Token> tokens)
+        public MultiLineCommentNode(IEnumerable<Token> tokens)
         {
-            if (tokens == null)
-            {
-                throw new ArgumentNullException(nameof(tokens));
-            }
-
+            TokenStream stream = new TokenStream(tokens);
             List<Token> list = new List<Token>();
-            list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentStart));
-            list.AddRange(tokens.TakeWhile(tok => tok.TokenType != TokenType.CommentEnd));
-            list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentEnd));
+            list.AddRange(stream.NextTokens(TokenType.CommentStart, 1));
+            list.AddRange(stream.NextTokens(tok => tok.TokenType != TokenType.CommentEnd));
+            list.Add(stream.NextToken(TokenType.CommentEnd));
             this.Tokens = new TokenList(list);
         }
 
