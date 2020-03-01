@@ -5,11 +5,7 @@
 
 namespace Classier.NET.Parsing.Tests
 {
-    using System;
-    using System.Collections.Generic;
     using System.IO;
-    using System.Linq;
-    using FakeItEasy;
     using Xunit;
 
     public class MultiLineCommentTests
@@ -17,12 +13,15 @@ namespace Classier.NET.Parsing.Tests
         [Theory]
         [InlineData("/* This is my comment */", 11)]
         [InlineData("/*Hello */    ", 4)]
+        [InlineData("/**/", 2)]
+        [InlineData("/*/*Test*/", 4)]
         public void MultiLineCommentNodeFromStringIsValid(string content, int tokenCount)
         {
             // Act
             var comment = new MultiLineCommentNode(new TextTokenCollection(() => new StringReader(content)));
 
             // Assert
+            Assert.NotEmpty(comment.ToString());
             Assert.StartsWith(content.ToString(), content);
             Assert.Equal("/*", comment.StartToken.ToString());
             Assert.Equal("*/", comment.EndToken.ToString());

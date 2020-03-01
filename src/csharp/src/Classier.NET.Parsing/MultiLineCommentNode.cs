@@ -22,15 +22,11 @@ namespace Classier.NET.Parsing
         /// <exception cref="ArgumentNullException"><paramref name="tokens"/> is <see langword="null"/>.</exception>
         public MultiLineCommentNode(IEnumerable<Token> tokens)
         {
-            if (tokens == null)
-            {
-                throw new ArgumentNullException(nameof(tokens));
-            }
-
+            TokenStream stream = new TokenStream(tokens);
             List<Token> list = new List<Token>();
-            list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentStart)); // TODO: Find way to throw exception if conditions aren't met.
-            list.AddRange(tokens.TakeWhile(tok => tok.TokenType != TokenType.CommentEnd));
-            list.AddRange(tokens.TakeWhile(tok => tok.TokenType == TokenType.CommentEnd));
+            list.AddRange(stream.NextTokens(TokenType.CommentStart, 1));
+            list.AddRange(stream.NextTokens(tok => tok.TokenType != TokenType.CommentEnd));
+            list.Add(stream.NextToken(TokenType.CommentEnd));
             this.Tokens = new TokenList(list);
         }
 

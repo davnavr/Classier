@@ -22,7 +22,7 @@ namespace Classier.NET.Parsing.Tests
         [InlineData("#if DEBUG // This is a comment", TokenType.PreprocessorDir, TokenType.Whitespace, TokenType.Identifier, TokenType.Whitespace, TokenType.SingleLineComment)]
         [InlineData("/*test*/", TokenType.CommentStart, TokenType.Identifier, TokenType.CommentEnd)]
         [InlineData(" \u0000 ", TokenType.Whitespace, TokenType.Unknown, TokenType.Whitespace)]
-        //// TODO: Add test data for other things.
+        [InlineData("/**/  /**/", TokenType.CommentStart, TokenType.CommentEnd, TokenType.Whitespace, TokenType.CommentStart, TokenType.CommentEnd)]
         public void TokensForClassierSourceAreValid(string source, params TokenType[] expectedTokenTypes)
         {
             // Act
