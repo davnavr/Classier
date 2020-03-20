@@ -1,10 +1,9 @@
-﻿// Learn more about F# at http://fsharp.org
+﻿// Copyright (c) 2020, David Navarro. All rights reserved.
+// Licensed under the MIT license. For more information, see the 'LICENSE' file in the project root.
 
 module Classier.NET.Compiler.CommandLine
 
 open System
 
 [<EntryPoint>]
-let main argv =
-    printfn "Hello World from F#!"
-    0 // return an integer exit code
+let main args = -1
