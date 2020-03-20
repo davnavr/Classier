@@ -5,12 +5,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <AssemblyName>$(Product).Compiler</AssemblyName>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="*.fs" />
+    <Compile Include="Lexing.fs" />
+    <Compile Include="Parsing.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
 
 </Project>

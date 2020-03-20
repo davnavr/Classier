@@ -5,12 +5,10 @@
 -->
 <Project>
 
-  <!-- Common properties -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
   <PropertyGroup>
-    <NeutralLanguage>en-US</NeutralLanguage>
-    <Product>Classier.NET</Product>
-    <RootNamespace>$(AssemblyName)</RootNamespace>
-    <SrcDirectory>$(MSBuildThisFileDirectory)</SrcDirectory>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
 </Project>
