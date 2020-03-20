@@ -7,7 +7,7 @@
 
   <!-- Code analysis files -->
   <ItemGroup>
-    <AdditionalFiles Include="$(CSharpRootDirectory)\stylecop.json" Link="stylecop.json" />
+    <AdditionalFiles Include="$(SrcDirectory)/csharp/stylecop.json" Link="stylecop.json" />
     <PackageReference Include="Microsoft.DotNet.Analyzers.Compatibility" Version="0.2.12-alpha" PrivateAssets="all" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.1.118" PrivateAssets="all" />
   </ItemGroup>

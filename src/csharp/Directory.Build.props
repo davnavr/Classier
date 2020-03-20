@@ -5,12 +5,11 @@
 -->
 <Project>
 
-  <!-- Common properties -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!-- C# properties -->
   <PropertyGroup>
     <LangVersion>7.2</LangVersion>
-    <NeutralLanguage>en-US</NeutralLanguage>
-    <Product>Classier.NET</Product>
-    <CSharpRootDirectory>$(MSBuildThisFileDirectory)</CSharpRootDirectory>
   </PropertyGroup>
 
 </Project>
