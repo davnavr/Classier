@@ -15,10 +15,20 @@ type Token<'T> =
         Type: 'T
     }
 
-let readLines<'T> (src: (unit -> TextReader)) =
-    use r1 = src()
-    use r2 = src()
-    0
+let readLine r =
+    "Test"
+
+/// <summary>
+/// Reads the lines from a <see cref="TextReader"/> and returns them.
+/// </summary>
+/// <param name="src">Provides the <see cref="TextReader"/> used to read the lines.</param>
+/// <returns>A sequence containing the lines, including the newline characters used at the end of each line.</returns>
+let readLines src =
+    use r: TextReader = src()
+    let readChar() = r.Read()
+    Seq.initInfinite (fun _ -> readLine readChar)
+        |> Seq.takeWhile (fun _ -> r.Peek() >= 0)
+
 
 //let tokenize<'T> (src, tmap) =
 //    let lines = readLines(src)

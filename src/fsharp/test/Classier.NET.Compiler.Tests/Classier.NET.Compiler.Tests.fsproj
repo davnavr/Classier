@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!--<Compile Include="LexingTests.fs" />-->
+    <Compile Include="LexingTests.fs" />
   </ItemGroup>
 
 </Project>
