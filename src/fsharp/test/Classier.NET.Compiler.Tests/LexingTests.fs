@@ -13,14 +13,12 @@ open Classier.NET.Compiler.Lexing
 [<InlineData("This is a test.", 1)>]
 [<InlineData("One Line\nTwoLine", 2)>]
 [<InlineData("Slash R\r\nSlash N", 2)>]
+[<InlineData("", 0)>]
 [<Theory>]
 let ``Read lines are valid`` content lcount =
-    // Arrange
-    use r = new StringReader("Test")
-
     // Act
-    let lines = readLines (fun() -> r.Read())
+    let lines: seq<string> = readLines content isFullLine
 
     // Assert
-    Assert.Equal(lcount, lines |> Seq.length)
     Assert.Equal(content, String.Concat(lines))
+    Assert.Equal(lcount, lines |> Seq.length)

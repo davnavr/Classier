@@ -15,24 +15,30 @@ type Token<'T> =
         Type: 'T
     }
     
-// TODO: Need to read characters and store them, maybe use recursion here?
-let readSingleLine read isLine =
-    let appendChar line =
-        let c = read()
-        let singleLine() =
-            let fullLine = line + string(char(c))
-            if isLine(fullLine) then fullLine else "Do the recursive call here"
+// TODO: Need to determine when a line is formed.
+let readFullLine (chars: seq<char>, start) isLine =
+    match chars |> Seq.skip(start) with
+    | none when none |> Seq.isEmpty ->
+        String.Empty
+    | remaining -> "Test"
 
-        match c with
-        | -1 -> String.Empty
-        | _ -> singleLine()
+let readLines chars isLine =
+    let rec next start =
+        seq {
+            let line = readFullLine (chars, start) isLine
 
-    appendChar String.Empty
+            match line.Length with
+            | 0 ->
+                yield! Seq.empty
+            | _ ->
+                yield line
+                yield! next (start + line.Length)
+        }
 
-let readLines read isLine =
-    let next _ = readSingleLine read isLine
+    next 0
 
-    Seq.initInfinite next |> Seq.takeWhile (fun str -> str.Length > 0)
+// TODO: Check for other newline characters
+let isFullLine (line: string) = line.EndsWith("\n")
 
 //let tokenize<'T> (src, tmap) =
 //    let lines = readLines(src)
