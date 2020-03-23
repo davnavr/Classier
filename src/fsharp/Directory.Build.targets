@@ -9,7 +9,7 @@
     Install the local tool at:
     https://www.nuget.org/packages/dotnet-fsharplint/
   -->
-  <Target Name="FSharpLint" AfterTargets="AfterBuild">
+  <Target Name="FSharpLint" AfterTargets="AfterBuild" Condition="'$(Configuration)' != 'DEBUG'">
     <Exec Command="dotnet fsharplint -f msbuild lint $(MSBuildProjectFullPath)"
           ConsoleToMsBuild="true"
           IgnoreExitCode="true"
