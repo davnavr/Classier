@@ -16,10 +16,10 @@ open Classier.NET.Compiler.Lexing
 [<Theory>]
 let ``Read lines are valid`` content lcount =
     // Arrange
-    let r() = new StringReader("Test")
+    use r = new StringReader("Test")
 
     // Act
-    let lines = readLines(r)
+    let lines = readLines (fun() -> r.Read())
 
     // Assert
     Assert.Equal(lcount, lines |> Seq.length)

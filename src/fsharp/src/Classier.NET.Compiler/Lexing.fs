@@ -14,23 +14,25 @@ type Token<'T> =
         LinePos: int
         Type: 'T
     }
+    
+// TODO: Need to read characters and store them, maybe use recursion here?
+let readSingleLine read isLine =
+    let appendChar line =
+        let c = read()
+        let singleLine() =
+            let fullLine = line + string(char(c))
+            if isLine(fullLine) then fullLine else "Do the recursive call here"
 
-let readLine r =
-    "Test"
+        match c with
+        | -1 -> String.Empty
+        | _ -> singleLine()
 
-/// <summary>
-/// Reads the lines from a <see cref="TextReader"/> and returns them.
-/// </summary>
-/// <param name="src">Provides the <see cref="TextReader"/> used to read the lines.</param>
-/// <returns>A sequence containing the lines, including the newline characters used at the end of each line.</returns>
-let readLines src =
-    seq {
-        use r: #TextReader = src()
-        let next _ = readLine (fun() -> r.Read())
-        let notEnd _ = r.Peek() >= 0
+    appendChar String.Empty
 
-        yield! Seq.initInfinite next |> Seq.takeWhile notEnd
-    }
+let readLines read isLine =
+    let next _ = readSingleLine read isLine
+
+    Seq.initInfinite next |> Seq.takeWhile (fun str -> str.Length > 0)
 
 //let tokenize<'T> (src, tmap) =
 //    let lines = readLines(src)
