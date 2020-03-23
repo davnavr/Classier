@@ -13,6 +13,7 @@ open Classier.NET.Compiler.Lexing
 [<InlineData("This is a test.", 1)>]
 [<InlineData("One Line\nTwoLine", 2)>]
 [<InlineData("Slash R\r\nSlash N", 2)>]
+[<InlineData("\n\nTesting, 1 2 3\n", 4)>]
 [<InlineData("", 0)>]
 [<Theory>]
 let ``Read lines are valid`` content lcount =

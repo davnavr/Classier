@@ -15,27 +15,28 @@ type Token<'T> =
         Type: 'T
     }
     
-// TODO: Need to determine when a line is formed.
-let readFullLine (chars: seq<char>, start) isLine =
-    match chars |> Seq.skip(start) with
-    | none when none |> Seq.isEmpty ->
+// TODO: Need to append chars and determine when a line is formed.
+let toFullLine chars isLine =
+    match chars with
+    | empty when empty |> Seq.isEmpty ->
         String.Empty
-    | remaining -> "Test"
+    | _ ->
+        "T" // TODO: How do we peek the next character and make sure that it isn't a '\n' for when the newline is '\r\n'. First, take until isLine returns true, then takeUntil isLine returns false.
 
 let readLines chars isLine =
-    let rec next start =
+    let rec nextLine start =
         seq {
-            let line = readFullLine (chars, start) isLine
+            let line = toFullLine (chars |> Seq.skip(start)) isLine
 
             match line.Length with
             | 0 ->
                 yield! Seq.empty
             | _ ->
                 yield line
-                yield! next (start + line.Length)
+                yield! nextLine (start + line.Length)
         }
 
-    next 0
+    nextLine 0
 
 // TODO: Check for other newline characters
 let isFullLine (line: string) = line.EndsWith("\n")
