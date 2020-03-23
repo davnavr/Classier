@@ -24,11 +24,13 @@ let readLine r =
 /// <param name="src">Provides the <see cref="TextReader"/> used to read the lines.</param>
 /// <returns>A sequence containing the lines, including the newline characters used at the end of each line.</returns>
 let readLines src =
-    use r: TextReader = src()
-    let readChar() = r.Read()
-    Seq.initInfinite (fun _ -> readLine readChar)
-        |> Seq.takeWhile (fun _ -> r.Peek() >= 0)
+    seq {
+        use r: #TextReader = src()
+        let next _ = readLine (fun() -> r.Read())
+        let notEnd _ = r.Peek() >= 0
 
+        yield! Seq.initInfinite next |> Seq.takeWhile notEnd
+    }
 
 //let tokenize<'T> (src, tmap) =
 //    let lines = readLines(src)

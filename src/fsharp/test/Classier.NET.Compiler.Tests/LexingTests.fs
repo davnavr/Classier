@@ -16,7 +16,7 @@ open Classier.NET.Compiler.Lexing
 [<Theory>]
 let ``Read lines are valid`` content lcount =
     // Arrange
-    let r() = new StringReader("Test") :> TextReader
+    let r() = new StringReader("Test")
 
     // Act
     let lines = readLines(r)
