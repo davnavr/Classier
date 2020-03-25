@@ -16,7 +16,7 @@ open Classier.NET.Compiler.Lexing
 [<InlineData("\n\nTesting, 1 2 3\n", 4)>]
 [<InlineData("", 0)>]
 [<Theory>]
-let ``Read lines are valid`` content lcount =
+let readLinesIsValid content lcount =
     // Act
     let lines: seq<string> = readLines content isFullLine
 
