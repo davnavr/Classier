@@ -10,16 +10,4 @@ open Xunit
 
 open Classier.NET.Compiler.Lexing
 
-[<InlineData("This is a test.", 1)>]
-[<InlineData("One Line\nTwoLine", 2)>]
-[<InlineData("Slash R\r\nSlash N", 2)>]
-[<InlineData("\n\nTesting, 1 2 3\n", 4)>]
-[<InlineData("", 0)>]
-[<Theory>]
-let readLinesIsValid content lcount =
-    // Act
-    let lines: seq<string> = readLines content isFullLine
 
-    // Assert
-    Assert.Equal(content, String.Concat(lines))
-    Assert.Equal(lcount, lines |> Seq.length)

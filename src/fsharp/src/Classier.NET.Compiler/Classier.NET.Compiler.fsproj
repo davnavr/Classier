@@ -6,11 +6,14 @@
 
   <PropertyGroup>
     <AssemblyName>$(Product).Compiler</AssemblyName>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Collections.fs" />
+    <Compile Include="Text.fs" />
     <Compile Include="Lexing.fs" />
     <Compile Include="Parsing.fs" />
     <Compile Include="Program.fs" />
