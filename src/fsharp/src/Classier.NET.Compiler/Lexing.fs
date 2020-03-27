@@ -36,12 +36,11 @@ let matchChar char: MatchFunc<char> =
 /// Matches against a sequence of characters.
 /// </summary>
 /// <param name="str">The expected sequence of characters.</param>
-let matchStr (str: seq<char>): MatchFunc<string> =
+let matchStr str: MatchFunc<char> =
     match str with
     | empty when empty |> Seq.isEmpty ->
         Match (fun cur -> Success cur)
     | _ ->
-        Match (fun cur ->
-            Failure ("Not implemented", cur))
+        str |> Seq.map matchChar |> Seq.reduce andThen
 
 // let tokenize<'T> chars tmap =

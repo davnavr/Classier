@@ -22,12 +22,19 @@ let isSuccess r =
 [<InlineData('a', "ABC", false)>]
 [<InlineData('b', "", false)>]
 [<Theory>]
-let matchCharIsSuccess (c, text, success) =
-    // Arrange
-    let (Match m) = matchChar c
-
+let matchCharMatchesCorrectly (expected, text, success) =
     // Act
-    let r = m (Cursor(text))
+    let r = result (matchChar expected) (Cursor(text))
+
+    // Assert
+    Assert.Equal(success, isSuccess r)
+
+[<InlineData("Test", "Test", true)>]
+[<InlineData("error", "erro", false)>]
+[<Theory>]
+let matchStrMatchesCorrectly (expected, text, success) =
+    // Act
+    let r = result (matchStr expected) (Cursor(text))
 
     // Assert
     Assert.Equal(success, isSuccess r)
