@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <Compile Include="Collections.fs" />
-    <Compile Include="Text.fs" />
+    <Compile Include="Matching.fs" />
     <Compile Include="Lexing.fs" />
     <Compile Include="Parsing.fs" />
     <Compile Include="Program.fs" />

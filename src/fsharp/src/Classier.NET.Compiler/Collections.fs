@@ -6,7 +6,9 @@ namespace Classier.NET.Compiler.Collections
 open System.Collections.Generic
 
 type Item<'T> =
+    /// Represents an item in a collection.
     | Item of 'T
+    /// Indicates that the end of the collection has been reached.
     | End
 
 type Cursor<'T> private (e: IEnumerator<'T>) =
