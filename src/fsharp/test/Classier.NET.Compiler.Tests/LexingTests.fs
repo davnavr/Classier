@@ -30,11 +30,21 @@ let matchCharMatchesCorrectly (expected, text, success) =
     Assert.Equal(success, isSuccess r)
 
 [<InlineData("Test", "Test", true)>]
-[<InlineData("error", "erro", false)>]
+[<InlineData("", "", true)>]
 [<Theory>]
-let matchStrMatchesCorrectly (expected, text, success) =
+let matchStrIsSuccess (expected, text) =
     // Act
     let r = result (matchStr expected) (Cursor(text))
 
     // Assert
-    Assert.Equal(success, isSuccess r)
+    Assert.True(isSuccess r)
+
+[<InlineData("error", "erro")>]
+[<InlineData("oops", "")>]
+[<Theory>]
+let matchStrIsFailure (expected, text) =
+    // Act
+    let r = result (matchStr expected) (Cursor(text))
+
+    // Assert
+    Assert.True(isSuccess r)

@@ -12,10 +12,12 @@ open Classier.NET.Compiler.Matching
 type Token<'T> =
     {
         Content: string
-        LineNum: int
-        LinePos: int
         Type: 'T
     }
+
+type TokenDictionary<'T when 'T : comparison> = Map<'T, MatchFunc<char>>
+
+type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
 /// <summary>
 /// Matches against the specified character.
@@ -41,6 +43,18 @@ let matchStr str: MatchFunc<char> =
     | empty when empty |> Seq.isEmpty ->
         Match (fun cur -> Success cur)
     | _ ->
-        str |> Seq.map matchChar |> Seq.reduce andThen
+        Match (fun cur ->
+            let r = result (str |> Seq.map matchChar |> Seq.reduce andThen) cur
+            match r with
+            | Success _ -> r
+            | Failure (msg, c) -> Failure ((sprintf "Cannot parse '%s'. %s" str msg), c))
 
-// let tokenize<'T> chars tmap =
+let createTokenizer<'T when 'T : comparison> (tmap: TokenDictionary<'T>, defaultVal: 'T): Tokenizer<'T> =
+    Tokenizer (fun chars ->
+        seq {
+            yield { Content = "Test"; Type = defaultVal }
+        })
+
+let tokenize<'T when 'T : comparison> (tokenizer: Tokenizer<'T>) chars =
+    let (Tokenizer tokenizeFunc) = tokenizer
+    tokenizeFunc chars

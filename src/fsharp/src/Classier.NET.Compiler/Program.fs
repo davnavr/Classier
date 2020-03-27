@@ -7,6 +7,12 @@ open System
 
 open Classier.NET.Compiler.Lexing
 
+type TokenType =
+    /// The token is of an unknown type.
+    | Unknown
+    /// The token is an access modifier.
+    | AccessModifier
+
 /// <summary>
 /// The entry point of the compiler.
 /// </summary>
@@ -15,4 +21,9 @@ open Classier.NET.Compiler.Lexing
 /// TODO: Describe the arguments in a list here.
 /// </param>
 [<EntryPoint>]
-let main args = -1
+let main args =
+    let tokenDefs = [
+            TokenType.AccessModifier, (matchStr "test")
+        ]
+    let tokenizer = createTokenizer (tokenDefs |> Map.ofList, TokenType.Unknown)
+    -1
