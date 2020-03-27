@@ -11,22 +11,23 @@ type Item<'T> =
     /// Indicates that the end of the collection has been reached.
     | End
 
-type Cursor<'T> private (e: IEnumerator<'T>) =
+type Cursor<'T> private (e: IEnumerator<'T>, pos: int) =
     let hasVal = e.MoveNext()
     let item =
         if hasVal then
             Item e.Current
         else
             End
-    let next = lazy Cursor(e)
+    let next = lazy Cursor(e, pos + 1)
     
-    new(c: IEnumerable<'T>) = Cursor(c.GetEnumerator())
+    new(c: IEnumerable<'T>) = Cursor(c.GetEnumerator(), 0)
 
-    member this.Item = item
+    member _this.Item = item
+    member _this.Index = pos
+    member _this.ReachedEnd = not hasVal
     member this.Next =
-        match this.Item with
-        | End ->
+        if hasVal then
+            next.Value
+        else
             e.Dispose() |> ignore
             this
-        | Item _ ->
-            next.Value

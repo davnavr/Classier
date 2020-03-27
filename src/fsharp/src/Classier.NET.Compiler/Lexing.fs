@@ -50,15 +50,18 @@ let matchStr str: MatchFunc<char> =
             | Failure (msg, c) -> Failure ((sprintf "Cannot parse '%s'. %s" str msg), c))
 
 let createTokenizer<'T when 'T : comparison> (tmap: TokenDictionary<'T>, defaultVal: 'T): Tokenizer<'T> =
-    let nextToken cur =
-        "Test"
+    let nextToken cur: Token<'T> * Cursor<char> =
+        // TODO: Find longest token
+        ({ Content = "Test"; Type = defaultVal }, cur)
 
     Tokenizer (fun chars ->
         seq {
             let mutable cur = Cursor(chars)
             
-
-            yield { Content = "Test"; Type = defaultVal }
+            while not cur.ReachedEnd do
+                let (ntoken, ncur) = nextToken cur
+                yield ntoken
+                cur <- ncur
         })
 
 let tokenize<'T> (tokenizer: Tokenizer<'T>) chars =

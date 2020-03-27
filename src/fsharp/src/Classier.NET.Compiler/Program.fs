@@ -13,6 +13,11 @@ type TokenType =
     /// The token is an access modifier.
     | AccessModifier
 
+let tokenDefs =
+    [
+        TokenType.AccessModifier, (matchStr "test")
+    ] |> Map.ofList
+
 /// <summary>
 /// The entry point of the compiler.
 /// </summary>
@@ -22,8 +27,5 @@ type TokenType =
 /// </param>
 [<EntryPoint>]
 let main args =
-    let tokenDefs = [
-            TokenType.AccessModifier, (matchStr "test")
-        ]
-    let tokenizer = createTokenizer (tokenDefs |> Map.ofList, TokenType.Unknown)
+    let tokenizer = createTokenizer (tokenDefs, TokenType.Unknown)
     -1
