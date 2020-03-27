@@ -23,48 +23,16 @@ type TokenDef<'T> =
 
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
-/// <summary>
-/// Matches against the specified character.
-/// </summary>
-/// <param name="char">The character to match.</param>
-let matchChar char: MatchFunc<char> =
-    let failMsg r = sprintf "Expected character %c, but %s" char r
-    Match (fun cur ->
-        match cur.Item with
-        | Item act ->
-            if char = act then
-                Success cur.Next
-            else
-                Failure (failMsg (sprintf "got %c instead" act), cur)
-        | End -> Failure (failMsg "the end of the text was reached instead.", cur))
-
-/// <summary>
-/// Matches against a sequence of characters.
-/// </summary>
-/// <param name="str">The expected sequence of characters.</param>
-let matchStr str: MatchFunc<char> =
-    match str with
-    | empty when empty |> Seq.isEmpty ->
-        Match (fun cur -> Success cur)
-    | _ ->
-        Match (fun cur ->
-            let r = result (str |> Seq.map matchChar |> Seq.reduce andThen, cur)
-            match r with
-            | Success _ -> r
-            | Failure (msg, c) -> Failure (sprintf "Cannot parse '%s'. %s" str msg, c))
-
 let createTokenizer<'T when 'T : comparison> (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
     let results cur =
         definitions
-            |> Seq.map (fun def -> def.Type, result (def.Match, cur))
-            |> Seq.filter (fun (_, result) ->
-                match result with
-                | Success _ -> true
-                | Failure _ -> false)
+        |> Seq.map (fun def -> def.Type, result (def.Match, cur))
+        |> Seq.filter (fun (_, result) -> isSuccess result)
     let nextToken (cur: Cursor<char>) =
         // TODO: Find longest token
-        let tokenDef = results cur // |> Seq.fold
-        
+        let matches = results cur // TODO: Need to find a way to append char to the unknown token until a definition is found.
+        //let tokenDef =  // |> Seq.fold
+
         { Content = "Test"; Type = defaultVal }, cur.Next 
 
     Tokenizer (fun chars ->

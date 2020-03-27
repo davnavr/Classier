@@ -12,6 +12,8 @@ type TokenType =
     | Unknown
     /// The token is an access modifier.
     | AccessModifier
+    /// The token indicates a new line.
+    | NewLine
 
 let tokenizer = createTokenizer ([
         { Type = TokenType.AccessModifier; Match = (matchStr "test") }
