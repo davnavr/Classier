@@ -19,9 +19,14 @@ type Cursor<'T> private (e: IEnumerator<'T>) =
         else
             End
     let next = lazy Cursor(e)
-
-    new(c: IEnumerable<'T>) =
-        Cursor(c.GetEnumerator())
+    
+    new(c: IEnumerable<'T>) = Cursor(c.GetEnumerator())
 
     member this.Item = item
-    member this.Next = next.Value
+    member this.Next =
+        match this.Item with
+        | End ->
+            e.Dispose() |> ignore
+            this
+        | Item _ ->
+            next.Value

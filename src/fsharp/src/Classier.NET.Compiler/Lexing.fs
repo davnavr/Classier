@@ -50,11 +50,17 @@ let matchStr str: MatchFunc<char> =
             | Failure (msg, c) -> Failure ((sprintf "Cannot parse '%s'. %s" str msg), c))
 
 let createTokenizer<'T when 'T : comparison> (tmap: TokenDictionary<'T>, defaultVal: 'T): Tokenizer<'T> =
+    let nextToken cur =
+        "Test"
+
     Tokenizer (fun chars ->
         seq {
+            let mutable cur = Cursor(chars)
+            
+
             yield { Content = "Test"; Type = defaultVal }
         })
 
-let tokenize<'T when 'T : comparison> (tokenizer: Tokenizer<'T>) chars =
+let tokenize<'T> (tokenizer: Tokenizer<'T>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer
     tokenizeFunc chars
