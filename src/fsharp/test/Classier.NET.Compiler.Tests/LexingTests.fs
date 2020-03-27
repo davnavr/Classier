@@ -24,7 +24,7 @@ let isSuccess r =
 [<Theory>]
 let matchCharIsCorrect (expected, text, success) =
     // Act
-    let r = result (matchChar expected) (Cursor(text))
+    let r = result (matchChar expected, Cursor(text))
 
     // Assert
     Assert.Equal(success, isSuccess r)
@@ -36,7 +36,7 @@ let matchCharIsCorrect (expected, text, success) =
 [<Theory>]
 let matchStrIsCorrect (expected, text, success) =
     // Act
-    let r = result (matchStr expected) (Cursor(text))
+    let r = result (matchStr expected, Cursor(text))
 
     // Assert
     Assert.Equal(success, isSuccess r)

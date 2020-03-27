@@ -15,7 +15,11 @@ type Token<'T> =
         Type: 'T
     }
 
-type TokenDictionary<'T when 'T : comparison> = Map<'T, MatchFunc<char>>
+type TokenDef<'T> =
+    {
+        Match: MatchFunc<char>
+        Type: 'T
+    }
 
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
@@ -44,15 +48,24 @@ let matchStr str: MatchFunc<char> =
         Match (fun cur -> Success cur)
     | _ ->
         Match (fun cur ->
-            let r = result (str |> Seq.map matchChar |> Seq.reduce andThen) cur
+            let r = result (str |> Seq.map matchChar |> Seq.reduce andThen, cur)
             match r with
             | Success _ -> r
-            | Failure (msg, c) -> Failure ((sprintf "Cannot parse '%s'. %s" str msg), c))
+            | Failure (msg, c) -> Failure (sprintf "Cannot parse '%s'. %s" str msg, c))
 
-let createTokenizer<'T when 'T : comparison> (tmap: TokenDictionary<'T>, defaultVal: 'T): Tokenizer<'T> =
-    let nextToken cur: Token<'T> * Cursor<char> =
+let createTokenizer<'T when 'T : comparison> (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
+    let results cur =
+        definitions
+            |> Seq.map (fun def -> def.Type, result (def.Match, cur))
+            |> Seq.filter (fun (_, result) ->
+                match result with
+                | Success _ -> true
+                | Failure _ -> false)
+    let nextToken (cur: Cursor<char>) =
         // TODO: Find longest token
-        ({ Content = "Test"; Type = defaultVal }, cur)
+        let tokenDef = results cur // |> Seq.fold
+        
+        { Content = "Test"; Type = defaultVal }, cur.Next 
 
     Tokenizer (fun chars ->
         seq {

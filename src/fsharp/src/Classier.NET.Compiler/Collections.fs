@@ -14,10 +14,9 @@ type Item<'T> =
 type Cursor<'T> private (e: IEnumerator<'T>, pos: int) =
     let hasVal = e.MoveNext()
     let item =
-        if hasVal then
-            Item e.Current
-        else
-            End
+        if hasVal
+        then Item e.Current
+        else End
     let next = lazy Cursor(e, pos + 1)
     
     new(c: IEnumerable<'T>) = Cursor(c.GetEnumerator(), 0)
