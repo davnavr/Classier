@@ -24,13 +24,17 @@ type TokenDef<'T> =
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
 let createTokenizer<'T when 'T : comparison> (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
-    let results cur =
-        definitions
-        |> Seq.map (fun def -> def.Type, result (def.Match, cur))
-        |> Seq.filter (fun (_, result) -> isSuccess result)
     let nextToken (cur: Cursor<char>) =
-        // TODO: Find longest token
-        let matches = results cur // TODO: Need to find a way to append char to the unknown token until a definition is found.
+        // TODO: Need to find a way to append char to the unknown token until a definition is found.
+        let results =
+            definitions
+            |> Seq.map (fun def -> def.Type, result (def.Match, cur)) 
+            |> Seq.cache
+
+        //match results |> Seq.tryFind(fun (_, r) -> isSuccess r) with
+        //| Some r -> ()
+        //| None -> ()
+
         //let tokenDef =  // |> Seq.fold
 
         { Content = "Test"; Type = defaultVal }, cur.Next 

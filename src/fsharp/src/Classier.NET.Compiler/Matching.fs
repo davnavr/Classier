@@ -31,16 +31,32 @@ let failure<'T> msg =
     Match (fun (cur: Cursor<'T>) -> Failure(msg, cur))
 
 // and
-let thenMatch<'T> (m1: MatchFunc<'T>) m2: MatchFunc<'T> =
+let thenMatch<'T> (m1: MatchFunc<'T>) m2 =
     Match (fun c1 ->
         let r1 = result (m1, c1)
         match r1 with
         | Failure _ -> r1
         | Success c2 -> result (m2, c2))
 
-//let orMatch<'T>
+let orMatch<'T> (m1: MatchFunc<'T>) m2 =
+    Match (fun cur ->
+        let r1 = result (m1, cur)
+        match r1 with
+        | Failure _ -> result (m2, cur)
+        | Success _ -> r1)
 
-let matchAny<'T> (matches: seq<MatchFunc<'T>>) = failure "Not implemented."
+let matchAny<'T> (matches: seq<MatchFunc<'T>>) =
+    if matches |> Seq.isEmpty then
+        failure "Cannot match any, the match sequence was empty."
+    else
+        Match (fun cur ->
+            let results =
+                matches
+                |> Seq.map(fun f -> result (f, cur))
+                |> Seq.cache
+            match results |> Seq.tryFind isSuccess with
+            | Some result -> result
+            | None -> results |> Seq.last)
 
 /// <summary>
 /// Matches against the specified character.
@@ -62,17 +78,18 @@ let matchChar char: MatchFunc<char> =
 /// </summary>
 /// <param name="str">The expected sequence of characters.</param>
 let matchStr str: MatchFunc<char> =
-    match str with
-    | empty when empty |> Seq.isEmpty -> success
-    | _ ->
+    if str |> Seq.isEmpty then
+        success
+    else
         Match (fun cur ->
             let r = result (str |> Seq.map matchChar |> Seq.reduce thenMatch, cur)
             match r with
             | Success _ -> r
             | Failure (msg, c) -> Failure (sprintf "Failure parsing '%s'. %s" str msg, c))
 
-let matchAnyStr strings =
+let matchAnyStr (strings: seq<string>) =
     match strings with
     | empty when empty |> Seq.isEmpty ->
         success
-    | _ -> failure "Not implemented"
+    | _ ->
+        strings |> Seq.map matchStr |> matchAny
