@@ -6,6 +6,7 @@ module Classier.NET.Compiler.Program
 open System
 
 open Classier.NET.Compiler.Lexing
+open Classier.NET.Compiler.Matching
 
 type TokenType =
     /// The token is of an unknown type.

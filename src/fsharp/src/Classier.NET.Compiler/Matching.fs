@@ -15,10 +15,25 @@ type MatchResult<'T> =
 /// <typeparam name="T">The type of the object to match.</typeparam>
 type MatchFunc<'T> = Match of (Cursor<'T> -> MatchResult<'T>)
 
+/// <summary>
+/// Determines whether a <see cref="Matching.MatchResult<T>"/> is a <see cref="Matching.MatchResult<T>.Success"/>.
+/// </summary>
+/// <param name="result">The result to check.</param>
+/// <returns><see langword="true"/> if the <paramref name="result"/> is a <see cref="Matching.MatchResult<T>.Success"/>; otherwise <see langword="false"/>.</result>
 let isSuccess result =
     match result with
     | Success _ -> true
     | Failure _ -> false
+
+let asSuccess result =
+    match result with
+    | Success cur -> cur
+    | Failure _ -> invalidArg "result" "The result must indicate a success."
+
+let asFailure result =
+    match result with
+    | Success _ -> invalidArg "result" "The result must indicate a failure."
+    | Failure (msg, cur) -> (msg, cur)
 
 let result<'T> (f: MatchFunc<'T>, cur) =
     let (Match matchFunc) = f
@@ -85,7 +100,7 @@ let matchStr str: MatchFunc<char> =
             let r = result (str |> Seq.map matchChar |> Seq.reduce thenMatch, cur)
             match r with
             | Success _ -> r
-            | Failure (msg, c) -> Failure (sprintf "Failure parsing '%s'. %s" str msg, c))
+            | Failure (msg, _) -> Failure (sprintf "Failure parsing '%s'. %s" str msg, cur))
 
 let matchAnyStr (strings: seq<string>) =
     match strings with
