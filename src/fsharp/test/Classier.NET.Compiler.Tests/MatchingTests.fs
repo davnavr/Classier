@@ -8,7 +8,6 @@ open System.IO
 
 open Xunit
 
-open Classier.NET.Compiler.Collections
 open Classier.NET.Compiler.Matching
 
 [<InlineData('T', "Test")>]
@@ -16,40 +15,40 @@ open Classier.NET.Compiler.Matching
 [<Theory>]
 let matchCharIsSuccess (expected, text) =
     // Arrange
-    let cur = Cursor(text)
+    let item = itemFrom text
 
     // Act
-    let r = result (matchChar expected, cur)
+    let r = result (matchChar expected, item)
 
     // Assert
-    Assert.NotEqual(cur.Index, (asSuccess r).Index)
+    Assert.NotEqual(itemIndex item, asSuccess r |> itemIndex)
 
 [<InlineData('a', "ABC")>]
 [<InlineData(' ', "This is testing")>]
 [<Theory>]
 let matchCharIsFailureForIncorrectChar (expected, text) =
     // Arrange
-    let cur = Cursor(text)
+    let item = itemFrom text
 
     // Act
-    let r = result (matchChar expected, cur)
+    let r = result (matchChar expected, item)
 
     // Assert
-    let msg, fcur = asFailure r
-    Assert.Equal(cur, fcur)
+    let msg, fitem = asFailure r
+    Assert.Equal(itemIndex item, itemIndex fitem)
     Assert.Contains("got", msg)
 
 [<Fact>]
 let matchCharIsFailureForEmptyText =
     // Arrange
-    let cur = Cursor(String.Empty)
+    let item = itemFrom "airline"
 
     // Act
-    let r = result (matchChar 'a', cur)
+    let r = result (matchChar 'a', item)
 
     // Assert
-    let msg, fcur = asFailure r
-    Assert.Equal(cur, fcur)
+    let msg, fitem = asFailure r
+    Assert.Equal(itemIndex item, itemIndex fitem)
     Assert.Contains("end of", msg)
 
 [<InlineData("Test", "Test")>]
@@ -57,40 +56,40 @@ let matchCharIsFailureForEmptyText =
 [<Theory>]
 let matchStrIsSuccess (expected, text) =
     // Arrange
-    let cur = Cursor(text)
+    let item = itemFrom text
 
     // Act
-    let r = result (matchStr expected, cur)
+    let r = result (matchStr expected, item)
 
     // Assert
-    Assert.NotEqual(cur.Index, (asSuccess r).Index)
+    Assert.NotEqual(itemIndex item, asSuccess r |> itemIndex)
 
 [<InlineData("")>]
 [<InlineData("hello")>]
 [<Theory>]
 let matchStrIsSuccessForEmptyString text =
     // Arrange
-    let cur = Cursor(text)
+    let item = itemFrom text
 
     // Act
-    let r = result (matchStr String.Empty, cur)
+    let r = result (matchStr String.Empty, item)
 
     // Assert
-    Assert.Equal(cur, asSuccess r)
+    Assert.Equal(itemIndex item, asSuccess r |> itemIndex)
 
 [<InlineData("error", "erro")>]
 [<InlineData("oops", "")>]
 [<Theory>]
 let matchStrIsFailureForEndOfText (expected, text) =
     // Arrange
-    let cur = Cursor(text)
+    let item = itemFrom text
 
     // Act
-    let r = result (matchStr expected, cur)
+    let r = result (matchStr expected, item)
 
     // Assert
-    let msg, fcur = asFailure r
-    Assert.Equal(cur, fcur)
+    let msg, fitem = asFailure r
+    Assert.Equal(itemIndex item, itemIndex fitem)
     Assert.Contains(expected, msg)
     Assert.Contains("end of", msg)
 
@@ -101,13 +100,13 @@ let matchStrIsFailureForEndOfText (expected, text) =
 [<Theory>]
 let matchStrIsFailureForIncorrect (expected, text) =
     // Arrange
-    let cur = Cursor(text)
+    let item = itemFrom text
 
     // Act
-    let r = result (matchStr expected, cur)
+    let r = result (matchStr expected, item)
 
     // Assert
-    let msg, fcur = asFailure r
-    Assert.Equal(cur, fcur)
+    let msg, fitem = asFailure r
+    Assert.Equal(itemIndex item, itemIndex fitem)
     Assert.Contains(expected, msg)
     Assert.Contains("got", msg)

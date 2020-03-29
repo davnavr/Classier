@@ -12,7 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Collections.fs" />
     <Compile Include="Matching.fs" />
     <Compile Include="Lexing.fs" />
     <Compile Include="Parsing.fs" />

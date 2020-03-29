@@ -6,7 +6,6 @@ module Classier.NET.Compiler.Lexing
 
 open System
 
-open Classier.NET.Compiler.Collections
 open Classier.NET.Compiler.Matching
 
 type Token<'T> =
@@ -23,12 +22,12 @@ type TokenDef<'T> =
 
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
-let createTokenizer<'T when 'T : comparison> (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
-    let nextToken (cur: Cursor<char>) =
+let createTokenizer<'T> (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
+    let nextToken (item: Item<char>) =
         // TODO: Need to find a way to append char to the unknown token until a definition is found.
         let results =
             definitions
-            |> Seq.map (fun def -> def.Type, result (def.Match, cur)) 
+            |> Seq.map (fun def -> def.Type, result (def.Match, item)) 
             |> Seq.cache
 
         //match results |> Seq.tryFind(fun (_, r) -> isSuccess r) with
@@ -37,16 +36,16 @@ let createTokenizer<'T when 'T : comparison> (definitions: seq<TokenDef<'T>>, de
 
         //let tokenDef =  // |> Seq.fold
 
-        { Content = "Test"; Type = defaultVal }, cur.Next 
+        { Content = "Test"; Type = defaultVal }, nextItem item
 
     Tokenizer (fun chars ->
         seq {
-            let mutable cur = Cursor(chars)
+            let mutable item = itemFrom chars
             
-            while not cur.ReachedEnd do
-                let (ntoken, ncur) = nextToken cur
-                yield ntoken
-                cur <- ncur
+            while not (itemIsEnd item) do
+                let (token, next) = nextToken item
+                yield token
+                item <- next
         })
 
 let tokenize<'T> (tokenizer: Tokenizer<'T>) chars =
