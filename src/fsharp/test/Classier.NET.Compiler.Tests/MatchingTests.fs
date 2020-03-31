@@ -10,6 +10,22 @@ open Xunit
 
 open Classier.NET.Compiler.Matching
 
+[<InlineData("not", "all", "is", "well")>]
+[<InlineData("because", "it", "no", "working")>]
+[<Theory>]
+let matchAnyOfFailsWithLastResult (text, [<ParamArray>] matches: string[]) =
+    // Arrange
+    let item = itemFrom text
+    let last = matches |> Array.last
+
+    // Act
+    let r = result (matchAnyOf matches matchStr, item)
+
+    // Assert
+    let msg, fitem = asFailure r
+    Assert.Contains(last, msg)
+    Assert.Equal(itemIndex item, itemIndex fitem)
+
 [<InlineData('T', "Test")>]
 [<InlineData('\r', "\r\n")>]
 [<Theory>]
@@ -52,6 +68,7 @@ let matchCharIsFailureForEmptyText =
     Assert.Contains("end of", msg)
 
 [<InlineData("Test", "Test")>]
+[<InlineData("s", "string")>]
 [<InlineData("class MyClass", "class MyClass extends")>]
 [<Theory>]
 let matchStrIsSuccess (expected, text) =

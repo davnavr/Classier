@@ -22,19 +22,24 @@ type TokenDef<'T> =
 
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
-let createTokenizer<'T> (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
+let tokenContent (token: Token<'T>) = token.Content
+
+let tokenType (token: Token<'T>) = token.Type
+
+let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
     let nextToken (item: Item<char>) =
         // TODO: Need to find a way to append char to the unknown token until a definition is found.
         let results =
             definitions
-            |> Seq.map (fun def -> def.Type, result (def.Match, item)) 
+            |> Seq.map (fun def -> def.Type, result (def.Match, item))
+            |> Seq.filter (fun (_, r) -> isSuccess r)
             |> Seq.cache
+        
+        // TODO: How do we check if the results have a success while also sorting it by the longest success efficiently?
 
-        //match results |> Seq.tryFind(fun (_, r) -> isSuccess r) with
-        //| Some r -> ()
-        //| None -> ()
-
-        //let tokenDef =  // |> Seq.fold
+        let tokenMatch =
+            (fun x1 x2 -> x1)
+            |> Seq.fold
 
         { Content = "Test"; Type = defaultVal }, nextItem item
 
@@ -48,6 +53,6 @@ let createTokenizer<'T> (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokeni
                 item <- next
         })
 
-let tokenize<'T> (tokenizer: Tokenizer<'T>) chars =
+let tokenize (tokenizer: Tokenizer<'T>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer
     tokenizeFunc chars

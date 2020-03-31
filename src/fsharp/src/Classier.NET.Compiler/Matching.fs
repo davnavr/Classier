@@ -9,7 +9,7 @@ type Item<'T> =
     | End
 
 type MatchResult<'T> =
-    | Success of Item<'T>
+    | Success of Item<'T> // TODO: Include a seq<'T> in the Success?
     | Failure of string * Item<'T>
 
 /// <summary>
@@ -23,7 +23,7 @@ type MatchFunc<'T> = Match of (Item<'T> -> MatchResult<'T>)
 /// </summary>
 /// <param name="items">The sequence contains the items.</param>
 /// <returns>An <see cref="Item{T}.Item"/> containing the first element of the sequenc; or <see cref="Item{T}.End"/> if the sequence has no items.</returns>
-let itemFrom<'T> (items: seq<'T>): Item<'T> =
+let itemFrom (items: seq<'T>): Item<'T> =
     let enumerator = items.GetEnumerator()
     let rec nextItem index =
         if enumerator.MoveNext() then
@@ -33,7 +33,7 @@ let itemFrom<'T> (items: seq<'T>): Item<'T> =
             End
     nextItem 0
 
-let itemIsEnd<'T> (item: Item<'T>) =
+let itemIsEnd (item: Item<'T>) =
     match item with
     | End -> true
     | Item  _ -> false
@@ -43,12 +43,12 @@ let itemIsEnd<'T> (item: Item<'T>) =
 /// </summary>
 /// <param name="item"></param>
 /// <returns>The index of the specified item; or <c>-1</c> if the item indicated the end of the sequence.</returns>
-let itemIndex<'T> (item: Item<'T>) =
+let itemIndex (item: Item<'T>) =
     match item with
     | Item (_, i, _) -> i
     | End -> -1
 
-let nextItem<'T> (item: Item<'T>) =
+let nextItem (item: Item<'T>) =
     match item with
     | Item (_, _, next) -> next.Value
     | End -> End
@@ -73,32 +73,32 @@ let asFailure result =
     | Success _ -> invalidArg "result" "The result must indicate a failure."
     | Failure (msg, item) -> (msg, item)
 
-let result<'T> (f: MatchFunc<'T>, item) =
+let result (f: MatchFunc<'T>, item) =
     let (Match matchFunc) = f
     matchFunc(item)
 
-let success<'T> =
+let success =
     Match (fun (cur: Item<'T>) -> Success cur)
 
-let failure<'T> msg =
+let failure msg =
     Match (fun (cur: Item<'T>) -> Failure(msg, cur))
 
 // and
-let thenMatch<'T> (m1: MatchFunc<'T>) m2 =
+let thenMatch (m1: MatchFunc<'T>) m2 =
     Match (fun item1 ->
         let result1 = result (m1, item1)
         match result1 with
         | Failure _ -> result1
         | Success item2 -> result (m2, item2))
 
-let orMatch<'T> (m1: MatchFunc<'T>) m2 =
+let orMatch (m1: MatchFunc<'T>) m2 =
     Match (fun item ->
         let result1 = result (m1, item)
         match result1 with
         | Failure _ -> result (m2, item)
         | Success _ -> result1)
 
-let matchAny<'T> (matches: seq<MatchFunc<'T>>) =
+let matchAny (matches: seq<MatchFunc<'T>>) =
     if matches |> Seq.isEmpty then
         failure "Cannot match any, the match sequence was empty."
     else
@@ -111,11 +111,30 @@ let matchAny<'T> (matches: seq<MatchFunc<'T>>) =
             | Some result -> result
             | None -> results |> Seq.last)
 
+let matchAnyOf (items: seq<'TItem>) (f: 'TItem -> MatchFunc<'T>) =
+    if items |> Seq.isEmpty then
+        success
+    else
+        items |> Seq.map f |> matchAny
+
+// 1 or more
+let matchMany (f: MatchFunc<'T>) =
+    Match (fun item ->
+        let results =
+            (fun _ -> result (f, item))
+            |> Seq.initInfinite
+            |> Seq.takeWhile isSuccess
+    
+        if results |> Seq.isEmpty then
+            result (f, item)
+        else
+            results |> Seq.last)
+
 /// <summary>
 /// Matches against the specified character.
 /// </summary>
 /// <param name="char">The character to match.</param>
-let matchChar char: MatchFunc<char> =
+let matchChar char =
     let failMsg r = sprintf "Expected character %c, but %s" char r
     Match (fun cur ->
         match cur with
@@ -130,7 +149,7 @@ let matchChar char: MatchFunc<char> =
 /// Matches against a sequence of characters.
 /// </summary>
 /// <param name="str">The expected sequence of characters.</param>
-let matchStr str: MatchFunc<char> =
+let matchStr str =
     if str |> Seq.isEmpty then
         success
     else
@@ -139,10 +158,3 @@ let matchStr str: MatchFunc<char> =
             match r with
             | Success _ -> r
             | Failure (msg, _) -> Failure (sprintf "Failure parsing '%s'. %s" str msg, item))
-
-let matchAnyStr (strings: seq<string>) =
-    match strings with
-    | empty when empty |> Seq.isEmpty ->
-        success
-    | _ ->
-        strings |> Seq.map matchStr |> matchAny

@@ -8,16 +8,25 @@ open System
 open Classier.NET.Compiler.Lexing
 open Classier.NET.Compiler.Matching
 
+/// Indicates the type of a token.
 type TokenType =
     /// The token is of an unknown type.
-    | Unknown
+    | Unknown = 0
     /// The token is an access modifier.
-    | AccessModifier
+    | AccessModifier = 1
+    /// The token is a language keyword.
+    | Keyword = 2
+    /// The token is whitespace (a space or tab).
+    | Whitespace = 3
     /// The token indicates a new line.
-    | NewLine
+    | NewLine = 4
 
+/// Tokenizes the source code.
 let tokenizer = createTokenizer ([
-        { Type = TokenType.AccessModifier; Match = (matchStr "test") }
+        { Type = TokenType.AccessModifier; Match = (matchAnyOf ["public"; "internal"; "private"] matchStr) }
+        { Type = TokenType.Keyword; Match = (matchAnyOf ["class"; "using"] matchStr) }
+        { Type = TokenType.Whitespace; Match = matchMany (matchAnyOf [' '; '\t'] matchChar) }
+        { Type = TokenType.NewLine; Match = (matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr) }
     ], TokenType.Unknown)
 
 /// <summary>
