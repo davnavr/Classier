@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Copyright (c) 2020, David Navarro. All rights reserved.
-  Licensed under the MIT license. For more information, see the 'LICENSE' file in the project root.
+  Copyright (c) 2020, David Navarro.
 -->
 <Project>
-  
+
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" />
 
   <!-- References -->
@@ -12,7 +11,6 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
-    <ProjectReference Include="$(SrcDirectory)/fsharp/src/$(TestProjectFor)/$(TestProjectFor).fsproj" />
   </ItemGroup>
-  
+
 </Project>

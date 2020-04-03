@@ -1,12 +1,11 @@
 ﻿<!--
-  Copyright (c) 2020, David Navarro. All rights reserved.
-  Licensed under the MIT license. For more information, see the 'LICENSE' file in the project root.
+  Copyright (c) 2020, David Navarro.
 -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AssemblyName>$(Product).Compiler</AssemblyName>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <GenerateDocumentationFile Condition="'$(Configuration)' != 'DEBUG'">false</GenerateDocumentationFile>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>

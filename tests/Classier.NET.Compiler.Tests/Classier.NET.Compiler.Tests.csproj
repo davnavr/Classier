@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020, David Navarro.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Assembly information -->
+  <PropertyGroup>
+    <AssemblyName>$(RootNamespace).Tests</AssemblyName>
+    <RootNamespace>$(Product).Compiler</RootNamespace>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+  </PropertyGroup>
+
+  <!-- References -->
+  <ItemGroup>
+    <ProjectReference Include="$(RootDirectory)/src/$(RootNamespace)/$(RootNamespace).fsproj" />
+  </ItemGroup>
+
+</Project>
