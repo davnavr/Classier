@@ -21,7 +21,7 @@ open Classier.NET.Compiler.Matching
 
 type Token<'T> =
     {
-        Content: string
+        Content: string // TODO: Change to seq<char>
         Type: 'T
     }
 
@@ -45,20 +45,31 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
             |> Seq.map (fun def -> def.Type, result (def.Match, item))
             |> Seq.filter (fun (_, r) -> isSuccess r)
             |> Seq.cache
+
+        let longestResult (ctype: 'T, endIndex: int) (rtype: 'T, r: MatchResult<char>) =
+            let current = (ctype, endIndex)
+            match r with
+            | Success nextItem ->
+                if nextItem.Index > endIndex then
+                    (rtype, nextItem.Index);
+                else
+                    current
+            | _ -> current
+
+        let (matchType, matchLen) = Seq.fold longestResult (defaultVal, -1) results
         
-        // TODO: How do we check if the results have a success while also sorting it by the longest success efficiently?
+        if matchType = defaultVal then
+            () // TODO: Return unknown until match is found.
+        else
+            ()
 
-        let tokenMatch =
-            (fun x1 x2 -> x1)
-            |> Seq.fold
-
-        { Content = "Test"; Type = defaultVal }, nextItem item
+        { Content = "Test"; Type = defaultVal }, item.Next
 
     Tokenizer (fun chars ->
         seq {
             let mutable item = itemFrom chars
             
-            while not (itemIsEnd item) do
+            while not item.HasNext do
                 let (token, next) = nextToken item
                 yield token
                 item <- next

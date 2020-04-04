@@ -19,6 +19,24 @@ type Item<'T> =
     /// Indicates the end of a sequence.
     | End
 
+    /// Gets the index of the specified item.
+    member this.Index =
+        match this with
+        | Item (_, index, _) -> index
+        | End -> -1
+
+    /// Gets the next item.
+    member this.Next =
+        match this with
+        | Item (_, _, next) -> next.Value
+        | End -> this
+
+    /// Gets a value indicating whether the next item in the sequence is available.
+    member this.HasNext =
+        match this.Next with
+        | Item _ -> true
+        | End -> false
+
 type MatchResult<'T> =
     | Success of Item<'T> // TODO: Include a seq<'T> in the Success?
     | Failure of string * Item<'T>
@@ -44,26 +62,6 @@ let itemFrom (items: seq<'T>): Item<'T> =
             End
     nextItem 0
 
-let itemIsEnd (item: Item<'T>) =
-    match item with
-    | End -> true
-    | Item  _ -> false
-
-/// <summary>
-/// Gets the index of the specified item.
-/// </summary>
-/// <param name="item"></param>
-/// <returns>The index of the specified item; or <c>-1</c> if the item indicated the end of the sequence.</returns>
-let itemIndex (item: Item<'T>) =
-    match item with
-    | Item (_, i, _) -> i
-    | End -> -1
-
-let nextItem (item: Item<'T>) =
-    match item with
-    | Item (_, _, next) -> next.Value
-    | End -> End
-
 /// <summary>
 /// Determines whether a result is a success.
 /// </summary>
@@ -74,11 +72,13 @@ let isSuccess result =
     | Success _ -> true
     | Failure _ -> false
 
+[<System.Obsolete>]
 let asSuccess result =
     match result with
     | Success item -> item
     | Failure _ -> invalidArg "result" "The result must indicate a success."
 
+[<System.Obsolete>]
 let asFailure result =
     match result with
     | Success _ -> invalidArg "result" "The result must indicate a failure."

@@ -41,7 +41,7 @@ namespace Classier.NET.Compiler
 
             // Assert
             Assert.Contains(matches[matches.Length - 1], msg);
-            Assert.Equal(itemIndex(startItem), itemIndex(endItem));
+            Assert.Equal(startItem.Index, endItem.Index);
         }
 
         [InlineData('T', "Test")]
@@ -56,7 +56,7 @@ namespace Classier.NET.Compiler
             Item<char> endItem = asSuccess(result(matchChar(expected), startItem));
 
             // Assert
-            Assert.NotEqual(itemIndex(startItem), itemIndex(endItem));
+            Assert.NotEqual(startItem.Index, endItem.Index);
         }
 
         [InlineData('a', "ABC")]
@@ -71,7 +71,7 @@ namespace Classier.NET.Compiler
             var (msg, endItem) = asFailure(result(matchChar(expected), startItem));
 
             // Assert
-            Assert.Equal(itemIndex(startItem), itemIndex(endItem));
+            Assert.Equal(startItem.Index, endItem.Index);
             Assert.Contains("got", msg);
         }
 
@@ -85,7 +85,7 @@ namespace Classier.NET.Compiler
             var (msg, endItem) = asFailure(result(matchChar('a'), startItem));
 
             // Assert
-            Assert.Equal(itemIndex(startItem), itemIndex(endItem));
+            Assert.Equal(startItem.Index, endItem.Index);
             Assert.Contains("end of", msg);
         }
 
@@ -102,7 +102,7 @@ namespace Classier.NET.Compiler
             Item<char> endItem = asSuccess(result(matchStr(expected), startItem));
 
             // Assert
-            Assert.NotEqual(itemIndex(startItem), itemIndex(endItem));
+            Assert.NotEqual(startItem.Index, endItem.Index);
         }
 
         [InlineData("")]
@@ -117,7 +117,7 @@ namespace Classier.NET.Compiler
             Item<char> endItem = asSuccess(result(matchStr(string.Empty), startItem));
 
             // Assert
-            Assert.Equal(itemIndex(startItem), itemIndex(endItem));
+            Assert.Equal(startItem.Index, endItem.Index);
         }
 
         [InlineData("error", "erro")]
@@ -132,7 +132,7 @@ namespace Classier.NET.Compiler
             var (msg, endItem) = asFailure(result(matchStr(expected), startItem));
 
             // Assert
-            Assert.Equal(itemIndex(startItem), itemIndex(endItem));
+            Assert.Equal(startItem.Index, endItem.Index);
             Assert.Contains(expected, msg);
             Assert.Contains("end of", msg);
         }
@@ -151,7 +151,7 @@ namespace Classier.NET.Compiler
             var (msg, endItem) = asFailure(result(matchStr(expected), startItem));
 
             // Assert
-            Assert.Equal(itemIndex(startItem), itemIndex(endItem));
+            Assert.Equal(startItem.Index, endItem.Index);
             Assert.Contains(expected, msg);
             Assert.Contains("got", msg);
             Assert.Contains(badChar, msg.Substring(msg.LastIndexOf("got")));
