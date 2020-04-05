@@ -56,7 +56,7 @@ namespace Classier.NET.Compiler
             var success = (MatchResult<char>.Success)result(matchChar(expected), startItem);
 
             // Assert
-            Assert.NotEqual(startItem.Index, success.Item.Index);
+            Assert.Equal(startItem.Index + 1, success.Item.Index);
         }
 
         [InlineData('a', "ABC")]
@@ -102,7 +102,7 @@ namespace Classier.NET.Compiler
             var success = (MatchResult<char>.Success)result(matchStr(expected), startItem);
 
             // Assert
-            Assert.NotEqual(startItem.Index, success.Item.Index);
+            Assert.Equal(startItem.Index + expected.Length, success.Item.Index);
         }
 
         [InlineData("")]
@@ -175,7 +175,7 @@ namespace Classier.NET.Compiler
             var success = (MatchResult<char>.Success)result(matchMany(matchStr(expected)), startItem);
 
             // Assert
-            Assert.NotEqual(startItem.Index, success.Item.Index);
+            Assert.Equal(startItem.Index + (expected.Length * repeatCount), success.Item.Index);
             Assert.Equal(string.Concat(Enumerable.Repeat(expected, repeatCount)), text.Substring(0, expected.Length * repeatCount));
         }
     }

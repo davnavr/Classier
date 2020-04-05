@@ -17,25 +17,25 @@ module Classier.NET.Compiler.Matching
 type Item<'T> =
     | Item of Item : 'T * Index : int * Next : Lazy<Item<'T>>
     /// Indicates the end of a sequence.
-    | End
+    | End of int
 
     /// Gets the index of the specified item.
     member this.Index =
         match this with
         | Item (_, index, _) -> index
-        | End -> -1
+        | End index -> index
 
     /// Gets the next item.
     member this.Next =
         match this with
         | Item (_, _, next) -> next.Value
-        | End -> this
+        | End _ -> this
 
     /// Gets a value indicating whether the next item in the sequence is available.
     member this.HasNext =
         match this.Next with
         | Item _ -> true
-        | End -> false
+        | End _ -> false
 
     member this.SelectItems (toItem: Item<'T>): seq<'T> =
         if this.Index > toItem.Index then
@@ -44,13 +44,14 @@ type Item<'T> =
             match this with
             | Item _ ->
                 seq {
+                    // TODO: Replace with Seq.fold.
                     let mutable prev = this
-                    while prev.HasNext do
+                    while (match prev with | Item _ -> true | End _ -> false) do
                         let (Item (item, _, next)) = prev
                         yield item
                         prev <- next.Value
                 }
-            | End -> Seq.empty
+            | End _ -> Seq.empty
             //Seq.initInfinite (fun _ -> this.Next)
             //|> Seq.takeWhile(fun item -> item.HasNext && item.Index <= toItem.Index)
             //|> Seq.map (fun next ->
@@ -86,7 +87,7 @@ let itemFrom (items: seq<'T>): Item<'T> =
             Item(enumerator.Current, index, lazy nextItem (index + 1))
         else
             enumerator.Dispose() |> ignore
-            End
+            End index
     nextItem 0
 
 /// <summary>
@@ -172,7 +173,7 @@ let matchChar char =
                 Success next.Value
             else
                 Failure (failMsg (sprintf "got %c instead" act), cur)
-        | End -> Failure (failMsg "the end of the text was reached instead.", cur))
+        | End _ -> Failure (failMsg "the end of the text was reached instead.", cur))
 
 /// <summary>
 /// Matches against a sequence of characters.

@@ -63,13 +63,14 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
             // TODO: Return unknown until match is found.
             { Content = "Test"; Type = defaultVal }, item.Next
         else
-            { Content = string(item.SelectItems(matchItem)); Type = matchType }, matchItem
+            { Content = String.Concat(item.SelectItems(matchItem)); Type = matchType }, matchItem
 
     Tokenizer (fun chars ->
         seq {
+            // TODO: Replace with Seq.fold.
             let mutable item = itemFrom chars
             
-            while item.HasNext do
+            while (match item with | Item _ -> true | End _ -> false) do
                 let (token, next) = nextToken item
                 yield token
                 item <- next
