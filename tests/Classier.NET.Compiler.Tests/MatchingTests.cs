@@ -159,14 +159,14 @@ namespace Classier.NET.Compiler
             Assert.Contains(badChar, message.Substring(message.LastIndexOf("got")));
         }
 
-        [InlineData("cs", "cscscs")]
-        [InlineData("work", "work")]
-        [InlineData("two", "two")]
-        [InlineData(" ", "      ")]
-        [InlineData("return", "returnret")]
-        [InlineData("menu", "menumenumenumenumenumenumenumenumenumenumenumenu")]
+        [InlineData("cs", "cscscs", 3)]
+        [InlineData("work", "work", 1)]
+        [InlineData("two", "twotwo", 2)]
+        [InlineData(" ", "      ", 6)]
+        [InlineData("return", "returnreturnret", 2)]
+        [InlineData("menu", "menumenumenumenumenumenumenumenumenumenumenumenu", 12)]
         [Theory]
-        public void MatchManyIsSuccessForRepeated(string expected, string text)
+        public void MatchManyIsSuccessForRepeated(string expected, string text, int repeatCount)
         {
             // Arrange
             Item<char> startItem = itemFrom(text);
@@ -176,7 +176,7 @@ namespace Classier.NET.Compiler
 
             // Assert
             Assert.NotEqual(startItem.Index, success.Item.Index);
-            ////Assert.EndsWith( , expected);
+            Assert.Equal(string.Concat(Enumerable.Repeat(expected, repeatCount)), text.Substring(0, expected.Length * repeatCount));
         }
     }
 }

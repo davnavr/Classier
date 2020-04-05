@@ -37,6 +37,28 @@ type Item<'T> =
         | Item _ -> true
         | End -> false
 
+    member this.SelectItems (toItem: Item<'T>): seq<'T> =
+        if this.Index > toItem.Index then
+            toItem.SelectItems this
+        else
+            match this with
+            | Item _ ->
+                seq {
+                    let mutable prev = this
+                    while prev.HasNext do
+                        let (Item (item, _, next)) = prev
+                        yield item
+                        prev <- next.Value
+                }
+            | End -> Seq.empty
+            //Seq.initInfinite (fun _ -> this.Next)
+            //|> Seq.takeWhile(fun item -> item.HasNext && item.Index <= toItem.Index)
+            //|> Seq.map (fun next ->
+            //    match next with
+            //    | Item (item, _, _) -> item
+            //    | End -> invalidOp "The item should not indicate the end of the collection.")
+            //|> Seq.cache
+
 type MatchResult<'T> =
     | Success of Item<'T> // TODO: Include a seq<'T> in the Success?
     | Failure of string * Item<'T>
@@ -56,7 +78,7 @@ type MatchFunc<'T> = Match of (Item<'T> -> MatchResult<'T>)
 /// Creates an item containing the first element of the specified sequence.
 /// </summary>
 /// <param name="items">The sequence contains the items.</param>
-/// <returns>An <see cref="Item{T}.Item"/> containing the first element of the sequenc; or <see cref="Item{T}.End"/> if the sequence has no items.</returns>
+/// <returns>An <see cref="Item{T}.Item"/> containing the first element of the sequence; or <see cref="Item{T}.End"/> if the sequence has no items.</returns>
 let itemFrom (items: seq<'T>): Item<'T> =
     let enumerator = items.GetEnumerator()
     let rec nextItem index =
@@ -76,18 +98,6 @@ let isSuccess result =
     match result with
     | Success _ -> true
     | Failure _ -> false
-
-[<System.Obsolete("Use casts instead.", true)>]
-let asSuccess result =
-    match result with
-    | Success item -> item
-    | Failure _ -> invalidArg "result" "The result must indicate a success."
-    
-[<System.Obsolete("Use casts instead.", true)>]
-let asFailure result =
-    match result with
-    | Success _ -> invalidArg "result" "The result must indicate a failure."
-    | Failure (msg, item) -> (msg, item)
 
 let result (f: MatchFunc<'T>, item) =
     let (Match matchFunc) = f

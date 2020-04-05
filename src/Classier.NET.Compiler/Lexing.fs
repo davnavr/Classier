@@ -31,6 +31,7 @@ type TokenDef<'T> =
         Type: 'T
     }
 
+/// Turns a sequence of characters into a sequence of tokens.
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
 let tokenContent (token: Token<'T>) = token.Content
@@ -39,31 +40,30 @@ let tokenType (token: Token<'T>) = token.Type
 
 let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
     let nextToken (item: Item<char>) =
-        // TODO: Need to find a way to append char to the unknown token until a definition is found.
         let results =
             definitions
             |> Seq.map (fun def -> def.Type, result (def.Match, item))
             |> Seq.filter (fun (_, r) -> isSuccess r)
-            //|> Seq.cache
+            |> Seq.cache
          
-        let longestResult (ctype: 'T, endIndex: int) (rtype: 'T, r: MatchResult<char>) =
-            let current = (ctype, endIndex)
+        let longestResult (ctype: 'T, citem: Item<char>) (rtype: 'T, r: MatchResult<char>) =
+            let current = (ctype, citem)
             match r with
             | Success nextItem ->
-                if nextItem.Index > endIndex then
-                    (rtype, nextItem.Index);
+                if nextItem.Index > citem.Index then
+                    (rtype, nextItem);
                 else
                     current
             | _ -> current
 
-        let (matchType, matchLen) = Seq.fold longestResult (defaultVal, -1) results
+        let (matchType, matchItem) = Seq.fold longestResult (defaultVal, item) results
         
         if matchType = defaultVal then
-            () // TODO: Return unknown until match is found.
+            // TODO: Need to find a way to append char to the unknown token until a definition is found.
+            // TODO: Return unknown until match is found.
+            { Content = "Test"; Type = defaultVal }, item.Next
         else
-            () // TODO: Get seq<char> from Success result.
-
-        { Content = "Test"; Type = defaultVal }, item.Next
+            { Content = string(item.SelectItems(matchItem)); Type = matchType }, matchItem
 
     Tokenizer (fun chars ->
         seq {
