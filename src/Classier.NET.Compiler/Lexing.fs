@@ -67,10 +67,9 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
 
     Tokenizer (fun chars ->
         seq {
-            // TODO: Replace with Seq.fold.
             let mutable item = itemFrom chars
             
-            while (match item with | Item _ -> true | End _ -> false) do
+            while not item.ReachedEnd do
                 let (token, next) = nextToken item
                 yield token
                 item <- next

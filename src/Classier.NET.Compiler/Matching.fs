@@ -30,13 +30,14 @@ type Item<'T> =
         match this with
         | Item (_, _, next) -> next.Value
         | End _ -> this
+        
+    /// Gets a value indicating whether the current item indicates the end of the sequence.
+    member this.ReachedEnd =
+        match this with
+        | Item _ -> false
+        | End _ -> true
 
-    /// Gets a value indicating whether the next item in the sequence is available.
-    member this.HasNext =
-        match this.Next with
-        | Item _ -> true
-        | End _ -> false
-
+    // exclusive
     member this.SelectItems (toItem: Item<'T>): seq<'T> =
         if this.Index > toItem.Index then
             toItem.SelectItems this
@@ -44,21 +45,17 @@ type Item<'T> =
             match this with
             | Item _ ->
                 seq {
-                    // TODO: Replace with Seq.fold.
-                    let mutable prev = this
-                    while (match prev with | Item _ -> true | End _ -> false) do
-                        let (Item (item, _, next)) = prev
+                    let mutable item = this
+                    while not item.ReachedEnd do
                         yield item
-                        prev <- next.Value
+                        item <- item.Next
                 }
+                |> Seq.takeWhile(fun item -> item.Index < toItem.Index)
+                |> Seq.map(fun entry ->
+                    match entry with
+                    | Item (item, _, _) -> item
+                    | End index -> invalidOp (sprintf "The entry at index '%i' should not indicate the end of the collection." index))
             | End _ -> Seq.empty
-            //Seq.initInfinite (fun _ -> this.Next)
-            //|> Seq.takeWhile(fun item -> item.HasNext && item.Index <= toItem.Index)
-            //|> Seq.map (fun next ->
-            //    match next with
-            //    | Item (item, _, _) -> item
-            //    | End -> invalidOp "The item should not indicate the end of the collection.")
-            //|> Seq.cache
 
 type MatchResult<'T> =
     | Success of Item<'T> // TODO: Include a seq<'T> in the Success?
