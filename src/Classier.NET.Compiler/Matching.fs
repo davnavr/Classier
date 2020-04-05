@@ -41,6 +41,11 @@ type MatchResult<'T> =
     | Success of Item<'T> // TODO: Include a seq<'T> in the Success?
     | Failure of string * Item<'T>
 
+    member this.Item =
+        match this with
+        | Success item -> item
+        | Failure (_, item) -> item
+
 /// <summary>
 /// Represents a function used to match against something.
 /// </summary>
@@ -72,13 +77,13 @@ let isSuccess result =
     | Success _ -> true
     | Failure _ -> false
 
-[<System.Obsolete>]
+[<System.Obsolete("Use casts instead.", true)>]
 let asSuccess result =
     match result with
     | Success item -> item
     | Failure _ -> invalidArg "result" "The result must indicate a success."
-
-[<System.Obsolete>]
+    
+[<System.Obsolete("Use casts instead.", true)>]
 let asFailure result =
     match result with
     | Success _ -> invalidArg "result" "The result must indicate a failure."
@@ -88,11 +93,10 @@ let result (f: MatchFunc<'T>, item) =
     let (Match matchFunc) = f
     matchFunc(item)
 
-let success =
-    Match (fun (cur: Item<'T>) -> Success cur)
+// fsharplint:disable-next-line ReimplementsFunction
+let success = Match (fun (cur: Item<'T>) -> Success cur)
 
-let failure msg =
-    Match (fun (cur: Item<'T>) -> Failure(msg, cur))
+let failure msg = Match (fun (cur: Item<'T>) -> Failure(msg, cur))
 
 // and
 let thenMatch (m1: MatchFunc<'T>) m2 =
@@ -132,10 +136,14 @@ let matchAnyOf (items: seq<'TItem>) (f: 'TItem -> MatchFunc<'T>) =
 let matchMany (f: MatchFunc<'T>) =
     Match (fun item ->
         let results =
-            (fun _ -> result (f, item))
-            |> Seq.initInfinite
-            |> Seq.takeWhile isSuccess
-    
+            seq {
+                let mutable prevMatch = result(f, item)
+                while isSuccess prevMatch do
+                    yield prevMatch
+                    prevMatch <- result(f, prevMatch.Item);
+            }
+            |> Seq.cache
+
         if results |> Seq.isEmpty then
             result (f, item)
         else

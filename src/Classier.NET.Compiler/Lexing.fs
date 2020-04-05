@@ -21,7 +21,7 @@ open Classier.NET.Compiler.Matching
 
 type Token<'T> =
     {
-        Content: string // TODO: Change to seq<char>
+        Content: string
         Type: 'T
     }
 
@@ -44,8 +44,8 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
             definitions
             |> Seq.map (fun def -> def.Type, result (def.Match, item))
             |> Seq.filter (fun (_, r) -> isSuccess r)
-            |> Seq.cache
-
+            //|> Seq.cache
+         
         let longestResult (ctype: 'T, endIndex: int) (rtype: 'T, r: MatchResult<char>) =
             let current = (ctype, endIndex)
             match r with
@@ -61,7 +61,7 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
         if matchType = defaultVal then
             () // TODO: Return unknown until match is found.
         else
-            ()
+            () // TODO: Get seq<char> from Success result.
 
         { Content = "Test"; Type = defaultVal }, item.Next
 
@@ -69,7 +69,7 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
         seq {
             let mutable item = itemFrom chars
             
-            while not item.HasNext do
+            while item.HasNext do
                 let (token, next) = nextToken item
                 yield token
                 item <- next
