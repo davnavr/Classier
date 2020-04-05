@@ -123,7 +123,7 @@ let orMatch (m1: MatchFunc<'T>) m2 =
 
 let matchAny (matches: seq<MatchFunc<'T>>) =
     if matches |> Seq.isEmpty then
-        failure "Cannot match any, the match sequence was empty."
+        success
     else
         Match (fun item ->
             let results =
