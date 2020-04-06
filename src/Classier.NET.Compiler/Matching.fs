@@ -182,14 +182,31 @@ let matchChain (items: seq<MatchFunc<'T>>) =
 /// <param name="char">The character to match.</param>
 let matchChar char =
     let failMsg r = sprintf "Expected character %c, but %s" char r
-    Match (fun cur ->
-        match cur with
+    Match (fun item ->
+        match item with
         | Item (act, _, next) ->
             if char = act then
                 Success next.Value
             else
-                Failure (failMsg (sprintf "got %c instead" act), cur)
-        | End _ -> Failure (failMsg "the end of the text was reached instead.", cur))
+                Failure (failMsg (sprintf "got %c instead" act), item)
+        | End _ -> Failure (failMsg "the end of the text was reached instead.", item))
+
+/// <summary>
+/// Matches against any of the specified characters.
+/// </summary>
+/// <param name="chars">A collection containing the characters to match.</param>
+let matchAnyChar chars = matchAnyOf chars matchChar
+
+/// <summary>
+/// Matches against the characters in the specified range, inclusive.
+/// </summary>
+/// <param name="c1">The lower character.</param>
+/// <param name="c2">The higher character.</param>
+let rec matchCharRange c1 c2 =
+    if c1 > c2 then
+        matchCharRange c2 c1
+    else
+        matchAnyChar (seq { c1 .. c2 })
 
 /// <summary>
 /// Matches against a sequence of characters.

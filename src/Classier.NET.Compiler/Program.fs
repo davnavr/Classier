@@ -104,8 +104,8 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.MLCommentEnd; Match = matchStr "*/" }
         { Type = TokenType.SLComment; Match = (matchStr "//") |> thenMatch (failure "Not yet implemented") }
         
-        //{ Type = TokenType.BinLit; Match = matchOptional (matchChar '-') |> thenMatch (matchStr "0") |> thenMatch (matchAnyOf ['b'; 'B'] matchChar) |> thenMatch (failure "Not implemented, should check for 0 or 1 and underscore digit separators") }
-        { Type = TokenType.BinLit; Match = matchChain [ matchOptional (matchChar '-'); matchStr "0"; matchAnyOf ['b'; 'B'] matchChar; ] }
+        { Type = TokenType.BinLit; Match = matchChain [ matchStr "0"; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany ] }
+        { Type = TokenType.HexLit; Match = matchChain [ matchStr "0"; matchAnyChar ['x'; 'X']; matchAny [ matchChar '_'; matchCharRange '0' '9'; matchCharRange 'a' 'f'; matchCharRange 'A' 'F' ] |> matchMany]}
         { Type = TokenType.TrueLit; Match = matchStr "true" }
         { Type = TokenType.FalseLit; Match = matchStr "false" }
 
@@ -113,7 +113,7 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.RightParen; Match = matchChar ')' }
         { Type = TokenType.Period; Match = matchChar '.' }
 
-        { Type = TokenType.Whitespace; Match = matchMany (matchAnyOf [' '; '\t'] matchChar) }
+        { Type = TokenType.Whitespace; Match = matchAnyChar [' '; '\t'] |> matchMany }
         { Type = TokenType.NewLine; Match = (matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr) }
 
         { Type = TokenType.Identifier; Match = failure "Not yet implemented."}

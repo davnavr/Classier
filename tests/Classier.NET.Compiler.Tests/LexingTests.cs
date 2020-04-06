@@ -28,6 +28,7 @@ namespace Classier.NET.Compiler
         [InlineData("1600\t// My comment", TokenType.IntLit, TokenType.Whitespace, TokenType.SLComment)]
         [InlineData("/*\u0001*/", TokenType.MLCommentStart, TokenType.Unknown, TokenType.MLCommentEnd)]
         [InlineData("myVariable.myMethod(true)", TokenType.Identifier, TokenType.Period, TokenType.Identifier, TokenType.LeftParen, TokenType.TrueLit, TokenType.RightParen)]
+        [InlineData("0B010101-0XFFAB", TokenType.BinLit, TokenType.SubOp, TokenType.HexLit)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {
