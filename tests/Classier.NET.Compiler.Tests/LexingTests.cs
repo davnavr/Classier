@@ -30,7 +30,7 @@ namespace Classier.NET.Compiler
         [InlineData("myVariable.myMethod(true)", TokenType.Identifier, TokenType.Period, TokenType.Identifier, TokenType.LeftParen, TokenType.TrueLit, TokenType.RightParen)]
         [InlineData("0B010101-0XFFAB", TokenType.BinLit, TokenType.SubOp, TokenType.HexLit)]
         [InlineData("private\r\nclass", TokenType.AccPrivate, TokenType.NewLine, TokenType.WrdClass)]
-        [InlineData("one\r\n\r\ntwo", TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier)]
+        [InlineData("one\r\n\r\ntwo\n\nthree", TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {

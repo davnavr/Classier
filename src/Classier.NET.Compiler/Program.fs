@@ -34,8 +34,10 @@ type TokenType =
     | WrdClass = 4
     /// The token is a keyword that indicates the declaration of a field or local variable.
     | WrdLet = 5
+    /// The token is a keyword that indicates the declaration of a namespace.
+    | WrdNamespace = 6
     /// The token is a modifier.
-    | Modifier = 6
+    | Modifier = 7
 
     /// The token is a plus sign.
     | AddOp = 10
@@ -97,6 +99,8 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.AccInternal; Match = matchStr "internal" }
         { Type = TokenType.AccPrivate; Match = matchStr "private" }
         { Type = TokenType.WrdClass; Match = matchStr "class" }
+        { Type = TokenType.WrdLet; Match = matchStr "let" }
+        { Type = TokenType.WrdNamespace; Match = matchStr "namespace" }
         { Type = TokenType.Modifier; Match = matchAnyOf ["mutable"; "virtual"] matchStr }
 
         { Type = TokenType.AddOp; Match = matchChar '+' }
@@ -112,8 +116,8 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.MLCommentEnd; Match = matchStr "*/" }
         { Type = TokenType.SLComment; Match = (matchStr "//") |> thenMatch (failure "Not yet implemented") }
         
-        { Type = TokenType.BinLit; Match = matchChain [ matchStr "0"; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany ] }
-        { Type = TokenType.HexLit; Match = matchChain [ matchStr "0"; matchAnyChar ['x'; 'X']; matchAny [ matchChar '_'; matchCharRange '0' '9'; matchCharRange 'a' 'f'; matchCharRange 'A' 'F' ] |> matchMany]}
+        { Type = TokenType.BinLit; Match = matchChain [matchStr "0"; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany] }
+        { Type = TokenType.HexLit; Match = matchChain [matchStr "0"; matchAnyChar ['x'; 'X']; matchAny [matchChar '_'; matchCharRange '0' '9'; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'] |> matchMany]}
         { Type = TokenType.TrueLit; Match = matchStr "true" }
         { Type = TokenType.FalseLit; Match = matchStr "false" }
 
@@ -124,7 +128,7 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.Whitespace; Match = matchAnyChar [' '; '\t'] |> matchMany }
         { Type = TokenType.NewLine; Match = (matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr) }
 
-        { Type = TokenType.Identifier; Match = failure "Not yet implemented."}
+        { Type = TokenType.Identifier; Match = matchChain [matchAny [matchCharRange 'a' 'z'; matchCharRange 'A' 'Z']; matchOptional (matchMany (matchAny [matchCharRange 'a' 'z'; matchCharRange 'A' 'Z'; matchCharRange '0' '9'; matchChar '_']))]}
     ], TokenType.Unknown)
 
 /// <summary>
