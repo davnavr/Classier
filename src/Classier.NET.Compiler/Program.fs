@@ -30,8 +30,12 @@ type TokenType =
     | AccInternal = 2
     /// The token is an access modifier restricting access to the containing type.
     | AccPrivate = 3
-    /// The token is a language keyword.
-    | Keyword = 4
+    /// The token is a keyword that indicates the declaration of a class.
+    | WrdClass = 4
+    /// The token is a keyword that indicates the declaration of a field or local variable.
+    | WrdLet = 5
+    /// The token is a modifier.
+    | Modifier = 6
 
     /// The token is a plus sign.
     | AddOp = 10
@@ -41,12 +45,14 @@ type TokenType =
     | MulOp = 12
     /// The token is a slash <c>U+002F</c>.
     | DivOp = 13
+    /// The token is an equals sign.
+    | EqOp = 14
     /// The token indicates the boolean <c>AND</c>.
-    | AndOp = 14
+    | AndOp = 15
     /// The token indicates the boolean <c>OR</c>.
-    | OrOp = 15
+    | OrOp = 16
     /// The token indicates logical negation.
-    | NotOp = 16
+    | NotOp = 17
 
     /// The token indicates the start of a multi-line comment.
     | MLCommentStart = 20
@@ -90,12 +96,14 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.AccPublic; Match = matchStr "public" }
         { Type = TokenType.AccInternal; Match = matchStr "internal" }
         { Type = TokenType.AccPrivate; Match = matchStr "private" }
-        { Type = TokenType.Keyword; Match = (matchAnyOf ["class"] matchStr) } // TODO: Make all keywords a separate enum value?
+        { Type = TokenType.WrdClass; Match = matchStr "class" }
+        { Type = TokenType.Modifier; Match = matchAnyOf ["mutable"; "virtual"] matchStr }
 
         { Type = TokenType.AddOp; Match = matchChar '+' }
         { Type = TokenType.SubOp; Match = matchChar '-' }
         { Type = TokenType.MulOp; Match = matchChar '*' }
         { Type = TokenType.DivOp; Match = matchChar '/' }
+        { Type = TokenType.EqOp; Match = matchChar '=' }
         { Type = TokenType.AndOp; Match = matchStr "and" }
         { Type = TokenType.OrOp; Match = matchStr "or" }
         { Type = TokenType.NotOp; Match = matchStr "not" }

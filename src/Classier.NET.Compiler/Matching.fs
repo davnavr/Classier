@@ -15,7 +15,7 @@
 module Classier.NET.Compiler.Matching
 
 type Item<'T> =
-    | Item of Item : 'T * Index : int * Next : Lazy<Item<'T>>
+    | Item of 'T * int * Lazy<Item<'T>>
     /// Indicates the end of a sequence.
     | End of int
 
@@ -37,25 +37,13 @@ type Item<'T> =
         | Item _ -> false
         | End _ -> true
 
-    // exclusive
-    member this.SelectItems (toItem: Item<'T>): seq<'T> =
-        if this.Index > toItem.Index then
-            toItem.SelectItems this
-        else
-            match this with
-            | Item _ ->
-                seq {
-                    let mutable item = this
-                    while not item.ReachedEnd do
-                        yield item
-                        item <- item.Next
-                }
-                |> Seq.takeWhile(fun item -> item.Index < toItem.Index)
-                |> Seq.map(fun entry ->
-                    match entry with
-                    | Item (item, _, _) -> item
-                    | End index -> invalidOp (sprintf "The entry at index '%i' should not indicate the end of the collection." index))
-            | End _ -> Seq.empty
+    member this.AsSequence() =
+        seq {
+            let mutable item = this
+            while not item.ReachedEnd do
+                yield item
+                item <- item.Next
+        }
 
 type MatchResult<'T> =
     | Success of Item<'T> // TODO: Include a seq<'T> in the Success?
@@ -86,6 +74,20 @@ let itemFrom (items: seq<'T>): Item<'T> =
             enumerator.Dispose() |> ignore
             End index
     nextItem 0
+
+let rec selectItems (fromItem: Item<'T>) (toItem: Item<'T>): seq<'T> =
+    if fromItem.Index > toItem.Index then
+        selectItems toItem fromItem
+    else
+        match fromItem with
+        | Item _ ->
+            fromItem.AsSequence()
+            |> Seq.takeWhile(fun item -> item.Index < toItem.Index)
+            |> Seq.map(fun entry ->
+                match entry with
+                | Item (item, _, _) -> item
+                | End index -> invalidOp (sprintf "The entry at index '%i' should not indicate the end of the collection." index))
+        | End _ -> Seq.empty
 
 /// <summary>
 /// Determines whether a result is a success.

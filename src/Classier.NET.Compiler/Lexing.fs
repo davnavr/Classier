@@ -39,13 +39,13 @@ let tokenContent (token: Token<'T>) = token.Content
 let tokenType (token: Token<'T>) = token.Type
 
 let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
-    let nextToken (item: Item<char>) =
+    let nextMatch (item: Item<char>) =
         let results =
             definitions
             |> Seq.map (fun def -> def.Type, result (def.Match, item))
             |> Seq.filter (fun (_, r) -> isSuccess r)
             |> Seq.cache
-         
+
         let longestResult (ctype: 'T, citem: Item<char>) (rtype: 'T, r: MatchResult<char>) =
             let current = (ctype, citem)
             match r with
@@ -56,21 +56,25 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
                     current
             | _ -> current
 
-        let (matchType, matchItem) = Seq.fold longestResult (defaultVal, item) results
+        Seq.fold longestResult (defaultVal, item) results
+
+    let rec nextToken (item: Item<char>) =
+        let (matchType, matchItem) = nextMatch item
         
         if matchType = defaultVal then
-            // TODO: Need to find a way to append char to the unknown token until a definition is found.
             // TODO: Return unknown until match is found.
-            { Content = "Test"; Type = defaultVal }, item.Next
+            let (Item (c, _, _)) = item
+            { Content = string(c); Type = defaultVal }, item.Next
         else
-            { Content = String.Concat(item.SelectItems(matchItem)); Type = matchType }, matchItem
+            { Content = String.Concat(selectItems item matchItem); Type = matchType }, matchItem
 
     Tokenizer (fun chars ->
         seq {
             let mutable item = itemFrom chars
-            
+
             while not item.ReachedEnd do
                 let (token, next) = nextToken item
+
                 yield token
                 item <- next
         })
