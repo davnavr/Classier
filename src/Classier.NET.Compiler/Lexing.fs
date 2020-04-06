@@ -62,20 +62,28 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
         let (matchType, matchItem) = nextMatch item
         
         if matchType = defaultVal then
-            // TODO: Return unknown until match is found.
-            let (Item (c, _, _)) = item
-            { Content = string(c); Type = defaultVal }, item.Next
+            None, matchItem.Next
         else
-            { Content = String.Concat(selectItems item matchItem); Type = matchType }, matchItem
+            Some { Content = String.Concat(selectItems item matchItem); Type = matchType }, matchItem
 
     Tokenizer (fun chars ->
         seq {
             let mutable item = itemFrom chars
+            let mutable unknown = item
 
             while not item.ReachedEnd do
                 let (token, next) = nextToken item
 
-                yield token
+                match token with
+                | Some t ->
+                    if not (item.Index = unknown.Index) then
+                        yield { Content = String.Concat(selectItems unknown item); Type = defaultVal }
+
+                    yield t
+                    unknown <- next
+                | None ->
+                    ()
+                
                 item <- next
         })
 

@@ -39,23 +39,6 @@ type TokenType =
     /// The token is a modifier.
     | Modifier = 7
 
-    /// The token is a plus sign.
-    | AddOp = 10
-    /// The token is a minus sign.
-    | SubOp = 11
-    /// The token is an asterisk.
-    | MulOp = 12
-    /// The token is a slash <c>U+002F</c>.
-    | DivOp = 13
-    /// The token is an equals sign.
-    | EqOp = 14
-    /// The token indicates the boolean <c>AND</c>.
-    | AndOp = 15
-    /// The token indicates the boolean <c>OR</c>.
-    | OrOp = 16
-    /// The token indicates logical negation.
-    | NotOp = 17
-
     /// The token indicates the start of a multi-line comment.
     | MLCommentStart = 20
     /// The token indicates the end of a multi-line comment.
@@ -63,35 +46,52 @@ type TokenType =
     /// The token is a single-line comment.
     | SLComment = 22
 
+    /// The token is a plus sign.
+    | AddOp = 40
+    /// The token is a minus sign.
+    | SubOp = 41
+    /// The token is an asterisk.
+    | MulOp = 42
+    /// The token is a slash <c>U+002F</c>.
+    | DivOp = 43
+    /// The token is an equals sign.
+    | EqOp = 44
+    /// The token indicates the boolean <c>AND</c>.
+    | AndOp = 45
+    /// The token indicates the boolean <c>OR</c>.
+    | OrOp = 46
+    /// The token indicates logical negation.
+    | NotOp = 47
+
     /// The token is a string literal.
-    | StrLit = 30
+    | StrLit = 60
     /// The token is a binary literal.
-    | BinLit = 31
+    | BinLit = 61
     /// The token is a hexadecimal (base-16) literal.
-    | HexLit = 33
+    | HexLit = 62
     /// The token is a numeric literal (base-10) with a fractional component.
-    | DecLit = 32
+    | DecLit = 62
     /// The token is an integer (base-10) literal.
-    | IntLit = 34
+    | IntLit = 63
     /// The token indicates a <c>true</c> boolean value.
-    | TrueLit = 35
+    | TrueLit = 64
     /// The token indicates a <c>false</c> boolean value.
-    | FalseLit = 36
+    | FalseLit = 65
 
     // The token is an open paranthesis.
-    | LeftParen = 41
+    | LeftParen = 81
     // The token is an closed paranthesis.
-    | RightParen = 42
+    | RightParen = 82
     // The token is a period.
-    | Period = 43
+    | Period = 83
 
     /// The token is whitespace (a space or tab).
-    | Whitespace = 98
+    | Whitespace = 100
     /// The token indicates a new line.
-    | NewLine = 99
+    | NewLine = 101
 
     /// The token is an identifier.
-    | Identifier = 100
+    | Identifier = 110
 
 /// Tokenizes the source code.
 let tokenizer = createTokenizer ([
@@ -101,7 +101,11 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.WrdClass; Match = matchStr "class" }
         { Type = TokenType.WrdLet; Match = matchStr "let" }
         { Type = TokenType.WrdNamespace; Match = matchStr "namespace" }
-        { Type = TokenType.Modifier; Match = matchAnyOf ["mutable"; "virtual"] matchStr }
+        { Type = TokenType.Modifier; Match = matchAnyOf ["extends"; "implements"; "mutable"; "virtual"] matchStr }
+
+        { Type = TokenType.MLCommentStart; Match = matchStr "/*" }
+        { Type = TokenType.MLCommentEnd; Match = matchStr "*/" }
+        { Type = TokenType.SLComment; Match = (matchStr "//") |> thenMatch (failure "Not yet implemented") }
 
         { Type = TokenType.AddOp; Match = matchChar '+' }
         { Type = TokenType.SubOp; Match = matchChar '-' }
@@ -111,10 +115,6 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.AndOp; Match = matchStr "and" }
         { Type = TokenType.OrOp; Match = matchStr "or" }
         { Type = TokenType.NotOp; Match = matchStr "not" }
-
-        { Type = TokenType.MLCommentStart; Match = matchStr "/*" }
-        { Type = TokenType.MLCommentEnd; Match = matchStr "*/" }
-        { Type = TokenType.SLComment; Match = (matchStr "//") |> thenMatch (failure "Not yet implemented") }
         
         { Type = TokenType.BinLit; Match = matchChain [matchStr "0"; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany] }
         { Type = TokenType.HexLit; Match = matchChain [matchStr "0"; matchAnyChar ['x'; 'X']; matchAny [matchChar '_'; matchCharRange '0' '9'; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'] |> matchMany]}

@@ -31,6 +31,7 @@ namespace Classier.NET.Compiler
         [InlineData("0B010101-0XFFAB", TokenType.BinLit, TokenType.SubOp, TokenType.HexLit)]
         [InlineData("private\r\nclass", TokenType.AccPrivate, TokenType.NewLine, TokenType.WrdClass)]
         [InlineData("one\r\n\r\ntwo\n\nthree", TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier)]
+        [InlineData("// docs\u0085\u0002\u0003\u0004extends", TokenType.SLComment, TokenType.NewLine, TokenType.Unknown, TokenType.Modifier)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {
