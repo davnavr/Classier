@@ -27,21 +27,66 @@ namespace Classier.NET.Compiler
 
     public class MatchingTests
     {
-        [InlineData("not", "all", "is", "well")]
-        [InlineData("because", "it", "no", "working")]
+        [InlineData(new[] { "all", "is", "well" }, "not")]
+        [InlineData(new[] { "it", "no", "working" }, "because")]
         [Theory]
-        public void MatchAnyOfFailsWithLastResult(string text, params string[] matches)
+        public void MatchAnyOfFailsWithLastResult(string[] matches, string text)
         {
             // Arrange
-            Item<char> startItem = itemFrom(text);
             var matchStrFunc = new InteropFunc<string, MatchFunc<char>>(str => matchStr(str));
 
             // Act
-            var failure = (MatchResult<char>.Failure)result(matchAnyOf(matches, matchStrFunc), startItem);
+            var failure = (MatchResult<char>.Failure)result(matchAnyOf(matches, matchStrFunc), itemFrom(text));
 
             // Assert
             Assert.Contains(matches[matches.Length - 1], failure.Item1);
-            Assert.Equal(startItem.Index, failure.Item2.Index);
+            Assert.Equal(0, failure.Item2.Index);
+        }
+
+        [InlineData("cs", "cscscs", 3)]
+        [InlineData("work", "work", 1)]
+        [InlineData("two", "twotwo", 2)]
+        [InlineData(" ", "      ", 6)]
+        [InlineData("return", "returnreturnret", 2)]
+        [InlineData("menu", "menumenumenumenumenumenumenumenumenumenumenumenu", 12)]
+        [Theory]
+        public void MatchManyIsSuccessForRepeated(string expected, string text, int repeatCount)
+        {
+            // Act
+            var success = (MatchResult<char>.Success)result(matchMany(matchStr(expected)), itemFrom(text));
+
+            // Assert
+            Assert.Equal(expected.Length * repeatCount, success.Item.Index);
+            Assert.Equal(string.Concat(Enumerable.Repeat(expected, repeatCount)), text.Substring(0, expected.Length * repeatCount));
+        }
+
+        [InlineData("sedan", "truck", 0)]
+        [InlineData("something", "", 0)]
+        [InlineData("success", "success", 7)]
+        [InlineData("done", "donut", 0)]
+        [InlineData("win", "winner", 3)]
+        [Theory]
+        public void MatchOptionalIsAlwaysSuccess(string expected, string actual, int expectedIndex)
+        {
+            // Act
+            var success = (MatchResult<char>.Success)result(matchOptional(matchStr(expected)), itemFrom(actual));
+
+            // Assert
+            Assert.Equal(expectedIndex, success.Item.Index);
+        }
+
+        [InlineData(new[] { "type", "of", "(", "object)" }, "typeof(object)")]
+        [Theory]
+        public void MatchChainIsSuccess(string[] expected, string actual)
+        {
+            // Arrange
+            var chain = expected.Select(str => matchStr(str));
+
+            // Act
+            var success = (MatchResult<char>.Success)result(matchChain(chain), itemFrom(actual));
+
+            // Assert
+            Assert.Equal(expected.Select(str => str.Length).Sum(), success.Item.Index);
         }
 
         [InlineData('T', "Test")]
@@ -49,14 +94,11 @@ namespace Classier.NET.Compiler
         [Theory]
         public void MatchCharIsSuccess(char expected, string text)
         {
-            // Arrange
-            Item<char> startItem = itemFrom(text);
-
             // Act
-            var success = (MatchResult<char>.Success)result(matchChar(expected), startItem);
+            var success = (MatchResult<char>.Success)result(matchChar(expected), itemFrom(text));
 
             // Assert
-            Assert.Equal(startItem.Index + 1, success.Item.Index);
+            Assert.Equal(1, success.Item.Index);
         }
 
         [InlineData('a', "ABC")]
@@ -64,28 +106,22 @@ namespace Classier.NET.Compiler
         [Theory]
         public void MatchCharIsFailureForIncorrectChar(char expected, string text)
         {
-            // Arrange
-            Item<char> startItem = itemFrom(text);
-
             // Act
-            var failure = (MatchResult<char>.Failure)result(matchChar(expected), startItem);
+            var failure = (MatchResult<char>.Failure)result(matchChar(expected), itemFrom(text));
 
             // Assert
-            Assert.Equal(startItem.Index, failure.Item2.Index);
+            Assert.Equal(0, failure.Item2.Index);
             Assert.Contains("got", failure.Item1);
         }
 
         [Fact]
         public void MatchCharIsFailureForEmptyText()
         {
-            // Arrange
-            Item<char> startItem = itemFrom(string.Empty);
-
             // Act
-            var failure = (MatchResult<char>.Failure)result(matchChar('a'), startItem);
+            var failure = (MatchResult<char>.Failure)result(matchChar('a'), itemFrom(string.Empty));
 
             // Assert
-            Assert.Equal(startItem.Index, failure.Item2.Index);
+            Assert.Equal(0, failure.Item2.Index);
             Assert.Contains("end of", failure.Item1);
         }
 
@@ -95,14 +131,11 @@ namespace Classier.NET.Compiler
         [Theory]
         public void MatchStrIsSuccess(string expected, string text)
         {
-            // Arrange
-            Item<char> startItem = itemFrom(text);
-
             // Act
-            var success = (MatchResult<char>.Success)result(matchStr(expected), startItem);
+            var success = (MatchResult<char>.Success)result(matchStr(expected), itemFrom(text));
 
             // Assert
-            Assert.Equal(startItem.Index + expected.Length, success.Item.Index);
+            Assert.Equal(expected.Length, success.Item.Index);
         }
 
         [InlineData("")]
@@ -157,26 +190,6 @@ namespace Classier.NET.Compiler
             Assert.Contains(expected, message);
             Assert.Contains("got", message);
             Assert.Contains(badChar, message.Substring(message.LastIndexOf("got")));
-        }
-
-        [InlineData("cs", "cscscs", 3)]
-        [InlineData("work", "work", 1)]
-        [InlineData("two", "twotwo", 2)]
-        [InlineData(" ", "      ", 6)]
-        [InlineData("return", "returnreturnret", 2)]
-        [InlineData("menu", "menumenumenumenumenumenumenumenumenumenumenumenu", 12)]
-        [Theory]
-        public void MatchManyIsSuccessForRepeated(string expected, string text, int repeatCount)
-        {
-            // Arrange
-            Item<char> startItem = itemFrom(text);
-
-            // Act
-            var success = (MatchResult<char>.Success)result(matchMany(matchStr(expected)), startItem);
-
-            // Assert
-            Assert.Equal(startItem.Index + (expected.Length * repeatCount), success.Item.Index);
-            Assert.Equal(string.Concat(Enumerable.Repeat(expected, repeatCount)), text.Substring(0, expected.Length * repeatCount));
         }
     }
 }

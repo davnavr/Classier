@@ -23,12 +23,11 @@ namespace Classier.NET.Compiler
 
     public class LexingTests
     {
-        [InlineData("  \npublic", TokenType.Whitespace, TokenType.NewLine, TokenType.AccModifier)]
+        [InlineData("  \npublic", TokenType.Whitespace, TokenType.NewLine, TokenType.AccPublic)]
         [InlineData("0b1101_0110+0xABC1_EF39", TokenType.BinLit, TokenType.AddOp, TokenType.HexLit)]
-        [InlineData("private/* This should\n be one token */", TokenType.AccModifier, TokenType.MLComment)]
         [InlineData("1600\t// My comment", TokenType.IntLit, TokenType.Whitespace, TokenType.SLComment)]
-        [InlineData("/* Next should be unknown \u03c0 */\u0001", TokenType.MLComment, TokenType.Unknown)]
-        [InlineData("myVariable.myMethod()", TokenType.Identifier, TokenType.Period, TokenType.Identifier, TokenType.LeftParen, TokenType.RightParen)]
+        [InlineData("/*\u0001*/", TokenType.MLCommentStart, TokenType.Unknown, TokenType.MLCommentEnd)]
+        [InlineData("myVariable.myMethod(true)", TokenType.Identifier, TokenType.Period, TokenType.Identifier, TokenType.LeftParen, TokenType.TrueLit, TokenType.RightParen)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {

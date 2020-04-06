@@ -24,30 +24,36 @@ type TokenType =
     /// The token is of an unknown type.
     | Unknown = 0
 
-    /// The token is an access modifier.
-    | AccModifier = 1
+    /// The token is an access modifier that indicates unrestricted access.
+    | AccPublic = 1
+    /// The token is an access modifier restricting access to the current library.
+    | AccInternal = 2
+    /// The token is an access modifier restricting access to the containing type.
+    | AccPrivate = 3
     /// The token is a language keyword.
-    | Keyword = 2
+    | Keyword = 4
 
     /// The token is a plus sign.
-    | AddOp = 50
+    | AddOp = 10
     /// The token is a minus sign.
-    | SubOp = 51
+    | SubOp = 11
     /// The token is an asterisk.
-    | MulOp = 52
+    | MulOp = 12
     /// The token is a slash <c>U+002F</c>.
-    | DivOp = 53
-    /// The token indicates the logical <c>AND</c>.
-    | AndOp = 54
-    /// The token indicates the logical <c>OR</c>.
-    | OrOp = 55
-    /// The token indicates the logical <c>XOR</c>.
-    | XorOp = 55
+    | DivOp = 13
+    /// The token indicates the boolean <c>AND</c>.
+    | AndOp = 14
+    /// The token indicates the boolean <c>OR</c>.
+    | OrOp = 15
+    /// The token indicates logical negation.
+    | NotOp = 16
 
-    /// The token is a multi-line comment.
-    | MLComment = 10
+    /// The token indicates the start of a multi-line comment.
+    | MLCommentStart = 20
+    /// The token indicates the end of a multi-line comment.
+    | MLCommentEnd = 21
     /// The token is a single-line comment.
-    | SLComment = 11
+    | SLComment = 22
 
     /// The token is a string literal.
     | StrLit = 30
@@ -81,13 +87,27 @@ type TokenType =
 
 /// Tokenizes the source code.
 let tokenizer = createTokenizer ([
-        { Type = TokenType.AccModifier; Match = (matchAnyOf ["public"; "internal"; "private"] matchStr) }
-        { Type = TokenType.Keyword; Match = (matchAnyOf ["class"] matchStr) }
+        { Type = TokenType.AccPublic; Match = matchStr "public" }
+        { Type = TokenType.AccInternal; Match = matchStr "internal" }
+        { Type = TokenType.AccPrivate; Match = matchStr "private" }
+        { Type = TokenType.Keyword; Match = (matchAnyOf ["class"] matchStr) } // TODO: Make all keywords a separate enum value?
 
         { Type = TokenType.AddOp; Match = matchChar '+' }
         { Type = TokenType.SubOp; Match = matchChar '-' }
         { Type = TokenType.MulOp; Match = matchChar '*' }
         { Type = TokenType.DivOp; Match = matchChar '/' }
+        { Type = TokenType.AndOp; Match = matchStr "and" }
+        { Type = TokenType.OrOp; Match = matchStr "or" }
+        { Type = TokenType.NotOp; Match = matchStr "not" }
+
+        { Type = TokenType.MLCommentStart; Match = matchStr "/*" }
+        { Type = TokenType.MLCommentEnd; Match = matchStr "*/" }
+        { Type = TokenType.SLComment; Match = (matchStr "//") |> thenMatch (failure "Not yet implemented") }
+        
+        //{ Type = TokenType.BinLit; Match = matchOptional (matchChar '-') |> thenMatch (matchStr "0") |> thenMatch (matchAnyOf ['b'; 'B'] matchChar) |> thenMatch (failure "Not implemented, should check for 0 or 1 and underscore digit separators") }
+        { Type = TokenType.BinLit; Match = matchChain [ matchOptional (matchChar '-'); matchStr "0"; matchAnyOf ['b'; 'B'] matchChar; ] }
+        { Type = TokenType.TrueLit; Match = matchStr "true" }
+        { Type = TokenType.FalseLit; Match = matchStr "false" }
 
         { Type = TokenType.LeftParen; Match = matchChar '(' }
         { Type = TokenType.RightParen; Match = matchChar ')' }
@@ -97,13 +117,6 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.NewLine; Match = (matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr) }
 
         { Type = TokenType.Identifier; Match = failure "Not yet implemented."}
-
-        { Type = TokenType.AndOp; Match = matchStr "and" }
-        { Type = TokenType.OrOp; Match = matchStr "or" }
-        { Type = TokenType.XorOp; Match = matchStr "xor" }
-
-        { Type = TokenType.TrueLit; Match = matchStr "true" }
-        { Type = TokenType.FalseLit; Match = matchStr "false" }
     ], TokenType.Unknown)
 
 /// <summary>

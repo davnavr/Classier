@@ -157,6 +157,25 @@ let matchMany (f: MatchFunc<'T>) =
         else
             results |> Seq.last)
 
+let matchOptional (f: MatchFunc<'T>) =
+    Match (fun item ->
+        let r = result (f, item)
+        match r with
+        | Success _ -> r
+        | Failure _ -> Success item)
+
+let matchChain (items: seq<MatchFunc<'T>>) =
+    if items |> Seq.isEmpty then
+        success
+    else
+        //Match (fun startItem ->
+        //    let nextResult prevResult f =
+        //        match prevResult with
+        //        | Failure _ -> prevResult
+        //        | Success nextItem -> result (f, nextItem)
+        //    Seq.fold nextResult (Success startItem) items)
+        Match (fun item -> result(items |> Seq.reduce thenMatch, item))
+
 /// <summary>
 /// Matches against the specified character.
 /// </summary>
@@ -181,7 +200,7 @@ let matchStr str =
         success
     else
         Match (fun item ->
-            let r = result (str |> Seq.map matchChar |> Seq.reduce thenMatch, item)
+            let r = result (str |> Seq.map matchChar |> matchChain, item)
             match r with
             | Success _ -> r
             | Failure (msg, _) -> Failure (sprintf "Failure parsing '%s'. %s" str msg, item))
