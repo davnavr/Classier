@@ -142,6 +142,21 @@ namespace Classier.NET.Compiler
             Assert.Equal(expectedIndex, success.Item.Index);
         }
 
+        [InlineData("has_tabs", "\t", "should\tnot_has_tabs")]
+        [Theory]
+        public void MatchWithoutIsFailureWhenFilterIsSuccess(string expected, string without, string actual)
+        {
+            // Arrange
+            var func = matchTo(matchStr(expected));
+
+            // Act
+            var failure = (MatchResult<char>.Failure)result(matchWithout(matchStr(without), func), itemFrom(actual));
+
+            // Assert
+            Assert.Equal(0, failure.Item2.Index);
+            Assert.Contains("inverted match", failure.Item1);
+        }
+
         [InlineData('T', "Test")]
         [InlineData('\r', "\r\n")]
         [Theory]

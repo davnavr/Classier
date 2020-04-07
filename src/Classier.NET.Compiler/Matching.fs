@@ -75,6 +75,7 @@ let itemFrom (items: seq<'T>): Item<'T> =
             End index
     nextItem 0
 
+// exclusive
 let rec selectItems (fromItem: Item<'T>) (toItem: Item<'T>): seq<'T> =
     if fromItem.Index > toItem.Index then
         selectItems toItem fromItem
@@ -196,7 +197,7 @@ let matchWithout filter matchFunc =
         let initialResult = result (matchFunc, item)
         match initialResult with
         | Success _ ->
-            match result (filter, item) with
+            match result (matchUntil filter, item) with
             | Success filterMatch ->
                 if filterMatch.Index <= initialResult.Item.Index
                 then Failure ("The inverted match failed.", item)

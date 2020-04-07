@@ -62,7 +62,7 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
         let (matchType, matchItem) = nextMatch item
         
         if matchType = defaultVal then
-            None, matchItem.Next
+            None, item.Next
         else
             Some { Content = String.Concat(selectItems item matchItem); Type = matchType }, matchItem
 
@@ -76,7 +76,7 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
 
                 match token with
                 | Some t ->
-                    if not (item.Index = unknown.Index) then
+                    if not (item.Index = unknown.Index) then // TODO: The item and unknown can magically align if a match was found when the only actual unknown token is one character long and is at the end of the sequence.
                         yield { Content = String.Concat(selectItems unknown item); Type = defaultVal }
 
                     yield t
