@@ -93,10 +93,50 @@ namespace Classier.NET.Compiler
         [InlineData("one", "onetoomany", 0)]
         [InlineData("+", "1 + 1", 2)]
         [Theory]
-        public void MatchUntilSuccessExcludesFinalMatch(string expected, string actual, int expectedIndex)
+        public void MatchUntilIsSuccessAndExcludesFinalMatch(string expected, string actual, int expectedIndex)
         {
             // Act
             var success = (MatchResult<char>.Success)result(matchUntil(matchStr(expected)), itemFrom(actual));
+
+            // Assert
+            Assert.Equal(expectedIndex, success.Item.Index);
+        }
+
+        [InlineData("content", "")]
+        [InlineData("123", "EFGHI")]
+        [Theory]
+        public void MatchUntilIsFailureForNoMatch(string expected, string actual)
+        {
+            // Act
+            var failure = (MatchResult<char>.Failure)result(matchUntil(matchStr(expected)), itemFrom(actual));
+
+            // Assert
+            Assert.Equal(0, failure.Item2.Index);
+        }
+
+        [InlineData("Data", "[InlineData]", 11)]
+        [InlineData("nbsp", "nbsp", 4)]
+        [InlineData("matchStr", "\n\nmatchStr(expected)", 10)]
+        [Theory]
+        public void MatchToIsSuccessAndIncludesFinalMatch(string expected, string actual, int expectedIndex)
+        {
+            // Act
+            var success = (MatchResult<char>.Success)result(matchTo(matchStr(expected)), itemFrom(actual));
+
+            // Assert
+            Assert.Equal(expectedIndex, success.Item.Index);
+        }
+
+        [InlineData("crafting", "circles", "mining & crafting", 17)]
+        [InlineData("no", " ", "hasnospaces", 5)]
+        [Theory]
+        public void MatchWithoutIsSuccessWhenFilterFails(string expected, string without, string actual, int expectedIndex)
+        {
+            // Arrange
+            var func = matchTo(matchStr(expected));
+
+            // Act
+            var success = (MatchResult<char>.Success)result(matchWithout(matchStr(without), func), itemFrom(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);

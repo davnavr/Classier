@@ -36,6 +36,7 @@ namespace Classier.NET.Compiler
         [InlineData("one\r\n\r\ntwo\n\nthree", TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier)]
         [InlineData("\u0085\u0002\u0003\u0004extends", TokenType.NewLine, TokenType.Unknown, TokenType.Modifier)]
         [InlineData("let myVar=\"string cheese is ok\"", TokenType.WrdLet, TokenType.Whitespace, TokenType.Identifier, TokenType.EqOp, TokenType.StrLit)]
+        [InlineData("\"no_newline\nin_string\"", TokenType.Unknown, TokenType.Identifier, TokenType.NewLine, TokenType.Identifier, TokenType.Unknown)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {

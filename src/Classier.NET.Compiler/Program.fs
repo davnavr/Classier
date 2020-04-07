@@ -97,6 +97,7 @@ type TokenType =
 
 let match_0_9 = matchCharRange '0' '9'
 let match_A_Z_AnyCase = matchCharRange 'A' 'Z' |> orMatch (matchCharRange 'a' 'z')
+let matchNL = matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr
 
 /// Tokenizes the source code.
 let tokenizer = createTokenizer ([ // TODO: Move this into a map literal, which just converts it into a TokenDef sequence
@@ -121,7 +122,7 @@ let tokenizer = createTokenizer ([ // TODO: Move this into a map literal, which 
         { Type = TokenType.OrOp; Match = matchStr "or" }
         { Type = TokenType.NotOp; Match = matchStr "not" }
         
-        { Type = TokenType.StrLit; Match = matchChain [matchChar '"'; matchChar '"'] }
+        { Type = TokenType.StrLit; Match = matchChain [matchChar '"'; matchTo (matchChar '"') |> matchWithout matchNL] } // TODO: How to ignore newline chars?
         { Type = TokenType.BinLit; Match = matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany] }
         { Type = TokenType.HexLit; Match = matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchAny [matchChar '_'; match_0_9; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'] |> matchMany]}
         { Type = TokenType.IntLit; Match = matchChain [match_0_9; matchOptional (matchMany (matchAny [matchChar '_'; match_0_9]))]}
@@ -134,7 +135,7 @@ let tokenizer = createTokenizer ([ // TODO: Move this into a map literal, which 
         { Type = TokenType.Comma; Match = matchChar ',' }
 
         { Type = TokenType.Whitespace; Match = matchAnyChar [' '; '\t'] |> matchMany }
-        { Type = TokenType.NewLine; Match = (matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr) }
+        { Type = TokenType.NewLine; Match = matchNL }
 
         { Type = TokenType.Identifier; Match = matchChain [match_A_Z_AnyCase; matchOptional (matchMany (matchAny [match_A_Z_AnyCase; match_0_9; matchChar '_']))]}
     ], TokenType.Unknown)

@@ -109,7 +109,7 @@ let success = Match (fun (cur: Item<'T>) -> Success cur)
 let failure msg = Match (fun (cur: Item<'T>) -> Failure(msg, cur))
 
 // and
-let thenMatch (m1: MatchFunc<'T>) m2 =
+let andMatch (m1: MatchFunc<'T>) m2 =
     Match (fun item1 ->
         let result1 = result (m1, item1)
         match result1 with
@@ -170,22 +170,39 @@ let matchChain (items: seq<MatchFunc<'T>>) =
     if items |> Seq.isEmpty then
         success
     else
-        Match (fun item -> result(items |> Seq.reduce thenMatch, item))
+        Match (fun item -> result(items |> Seq.reduce andMatch, item))
 
 let matchUntil (f: MatchFunc<'T>) =
     Match (fun startItem ->
-        startItem.AsSequence()
-        |> Seq.pick (fun item ->
-            let currentMatch = result (f, item)
-            match currentMatch with
-            | Success _ -> Some (Success item) // Returned item is the first item in the success.
-            | Failure _ ->
-                // Check if the last item was reached.
-                if currentMatch.Item.Next.ReachedEnd
-                then Some currentMatch
-                else None))
+        match startItem with
+        | Item _ ->
+            startItem.AsSequence()
+            |> Seq.pick (fun item ->
+                let currentMatch = result (f, item)
+                match currentMatch with
+                | Success _ -> Some (Success item) // Returned item is the first item in the success.
+                | Failure (msg, _) ->
+                    // Check if the last item was reached.
+                    if currentMatch.Item.Next.ReachedEnd
+                    then Some (Failure (msg, startItem))
+                    else None)
+        | End _ ->
+            result (f, startItem))
 
-let matchTo f = matchUntil f |> thenMatch f
+let matchTo f = andMatch (matchUntil f) f
+
+let matchWithout filter matchFunc =
+    Match (fun item ->
+        let initialResult = result (matchFunc, item)
+        match initialResult with
+        | Success _ ->
+            match result (filter, item) with
+            | Success filterMatch ->
+                if filterMatch.Index <= initialResult.Item.Index
+                then Failure ("The inverted match failed.", item)
+                else initialResult
+            | Failure _ -> initialResult
+        | Failure _ -> initialResult)
 
 /// <summary>
 /// Matches against the specified character.
