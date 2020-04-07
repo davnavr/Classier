@@ -101,6 +101,7 @@ namespace Classier.NET.Compiler
             Assert.Equal(1, success.Item.Index);
         }
 
+        // TODO: Check for the bad char surrounded by quotes ''.
         [InlineData('a', "ABC")]
         [InlineData(' ', "This is testing")]
         [Theory]
@@ -108,10 +109,12 @@ namespace Classier.NET.Compiler
         {
             // Act
             var failure = (MatchResult<char>.Failure)result(matchChar(expected), itemFrom(text));
+            var message = failure.Item1;
 
             // Assert
             Assert.Equal(0, failure.Item2.Index);
-            Assert.Contains("got", failure.Item1);
+            Assert.Contains("got", message);
+            Assert.Contains($"'{expected}'", message);
         }
 
         [Fact]
@@ -189,7 +192,7 @@ namespace Classier.NET.Compiler
             Assert.Equal(startItem.Index, failure.Item2.Index);
             Assert.Contains(expected, message);
             Assert.Contains("got", message);
-            Assert.Contains(badChar, message.Substring(message.LastIndexOf("got")));
+            Assert.Contains($"'{badChar}'", message);
         }
     }
 }

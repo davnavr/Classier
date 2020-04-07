@@ -13,3 +13,21 @@
 // limitations under the License.
 
 module Classier.NET.Compiler.Parsing
+
+open Classier.NET.Compiler.Lexing
+
+type Node<'T> =
+    {
+        Tokens: seq<Token<'T>>
+        Children: seq<Node<'T>>
+        Type: 'T
+    }
+
+/// Turns a sequence of tokens into a sequence of nodes.
+type Parser<'T> = Parser of (seq<Token<'T>> -> seq<Node<'T>>)
+
+// let createParser 
+
+let parse (parser: Parser<'T>) tokens =
+    let (Parser parseFunc) = parser
+    parseFunc tokens

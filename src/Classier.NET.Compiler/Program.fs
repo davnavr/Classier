@@ -78,12 +78,14 @@ type TokenType =
     /// The token indicates a <c>false</c> boolean value.
     | FalseLit = 65
 
-    // The token is an open paranthesis.
+    /// The token is an open paranthesis.
     | LeftParen = 81
-    // The token is an closed paranthesis.
+    /// The token is an closed paranthesis.
     | RightParen = 82
-    // The token is a period.
+    /// The token is a period.
     | Period = 83
+    /// The token is a comma.
+    | Comma = 84
 
     /// The token is whitespace (a space or tab).
     | Whitespace = 100
@@ -105,7 +107,7 @@ let tokenizer = createTokenizer ([
 
         { Type = TokenType.MLCommentStart; Match = matchStr "/*" }
         { Type = TokenType.MLCommentEnd; Match = matchStr "*/" }
-        { Type = TokenType.SLComment; Match = (matchStr "//") |> thenMatch (failure "Not yet implemented") }
+        { Type = TokenType.SLComment; Match = matchStr "//" }
 
         { Type = TokenType.AddOp; Match = matchChar '+' }
         { Type = TokenType.SubOp; Match = matchChar '-' }
@@ -118,12 +120,14 @@ let tokenizer = createTokenizer ([
         
         { Type = TokenType.BinLit; Match = matchChain [matchStr "0"; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany] }
         { Type = TokenType.HexLit; Match = matchChain [matchStr "0"; matchAnyChar ['x'; 'X']; matchAny [matchChar '_'; matchCharRange '0' '9'; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'] |> matchMany]}
+        { Type = TokenType.IntLit; Match = matchChain [matchCharRange '0' '9'; matchOptional (matchMany (matchAny [matchChar '_'; matchCharRange '0' '9']))]}
         { Type = TokenType.TrueLit; Match = matchStr "true" }
         { Type = TokenType.FalseLit; Match = matchStr "false" }
 
         { Type = TokenType.LeftParen; Match = matchChar '(' }
         { Type = TokenType.RightParen; Match = matchChar ')' }
         { Type = TokenType.Period; Match = matchChar '.' }
+        { Type = TokenType.Comma; Match = matchChar ',' }
 
         { Type = TokenType.Whitespace; Match = matchAnyChar [' '; '\t'] |> matchMany }
         { Type = TokenType.NewLine; Match = (matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr) }

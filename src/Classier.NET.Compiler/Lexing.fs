@@ -90,3 +90,15 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<
 let tokenize (tokenizer: Tokenizer<'T>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer
     tokenizeFunc chars
+
+let matchToken (t: 'T) =
+    Match (fun (item: Item<Token<'T>>) ->
+        let failMsg r = sprintf "Expected a token of type '%s', but %s" (t.ToString()) r
+        match item with
+        | Item (token, _, next) ->
+            if token.Type = t then
+                Success next.Value
+            else
+                Failure (sprintf "got a '%s' token instead." (token.Type.ToString()) |> failMsg, item)
+        | End _ ->
+            Failure (failMsg "the end of the token sequence was reached instead.", item))

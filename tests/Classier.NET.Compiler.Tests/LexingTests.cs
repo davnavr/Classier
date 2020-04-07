@@ -19,19 +19,20 @@ namespace Classier.NET.Compiler
     using System.Linq;
     using Xunit;
     using static Classier.NET.Compiler.Lexing;
+    using static Classier.NET.Compiler.Matching;
     using static Classier.NET.Compiler.Program;
 
     public class LexingTests
     {
         [InlineData("  \npublic", TokenType.Whitespace, TokenType.NewLine, TokenType.AccPublic)]
         [InlineData("0b1101_0110+0xABC1_EF39", TokenType.BinLit, TokenType.AddOp, TokenType.HexLit)]
-        [InlineData("1600\t// My comment", TokenType.IntLit, TokenType.Whitespace, TokenType.SLComment)]
+        [InlineData("1600\t // My comment", TokenType.IntLit, TokenType.Whitespace, TokenType.SLComment, TokenType.Whitespace, TokenType.Identifier, TokenType.Whitespace, TokenType.Identifier)]
         [InlineData("/*\u0001*/", TokenType.MLCommentStart, TokenType.Unknown, TokenType.MLCommentEnd)]
         [InlineData("myVariable.myMethod(true)", TokenType.Identifier, TokenType.Period, TokenType.Identifier, TokenType.LeftParen, TokenType.TrueLit, TokenType.RightParen)]
         [InlineData("0B010101-0XFFAB", TokenType.BinLit, TokenType.SubOp, TokenType.HexLit)]
         [InlineData("private\r\nclass", TokenType.AccPrivate, TokenType.NewLine, TokenType.WrdClass)]
         [InlineData("one\r\n\r\ntwo\n\nthree", TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier)]
-        [InlineData("// docs\u0085\u0002\u0003\u0004extends", TokenType.SLComment, TokenType.NewLine, TokenType.Unknown, TokenType.Modifier)]
+        [InlineData("\u0085\u0002\u0003\u0004extends", TokenType.NewLine, TokenType.Unknown, TokenType.Modifier)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {
@@ -41,6 +42,19 @@ namespace Classier.NET.Compiler
             // Assert
             Assert.Equal(source, string.Concat(tokens.Select(token => token.Content)));
             Assert.Equal(expectedTypes, tokens.Select(token => token.Type));
+        }
+
+        [Fact]
+        public void MatchTokenIsSuccessForMatchingType()
+        {
+            // Arrange
+            var tokens = new[] { new Token<TokenType>("this can be anything", TokenType.Whitespace) };
+
+            // Act
+            var success = (MatchResult<Token<TokenType>>.Success)result(matchToken(TokenType.Whitespace), itemFrom(tokens));
+
+            // Assert
+            Assert.Equal(1, success.Item.Index);
         }
     }
 }
