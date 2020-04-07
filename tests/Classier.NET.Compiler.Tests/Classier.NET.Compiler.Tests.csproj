@@ -20,7 +20,7 @@
   <PropertyGroup>
     <AssemblyName>$(RootNamespace).Tests</AssemblyName>
     <RootNamespace>$(Product).Compiler</RootNamespace>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
   <!-- References -->

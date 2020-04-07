@@ -24,10 +24,6 @@
   </ItemGroup>
 
   <!-- F# code analysis -->
-  <!--
-    Install the local tool at:
-    https://www.nuget.org/packages/dotnet-fsharplint/
-  -->
   <Target
     Name="FSharpLint"
     AfterTargets="AfterBuild"
