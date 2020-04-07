@@ -18,9 +18,9 @@ namespace Classier.NET.Compiler
 {
     using System.Linq;
     using Xunit;
+    using static Classier.NET.Compiler.Grammar;
     using static Classier.NET.Compiler.Lexing;
     using static Classier.NET.Compiler.Matching;
-    using static Classier.NET.Compiler.Program;
 
     public class LexingTests
     {
@@ -42,7 +42,7 @@ namespace Classier.NET.Compiler
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {
             // Act
-            var tokens = tokenize(Program.tokenizer, source);
+            var tokens = tokenize(Grammar.tokenizer, source);
 
             // Assert
             Assert.Equal(source, string.Concat(tokens.Select(token => token.Content)));

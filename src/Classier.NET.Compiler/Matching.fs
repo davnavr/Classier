@@ -192,7 +192,7 @@ let matchUntil (f: MatchFunc<'T>) =
 
 let matchTo f = andMatch (matchUntil f) f
 
-let matchWithout filter matchFunc =
+let matchWithout (filter: MatchFunc<'T>) matchFunc =
     Match (fun item ->
         let initialResult = result (matchFunc, item)
         match initialResult with
@@ -204,6 +204,8 @@ let matchWithout filter matchFunc =
                 else initialResult
             | Failure _ -> initialResult
         | Failure _ -> initialResult)
+
+let matchLazy (f: Lazy<MatchFunc<'T>>) = Match (fun item -> result (f.Value, item))
 
 /// <summary>
 /// Matches against the specified character.
