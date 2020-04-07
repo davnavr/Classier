@@ -95,8 +95,11 @@ type TokenType =
     /// The token is an identifier.
     | Identifier = 110
 
+let match_0_9 = matchCharRange '0' '9'
+let match_A_Z_AnyCase = matchCharRange 'A' 'Z' |> orMatch (matchCharRange 'a' 'z')
+
 /// Tokenizes the source code.
-let tokenizer = createTokenizer ([
+let tokenizer = createTokenizer ([ // TODO: Move this into a map literal, which just converts it into a TokenDef sequence
         { Type = TokenType.AccPublic; Match = matchStr "public" }
         { Type = TokenType.AccInternal; Match = matchStr "internal" }
         { Type = TokenType.AccPrivate; Match = matchStr "private" }
@@ -118,9 +121,10 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.OrOp; Match = matchStr "or" }
         { Type = TokenType.NotOp; Match = matchStr "not" }
         
-        { Type = TokenType.BinLit; Match = matchChain [matchStr "0"; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany] }
-        { Type = TokenType.HexLit; Match = matchChain [matchStr "0"; matchAnyChar ['x'; 'X']; matchAny [matchChar '_'; matchCharRange '0' '9'; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'] |> matchMany]}
-        { Type = TokenType.IntLit; Match = matchChain [matchCharRange '0' '9'; matchOptional (matchMany (matchAny [matchChar '_'; matchCharRange '0' '9']))]}
+        { Type = TokenType.StrLit; Match = matchChain [matchChar '"'; matchChar '"'] }
+        { Type = TokenType.BinLit; Match = matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany] }
+        { Type = TokenType.HexLit; Match = matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchAny [matchChar '_'; match_0_9; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'] |> matchMany]}
+        { Type = TokenType.IntLit; Match = matchChain [match_0_9; matchOptional (matchMany (matchAny [matchChar '_'; match_0_9]))]}
         { Type = TokenType.TrueLit; Match = matchStr "true" }
         { Type = TokenType.FalseLit; Match = matchStr "false" }
 
@@ -132,8 +136,25 @@ let tokenizer = createTokenizer ([
         { Type = TokenType.Whitespace; Match = matchAnyChar [' '; '\t'] |> matchMany }
         { Type = TokenType.NewLine; Match = (matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr) }
 
-        { Type = TokenType.Identifier; Match = matchChain [matchAny [matchCharRange 'a' 'z'; matchCharRange 'A' 'Z']; matchOptional (matchMany (matchAny [matchCharRange 'a' 'z'; matchCharRange 'A' 'Z'; matchCharRange '0' '9'; matchChar '_']))]}
+        { Type = TokenType.Identifier; Match = matchChain [match_A_Z_AnyCase; matchOptional (matchMany (matchAny [match_A_Z_AnyCase; match_0_9; matchChar '_']))]}
     ], TokenType.Unknown)
+
+(*
+/// Indicates the type of a node in the syntax tree.
+type NodeType =
+    /// The node contains tokens that are unknown or are skipped.
+    | Unknown = 0
+    /// The node allows for the use of types without their fully qualified names.
+    | UseStatement = 1
+    /// The node is a namespace declaration.
+    | NamespaceDecl = 2
+    /// The node is a class declaration.
+    | ClassDecl = 3
+    /// The node is a field declaration.
+    | FieldDecl = 4
+    /// The node is a method declaration.
+    | MethodDecl = 5
+*)
 
 /// <summary>
 /// The entry point of the compiler.

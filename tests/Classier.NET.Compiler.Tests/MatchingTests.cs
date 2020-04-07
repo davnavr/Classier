@@ -89,6 +89,19 @@ namespace Classier.NET.Compiler
             Assert.Equal(expected.Select(str => str.Length).Sum(), success.Item.Index);
         }
 
+        [InlineData("indented", "\t\t\tindented", 3)]
+        [InlineData("one", "onetoomany", 0)]
+        [InlineData("+", "1 + 1", 2)]
+        [Theory]
+        public void MatchUntilSuccessExcludesFinalMatch(string expected, string actual, int expectedIndex)
+        {
+            // Act
+            var success = (MatchResult<char>.Success)result(matchUntil(matchStr(expected)), itemFrom(actual));
+
+            // Assert
+            Assert.Equal(expectedIndex, success.Item.Index);
+        }
+
         [InlineData('T', "Test")]
         [InlineData('\r', "\r\n")]
         [Theory]

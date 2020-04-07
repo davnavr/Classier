@@ -22,6 +22,8 @@ namespace Classier.NET.Compiler
     using static Classier.NET.Compiler.Matching;
     using static Classier.NET.Compiler.Program;
 
+#pragma warning disable IDE0002 // Name can be simplified
+
     public class LexingTests
     {
         [InlineData("  \npublic", TokenType.Whitespace, TokenType.NewLine, TokenType.AccPublic)]
@@ -33,6 +35,7 @@ namespace Classier.NET.Compiler
         [InlineData("private\r\nclass", TokenType.AccPrivate, TokenType.NewLine, TokenType.WrdClass)]
         [InlineData("one\r\n\r\ntwo\n\nthree", TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier)]
         [InlineData("\u0085\u0002\u0003\u0004extends", TokenType.NewLine, TokenType.Unknown, TokenType.Modifier)]
+        [InlineData("let myVar=\"string cheese is ok\"", TokenType.WrdLet, TokenType.Whitespace, TokenType.Identifier, TokenType.EqOp, TokenType.StrLit)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {
@@ -56,5 +59,40 @@ namespace Classier.NET.Compiler
             // Assert
             Assert.Equal(1, success.Item.Index);
         }
+
+        [Fact]
+        public void MatchTokenIsFailureForIncorrectType()
+        {
+            // Arrange
+            var actual = TokenType.Unknown;
+            var expected = TokenType.WrdClass;
+            var tokens = new[] { new Token<TokenType>("about:blank", actual) };
+
+            // Act
+            var failure = (MatchResult<Token<TokenType>>.Failure)result(matchToken(expected), itemFrom(tokens));
+
+            // Assert
+            Assert.Equal(0, failure.Item2.Index);
+            Assert.Contains(actual.ToString(), failure.Item1);
+            Assert.Contains(expected.ToString(), failure.Item1);
+        }
+
+        [Fact]
+        public void MatchTokenIsFailureForEndOfSequence()
+        {
+            // Arrange
+            var expected = TokenType.WrdClass;
+            var tokens = new Token<TokenType>[0];
+
+            // Act
+            var failure = (MatchResult<Token<TokenType>>.Failure)result(matchToken(expected), itemFrom(tokens));
+
+            // Assert
+            Assert.Equal(0, failure.Item2.Index);
+            Assert.Contains("end of the token sequence", failure.Item1);
+            Assert.Contains(expected.ToString(), failure.Item1);
+        }
     }
+
+#pragma warning restore IDE0002 // Name can be simplified
 }

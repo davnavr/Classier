@@ -170,13 +170,22 @@ let matchChain (items: seq<MatchFunc<'T>>) =
     if items |> Seq.isEmpty then
         success
     else
-        //Match (fun startItem ->
-        //    let nextResult prevResult f =
-        //        match prevResult with
-        //        | Failure _ -> prevResult
-        //        | Success nextItem -> result (f, nextItem)
-        //    Seq.fold nextResult (Success startItem) items)
         Match (fun item -> result(items |> Seq.reduce thenMatch, item))
+
+let matchUntil (f: MatchFunc<'T>) =
+    Match (fun startItem ->
+        startItem.AsSequence()
+        |> Seq.pick (fun item ->
+            let currentMatch = result (f, item)
+            match currentMatch with
+            | Success _ -> Some (Success item) // Returned item is the first item in the success.
+            | Failure _ ->
+                // Check if the last item was reached.
+                if currentMatch.Item.Next.ReachedEnd
+                then Some currentMatch
+                else None))
+
+let matchTo f = matchUntil f |> thenMatch f
 
 /// <summary>
 /// Matches against the specified character.
