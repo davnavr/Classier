@@ -22,10 +22,10 @@ namespace Classier.NET.Compiler
     using static Classier.NET.Compiler.Matching;
     using static Classier.NET.Compiler.Program;
 
-#pragma warning disable IDE0002 // Name can be simplified
-
     public class LexingTests
     {
+#pragma warning disable IDE0002 // Name can be simplified
+
         [InlineData("  \npublic", TokenType.Whitespace, TokenType.NewLine, TokenType.AccPublic)]
         [InlineData("0b1101_0110+0xABC1_EF39", TokenType.BinLit, TokenType.AddOp, TokenType.HexLit)]
         [InlineData("1600\t // My comment", TokenType.IntLit, TokenType.Whitespace, TokenType.SLComment, TokenType.Whitespace, TokenType.Identifier, TokenType.Whitespace, TokenType.Identifier)]
@@ -37,6 +37,7 @@ namespace Classier.NET.Compiler
         [InlineData("\u0085\u0002\u0003\u0004extends", TokenType.NewLine, TokenType.Unknown, TokenType.Modifier)]
         [InlineData("let myVar=\"string cheese is ok\"", TokenType.WrdLet, TokenType.Whitespace, TokenType.Identifier, TokenType.EqOp, TokenType.StrLit)]
         [InlineData("\"no_newline\nin_string\"", TokenType.Unknown, TokenType.Identifier, TokenType.NewLine, TokenType.Identifier, TokenType.Unknown)]
+        [InlineData("valid__\r\u00EF\u00BB\u00BF", TokenType.Identifier, TokenType.NewLine, TokenType.Unknown)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {
@@ -47,6 +48,8 @@ namespace Classier.NET.Compiler
             Assert.Equal(source, string.Concat(tokens.Select(token => token.Content)));
             Assert.Equal(expectedTypes, tokens.Select(token => token.Type));
         }
+
+#pragma warning restore IDE0002 // Name can be simplified
 
         [Fact]
         public void MatchTokenIsSuccessForMatchingType()
@@ -94,6 +97,4 @@ namespace Classier.NET.Compiler
             Assert.Contains(expected.ToString(), failure.Item1);
         }
     }
-
-#pragma warning restore IDE0002 // Name can be simplified
 }
