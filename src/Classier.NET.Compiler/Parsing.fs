@@ -47,9 +47,7 @@ let lineInfo (tokens: seq<Token<'T>>) isNewline =
     let (parsedTokens, _) = tokens |> Seq.mapFold nextToken  (true, -1, 0)
     parsedTokens
 
-let createParser =
-    Parser (fun parsedTokens -> Seq.empty)
-
+/// Parses the specfified tokens with the specified parser.
 let parse (parser: Parser<'T>) tokens =
     let (Parser parseFunc) = parser
     parseFunc tokens

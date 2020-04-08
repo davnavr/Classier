@@ -28,7 +28,7 @@ namespace Classier.NET.Compiler
 
         [InlineData("  \npublic", TokenType.Whitespace, TokenType.NewLine, TokenType.AccPublic)]
         [InlineData("0b1101_0110+0xABC1_EF39", TokenType.BinLit, TokenType.AddOp, TokenType.HexLit)]
-        [InlineData("1600\t // My comment", TokenType.IntLit, TokenType.Whitespace, TokenType.SLComment, TokenType.Whitespace, TokenType.Identifier, TokenType.Whitespace, TokenType.Identifier)]
+        [InlineData("1600\t // My comment\r\n", TokenType.IntLit, TokenType.Whitespace, TokenType.SLComment, TokenType.NewLine)]
         [InlineData("/*\u0001*/", TokenType.MLCommentStart, TokenType.Unknown, TokenType.MLCommentEnd)]
         [InlineData("myVariable.myMethod(true)", TokenType.Identifier, TokenType.Period, TokenType.Identifier, TokenType.LeftParen, TokenType.TrueLit, TokenType.RightParen)]
         [InlineData("0B010101-0XFFAB", TokenType.BinLit, TokenType.SubOp, TokenType.HexLit)]
@@ -40,6 +40,7 @@ namespace Classier.NET.Compiler
         [InlineData("valid__\r\u00EF\u00BB\u00BF", TokenType.Identifier, TokenType.NewLine, TokenType.Unknown)]
         [InlineData("0x____ 0B_____", TokenType.IntLit, TokenType.Identifier, TokenType.Whitespace, TokenType.IntLit, TokenType.Identifier)]
         [InlineData("_____ 0b1____ 0XE__", TokenType.Unknown, TokenType.Whitespace, TokenType.BinLit, TokenType.Whitespace, TokenType.HexLit)]
+        [InlineData("// One comment\n// Two comment", TokenType.SLComment, TokenType.NewLine, TokenType.SLComment)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {

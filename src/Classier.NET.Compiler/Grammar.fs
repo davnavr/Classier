@@ -115,7 +115,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
 
         TokenType.MLCommentStart, matchStr "/*";
         TokenType.MLCommentEnd, matchStr "*/";
-        TokenType.SLComment, matchStr "//";
+        TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchType TokenType.NewLine |> matchUntil) (matchUntilEnd)];
 
         TokenType.AccPublic, matchStr "public";
         TokenType.AccInternal, matchStr "internal";
@@ -180,4 +180,15 @@ type NodeType =
 
 let parser =
     Parser (fun tokens ->
-        Seq.empty)
+        let parseWhitespace = matchToken TokenType.Whitespace |> matchMany
+        let parseComment = matchToken TokenType.SLComment |> orMatch (matchChain [matchToken TokenType.MLCommentStart; matchToken TokenType.MLCommentEnd |> matchTo])
+        let parseSkipped = matchOptional (matchAny [parseWhitespace; parseComment;])
+
+        let parseIdentifier = matchChain [matchToken TokenType.Identifier; matchOptional (matchChain [matchToken TokenType.Period; matchToken TokenType.Identifier] |> matchMany)]
+
+        if tokens |> Seq.isEmpty then
+            Seq.empty
+        else
+            let start = itemFrom tokens
+        
+            Seq.empty)

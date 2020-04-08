@@ -46,7 +46,7 @@ type Item<'T> =
         }
 
 type MatchResult<'T> =
-    | Success of Item<'T> // TODO: Include a seq<'T> in the Success?
+    | Success of Item<'T>
     | Failure of string * Item<'T>
 
     member this.Item =
@@ -189,6 +189,13 @@ let matchUntil (f: MatchFunc<'T>) =
                     else None)
         | End _ ->
             result (f, startItem))
+
+let matchUntilEnd =
+    Match (fun (item: Item<'T>) ->
+        if item.ReachedEnd then
+            Success item
+        else
+            Success (item.AsSequence() |> Seq.last).Next)
 
 let matchTo f = andMatch (matchUntil f) f
 
