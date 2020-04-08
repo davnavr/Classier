@@ -38,6 +38,8 @@ namespace Classier.NET.Compiler
         [InlineData("let myVar=\"string cheese is ok\"", TokenType.WrdLet, TokenType.Whitespace, TokenType.Identifier, TokenType.EqOp, TokenType.StrLit)]
         [InlineData("\"no_newline\nin_string\"", TokenType.Unknown, TokenType.Identifier, TokenType.NewLine, TokenType.Identifier, TokenType.Unknown)]
         [InlineData("valid__\r\u00EF\u00BB\u00BF", TokenType.Identifier, TokenType.NewLine, TokenType.Unknown)]
+        [InlineData("0x____ 0B_____", TokenType.IntLit, TokenType.Identifier, TokenType.Whitespace, TokenType.IntLit, TokenType.Identifier)]
+        [InlineData("_____ 0b1____ 0XE__", TokenType.Unknown, TokenType.Whitespace, TokenType.BinLit, TokenType.Whitespace, TokenType.HexLit)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {

@@ -41,10 +41,10 @@ let lineInfo (tokens: seq<Token<'T>>) isNewline =
         let (nextLine, nextPos) =
             if newline
             then line + 1, 0
-            else line, pos //+ 1
+            else line, pos
         { Token = token; Line = nextLine; Pos = nextPos }, (isNewline token, nextLine, nextPos + token.Content.Length)
-    let (parsedTokens, _) =
-        tokens |> Seq.mapFold nextToken  (true, -1, 0)
+
+    let (parsedTokens, _) = tokens |> Seq.mapFold nextToken  (true, -1, 0)
     parsedTokens
 
 let createParser =

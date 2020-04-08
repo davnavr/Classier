@@ -18,9 +18,11 @@ module rec Classier.NET.Compiler.Grammar
 
 open Classier.NET.Compiler.Lexing
 open Classier.NET.Compiler.Matching
+open Classier.NET.Compiler.Parsing
 
 /// Indicates the type of a token.
 type TokenType =
+    | ``a-fA-F0-9`` = -3
     /// Matches any character of the English alphabet, regardless of case.
     | ``a-zA-Z`` = -2
     /// Matches any numeric character.
@@ -47,8 +49,10 @@ type TokenType =
     | WrdLet = 25
     /// The token is a keyword that indicates the declaration of a namespace.
     | WrdNamespace = 26
+    /// The token is a keyword that allows the use of types without their fully qualified names.
+    | WrdUse = 27
     /// The token is a modifier.
-    | Modifier = 27
+    | Modifier = 28
 
     /// The token is a plus sign.
     | AddOp = 40
@@ -105,6 +109,7 @@ let matchType t = lazy (tokenizerDefs.Item t) |> matchLazy
 
 let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
     [
+        TokenType.``a-fA-F0-9``, matchAny [matchType TokenType.``0-9``; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'];
         TokenType.``a-zA-Z``, matchCharRange 'A' 'Z' |> orMatch (matchCharRange 'a' 'z');
         TokenType.``0-9``, matchCharRange '0' '9';
 
@@ -118,6 +123,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.WrdClass, matchStr "class";
         TokenType.WrdLet, matchStr "let";
         TokenType.WrdNamespace, matchStr "namespace";
+        TokenType.WrdUse, matchStr "use";
         TokenType.Modifier, matchAnyOf ["extends"; "implements"; "mutable"; "virtual"] matchStr;
 
         TokenType.AddOp, matchChar '+';
@@ -130,9 +136,9 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.NotOp, matchStr "not";
 
         TokenType.StrLit, andMatch (matchChar '"') (matchTo (matchChar '"') |> matchWithout (matchType TokenType.NewLine));
-        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany];
-        TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchAny [matchChar '_'; matchType TokenType.``0-9``; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'] |> matchMany];
-        TokenType.IntLit, matchChain [matchType TokenType.``0-9``; matchOptional (matchMany (matchAny [matchChar '_'; matchType TokenType.``0-9``]))];
+        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany)];
+        TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchType TokenType.``a-fA-F0-9``; matchType TokenType.``a-fA-F0-9`` |> orMatch (matchChar '_') |> matchMany];
+        TokenType.IntLit, matchChain [matchType TokenType.``0-9``; matchOptional (matchAny [matchChar '_'; matchType TokenType.``0-9``] |> matchMany)];
         TokenType.TrueLit, matchStr "true";
         TokenType.FalseLit, matchStr "false";
 
@@ -171,3 +177,7 @@ type NodeType =
     /// The node is a method declaration.
     | MethodDecl = 5
 *)
+
+let parser =
+    Parser (fun tokens ->
+        Seq.empty)
