@@ -41,6 +41,7 @@ namespace Classier.NET.Compiler
         [InlineData("0x____ 0B_____", TokenType.IntLit, TokenType.Identifier, TokenType.Whitespace, TokenType.IntLit, TokenType.Identifier)]
         [InlineData("_____ 0b1____ 0XE__", TokenType.Unknown, TokenType.Whitespace, TokenType.BinLit, TokenType.Whitespace, TokenType.HexLit)]
         [InlineData("// One comment\n// Two comment", TokenType.SLComment, TokenType.NewLine, TokenType.SLComment)]
+        [InlineData("class\r\n{\r\n}", TokenType.WrdClass, TokenType.NewLine, TokenType.LCBracket, TokenType.NewLine, TokenType.RCBracket)]
         [Theory]
         public void TokensFromStringAreValid(string source, params TokenType[] expectedTypes)
         {

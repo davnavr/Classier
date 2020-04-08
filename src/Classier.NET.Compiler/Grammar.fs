@@ -70,6 +70,10 @@ type TokenType =
     | OrOp = 46
     /// The token indicates logical negation.
     | NotOp = 47
+    /// The token is a left curly bracket <c>U+007B</c>.
+    | LCBracket = 48
+    /// The token is a right curly bracket <c>U+007D</c>.
+    | RCBracket = 49
 
     /// The token is a string literal.
     | StrLit = 60
@@ -134,6 +138,8 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.AndOp, matchStr "and";
         TokenType.OrOp, matchStr "or";
         TokenType.NotOp, matchStr "not";
+        TokenType.LCBracket, matchChar '{';
+        TokenType.RCBracket, matchChar '}';
 
         TokenType.StrLit, andMatch (matchChar '"') (matchTo (matchChar '"') |> matchWithout (matchType TokenType.NewLine));
         TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany)];
@@ -161,22 +167,32 @@ let tokenizer =
             |> Seq.map (fun (t, f) -> { Type = t; Match = f }),
         TokenType.Unknown)
 
-(*
 /// Indicates the type of a node in the syntax tree.
 type NodeType =
     /// The node contains tokens that are unknown or are skipped.
     | Unknown = 0
+    /// The node consists of whitespace tokens.
+    | Whitespace = 1
+    /// The node represents one or more single-line comments, or one multi-line comment.
+    | Comment = 2
+    /// The node is an identifier.
+    | Identifier = 20
     /// The node allows for the use of types without their fully qualified names.
-    | UseStatement = 1
+    | UseStatement = 40
     /// The node is a namespace declaration.
-    | NamespaceDecl = 2
+    | NamespaceDecl = 41
     /// The node is a class declaration.
-    | ClassDecl = 3
+    | ClassDecl = 42
     /// The node is a field declaration.
-    | FieldDecl = 4
+    | FieldDecl = 43
     /// The node is a method declaration.
-    | MethodDecl = 5
-*)
+    | MethodDecl = 44
+
+let parserDefs =
+    [
+       NodeType.Whitespace, matchToken TokenType.Whitespace |> matchMany;
+       NodeType.Comment, matchToken TokenType.SLComment |> orMatch (matchChain [matchToken TokenType.MLCommentStart; matchToken TokenType.MLCommentEnd |> matchTo]);
+    ]
 
 let parser =
     Parser (fun tokens ->
@@ -184,11 +200,9 @@ let parser =
         let parseComment = matchToken TokenType.SLComment |> orMatch (matchChain [matchToken TokenType.MLCommentStart; matchToken TokenType.MLCommentEnd |> matchTo])
         let parseSkipped = matchOptional (matchAny [parseWhitespace; parseComment;])
 
-        let parseIdentifier = matchChain [matchToken TokenType.Identifier; matchOptional (matchChain [matchToken TokenType.Period; matchToken TokenType.Identifier] |> matchMany)]
-
         if tokens |> Seq.isEmpty then
             Seq.empty
         else
             let start = itemFrom tokens
-        
+            
             Seq.empty)
