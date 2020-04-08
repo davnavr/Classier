@@ -99,6 +99,8 @@ type TokenType =
     /// The token is an identifier.
     | Identifier = 110
 
+let tokenIsNewline (token: Token<TokenType>) = token.Type = TokenType.NewLine
+
 let matchType t = lazy (tokenizerDefs.Item t) |> matchLazy
 
 let tokenizerDefs: Map<TokenType, MatchFunc<char>> =

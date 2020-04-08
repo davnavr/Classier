@@ -38,7 +38,7 @@ let tokenContent (token: Token<'T>) = token.Content
 
 let tokenType (token: Token<'T>) = token.Type
 
-let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T): Tokenizer<'T> =
+let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
     let nextMatch (item: Item<char>) =
         let results =
             definitions

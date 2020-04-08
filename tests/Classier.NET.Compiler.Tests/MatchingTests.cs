@@ -33,7 +33,7 @@ namespace Classier.NET.Compiler
         public void MatchAnyOfFailsWithLastResult(string[] matches, string text)
         {
             // Arrange
-            var matchStrFunc = new InteropFunc<string, MatchFunc<char>>(str => matchStr(str));
+            var matchStrFunc = new InteropFunc<string, MatchFunc<char>>(matchStr);
 
             // Act
             var failure = (MatchResult<char>.Failure)result(matchAnyOf(matches, matchStrFunc), itemFrom(text));
