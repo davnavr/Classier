@@ -84,8 +84,24 @@ let success label (result: 'Result) =
 let failure label msg: MatchFunc<'Match, 'Result> =
     Match (label, fun _ -> Failure (label, msg))
 
+/// Changes the label of the specified match.
 let labelMatch label (m: MatchFunc<'Match, 'Result>) =
-    Match (label, fun item -> evaluateMatch m item)
+    Match (label, fun item ->
+        let result = evaluateMatch m item
+        match result with
+        | Success _ -> result
+        | Failure (_, msg)->
+            Failure (label, msg))
+
+/// Inserts the specified message into the beginning of the message used when the specified match function fails.
+let addFailMsg msg (f: MatchFunc<'Match, 'Result>) =
+    Match (f.Label, fun item ->
+        let result = evaluateMatch f item
+        match result with
+        | Success _ -> result
+        | Failure (label, oldMsg) ->
+            let combinedMsg = sprintf "%s %s" msg oldMsg
+            Failure (label, combinedMsg))
 
 /// Matches with the first function, then feeds the resulting item into the second function.
 let andMatch (m1: MatchFunc<'Match, 'Result>) (m2: MatchFunc<'Match, 'Result>) =
@@ -223,9 +239,9 @@ let matchLazy (f: Lazy<MatchFunc<'Match, 'Result>>) =
 let matchPredicate (predicate: 'Match -> bool) label =
     Match (label, fun item ->
         match item with
-        | Item (current, _, next) ->
+        | Item (current: 'Match, _, next) ->
             if predicate current then
                 Success (current, next.Value)
             else
-                Failure (label, "The predicate was not satified.")
+                Failure (label, sprintf "Unexpected '%s'." (current.ToString()))
         | End _ -> Failure (label, "The end of the sequence was unexpectedly reached."))

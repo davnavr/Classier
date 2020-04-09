@@ -56,3 +56,4 @@ let parse (parser: Parser<'T>) tokens =
 let matchToken (t: 'T) =
     let label = sprintf "token %s" (t.ToString())
     matchPredicate (fun token -> token.Type = t) label
+    |> addFailMsg (sprintf "Error parsing %s." label)

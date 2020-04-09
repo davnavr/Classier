@@ -28,9 +28,9 @@ namespace Classier.NET.Compiler
     {
         private readonly MatchResult<TMatch, TResult> result;
 
-        public SuccessResult(MatchResult<TMatch, TResult> result)
+        public SuccessResult(MatchFunc<TMatch, TResult> func, Item<TMatch> item)
         {
-            this.result = result;
+            this.result = evaluateMatch(func, item);
         }
 
         public Item<TMatch> Item => this.CastSuccess().Item2;
@@ -41,7 +41,7 @@ namespace Classier.NET.Compiler
         {
             if (this.result is MatchResult<TMatch, TResult>.Failure failure)
             {
-                throw new InvalidOperationException($"Unexpected failure for {failure.Item1}. {failure.Item2}");
+                throw new InvalidOperationException($"Unexpected failure for ({failure.Item1}). {failure.Item2}");
             }
 
             return (MatchResult<TMatch, TResult>.Success)this.result;

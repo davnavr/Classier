@@ -26,21 +26,25 @@ namespace Classier.NET.Compiler
     /// <typeparam name="TResult">The type of the item produced from a successful match.</typeparam>
     public sealed class FailureResult<TMatch, TResult>
     {
+        private readonly MatchFunc<TMatch, TResult> func;
+
         private readonly MatchResult<TMatch, TResult> result;
 
-        public FailureResult(MatchResult<TMatch, TResult> result)
+        public FailureResult(MatchFunc<TMatch, TResult> func, Item<TMatch> item)
         {
-            this.result = result;
+            this.func = func;
+            this.result = evaluateMatch(this.func, item);
         }
 
-        public string Label => this.CastFailure().Item1
-        public string Message => this.CastFailure().Item2
+        public string Label => this.CastFailure().Item1;
+
+        public string Message => this.CastFailure().Item2;
 
         private MatchResult<TMatch, TResult>.Failure CastFailure()
         {
             if (this.result is MatchResult<TMatch, TResult>.Success success)
             {
-                throw new InvalidOperationException($"Unexpected success, the result is '{success.Item1}'.");
+                throw new InvalidOperationException($"Unexpected success when matching ({this.func.Label}), the result is '{success.Item1}'.");
             }
 
             return (MatchResult<TMatch, TResult>.Failure)this.result;

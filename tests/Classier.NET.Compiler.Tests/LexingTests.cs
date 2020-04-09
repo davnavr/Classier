@@ -65,7 +65,9 @@ namespace Classier.NET.Compiler
             var tokens = new[] { new Token<TokenType>(TokenType.Whitespace, "this can be anything") };
 
             // Act
-            var success = new SuccessResult(evaluateMatch(matchToken(TokenType.Whitespace), itemFrom(tokens)));
+            var success = new SuccessResult(
+                matchToken(TokenType.Whitespace),
+                itemFrom(tokens));
 
             // Assert
             Assert.Equal(1, success.Item.Index);
@@ -80,7 +82,9 @@ namespace Classier.NET.Compiler
             var tokens = new[] { new Token<TokenType>(actual, "about:blank") };
 
             // Act
-            var failure = new FailureResult(evaluateMatch(matchToken(expected), itemFrom(tokens)));
+            var failure = new FailureResult(
+                matchToken(expected),
+                itemFrom(tokens));
 
             // Assert
             Assert.Contains(actual.ToString(), failure.Message);
@@ -95,7 +99,9 @@ namespace Classier.NET.Compiler
             var tokens = new Token<TokenType>[0];
 
             // Act
-            var failure = new FailureResult(evaluateMatch(matchToken(expected), itemFrom(tokens)));
+            var failure = new FailureResult(
+                matchToken(expected),
+                itemFrom(tokens));
 
             // Assert
             Assert.Contains("end of the sequence", failure.Message);

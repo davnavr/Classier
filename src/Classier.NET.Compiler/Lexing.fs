@@ -34,6 +34,7 @@ let matchChar c =
     let charLabel = sprintf "char '%c'" c
     matchPredicate (fun ch -> c = ch) charLabel
     |> matchAsStr
+    |> addFailMsg (sprintf "Error parsing character '%c'." c)
 
 /// Matches against any of the specified characters.
 let matchAnyChar chars = matchAnyOf chars matchChar
@@ -53,6 +54,7 @@ let matchStr str =
     |> matchChain
     |> mapMatch String.Concat
     |> labelMatch strLabel
+    |> addFailMsg (sprintf "Error parsing string '%s'." str)
 
 let matchStrSeq (f: MatchFunc<'Match, seq<string>>) =
     f |> mapMatch String.Concat
