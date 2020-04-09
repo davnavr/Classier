@@ -34,9 +34,9 @@ type TokenDef<'T> =
 /// Turns a sequence of characters into a sequence of tokens.
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
-let tokenContent (token: Token<'T>) = token.Content
-
-let tokenType (token: Token<'T>) = token.Type
+let matchChar c =
+    let charLabel = sprintf "char %c" c
+    matchPredicate (fun ch -> c = ch) charLabel (fun ch -> ch.ToString())
 
 let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
     let nextMatch (item: Item<char>) =
@@ -93,7 +93,7 @@ let tokenize (tokenizer: Tokenizer<'T>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer
     tokenizeFunc chars
 
-let matchToken (t: 'T) =
+let matchToken (t: 'T) = // TODO: Move to Parsing.
     Match (fun (item: Item<Token<'T>>) ->
         let failMsg r = sprintf "Expected a token of type '%s', but %s" (t.ToString()) r
         match item with

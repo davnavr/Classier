@@ -29,7 +29,7 @@ type Node<'T> =
     {
         Tokens: seq<ParsedToken<'T>>
         Children: seq<Node<'T>>
-        Type: 'T
+        Info: 'T // TODO: Change this to a different type.
     }
 
 /// Turns a sequence of tokens into a sequence of nodes.
