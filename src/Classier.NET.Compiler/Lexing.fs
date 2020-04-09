@@ -19,88 +19,41 @@ open System
 
 open Classier.NET.Compiler.Matching
 
-type Token<'T> =
-    {
-        Content: string
-        Type: 'T
-    }
+type Token<'T> = { Type: 'T; Content: string }
 
-type TokenDef<'T> =
-    {
-        Match: MatchFunc<char>
-        Type: 'T
-    }
+type TokenDef<'T> = 'T * MatchFunc<char, Token<'T>>
 
 /// Turns a sequence of characters into a sequence of tokens.
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
+/// Matches against the specified character.
 let matchChar c =
-    let charLabel = sprintf "char %c" c
-    matchPredicate (fun ch -> c = ch) charLabel (fun ch -> ch.ToString())
+    let charLabel = sprintf "char '%c'" c
+    matchPredicate (fun ch -> c = ch) charLabel
+
+/// Matches against any of the specified characters.
+let matchAnyChar chars = matchAnyOf chars matchChar
+
+/// Matches against the characters in the specified range, inclusive.
+let rec matchCharRange (c1, c2) =
+    if c1 > c2 then
+        matchCharRange (c2, c1)
+    else
+        matchAnyChar (seq { c1..c2 })
+
+/// Matches against the specified string.
+let matchStr str =
+    let strLabel = sprintf "string '%s'" str
+    str
+    |> Seq.map matchChar
+    |> matchChain
+    |> mapMatch (fun chars -> String(chars |> Array.ofSeq))
+    |> labelMatch strLabel
 
 let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
-    let nextMatch (item: Item<char>) =
-        let results =
-            definitions
-            |> Seq.map (fun def -> def.Type, result (def.Match, item))
-            |> Seq.filter (fun (_, r) -> isSuccess r)
-            |> Seq.cache
-
-        let longestResult (ctype: 'T, citem: Item<char>) (rtype: 'T, r: MatchResult<char>) =
-            let current = (ctype, citem)
-            match r with
-            | Success nextItem ->
-                if nextItem.Index > citem.Index then
-                    (rtype, nextItem);
-                else
-                    current
-            | _ -> current
-
-        Seq.fold longestResult (defaultVal, item) results
-
-    let rec nextToken (item: Item<char>) =
-        let (matchType, matchItem) = nextMatch item
-        
-        if matchType = defaultVal then
-            None, item.Next
-        else
-            Some { Content = String.Concat(selectItems item matchItem); Type = matchType }, matchItem
-
     Tokenizer (fun chars ->
-        seq {
-            let mutable item = itemFrom chars
-            let mutable unknown = item
-
-            while not item.ReachedEnd do
-                let (token, next) = nextToken item
-
-                match token with
-                | Some t ->
-                    if item.Index > unknown.Index then
-                        yield { Content = String.Concat(selectItems unknown item); Type = defaultVal }
-
-                    yield t
-                    unknown <- next
-                | None ->
-                    // Stops the last unknown token from being skipped.
-                    if next.ReachedEnd then
-                        yield { Content = String.Concat(selectItems unknown next); Type = defaultVal }
-                
-                item <- next
-        })
+        Seq.empty)
 
 let tokenize (tokenizer: Tokenizer<'T>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer
     tokenizeFunc chars
-
-let matchToken (t: 'T) = // TODO: Move to Parsing.
-    Match (fun (item: Item<Token<'T>>) ->
-        let failMsg r = sprintf "Expected a token of type '%s', but %s" (t.ToString()) r
-        match item with
-        | Item (token, _, next) ->
-            if token.Type = t then
-                Success next.Value
-            else
-                Failure (sprintf "got a '%s' token instead." (token.Type.ToString()) |> failMsg, item)
-        | End _ ->
-            Failure (failMsg "the end of the token sequence was reached instead.", item))

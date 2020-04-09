@@ -25,7 +25,7 @@ type Item<'T> =
         | Item (_, index, _) -> index
         | End index -> index
 
-    /// Gets the next item.
+    /// Gets the next item after the current item, or the current item if it indicates the end of the sequence..
     member this.Next =
         match this with
         | Item (_, _, next) -> next.Value
@@ -48,10 +48,10 @@ type Item<'T> =
 
 type MatchResult<'Match, 'Result> =
     | Success of 'Result * Item<'Match>
-    | Failure of string
+    | Failure of string * string
 
 type MatchFunc<'Match, 'Result> =
-    | Match of string * (Item<'Match> -> MatchResult<'Match, 'Result>) // TODO: Add an object that provides error messages
+    | Match of string * (Item<'Match> -> MatchResult<'Match, 'Result>)
 
     member this.Label =
         let (Match (label, _)) = this
@@ -94,7 +94,7 @@ let isSuccess (result: MatchResult<'Match, 'Result>) =
     | Success _ -> true
     | Failure _ -> false
 
-let result (f: MatchFunc<'Match, 'Result>, item) = // TODO: Return the label as well?
+let evaluateMatch (f: MatchFunc<'Match, 'Result>) item = // TODO: Return the label as well?
     let (Match (_, matchFunc)) = f
     matchFunc(item)
 
@@ -107,46 +107,49 @@ let success label (result: 'Result) =
 
 /// Returns a match that is always a failure.
 let failure label msg: MatchFunc<'Match, 'Result> =
-    Match (label, fun _ -> Failure msg)
+    Match (label, fun _ -> Failure (label, msg))
 
-let labelMatch (m: MatchFunc<'Match, 'Result>) label =
-    Match (label, fun item -> result (m, item))
+let labelMatch label (m: MatchFunc<'Match, 'Result>) =
+    Match (label, fun item -> evaluateMatch m item)
 
 /// Matches with the first function, then feeds the resulting item into the second function.
-let andMatch (m1: MatchFunc<'Match, 'Result>) (m2: MatchFunc<'Match, 'Result>): MatchFunc<'Match, seq<'Result>> =
+let andMatch (m1: MatchFunc<'Match, 'Result>) (m2: MatchFunc<'Match, 'Result>) =
     let andLabel = sprintf "%s and %s" m1.Label m2.Label
     Match (andLabel, fun item1 ->
-        let match1 = result (m1, item1)
+        let match1 = evaluateMatch m1 item1
 
         match match1 with
-        | Failure msg -> Failure msg
+        | Failure (_, msg) -> Failure (andLabel, msg)
         | Success (result1, item2) ->
-            let match2 = result (m2, item2)
+            let match2 = evaluateMatch m2 item2
 
             match match2 with
-            | Failure msg -> Failure msg
+            | Failure (_, msg) -> Failure (andLabel, msg)
             | Success (result2, finalItem) ->
-                let finalResult = [result1; result2] |> Seq.ofList
+                let finalResult = (result1, result2)
                 Success (finalResult, finalItem))
 
 /// Matches with the first function, if the result if a failure, then matches the second function.
 let orMatch (m1: MatchFunc<'Match, 'Result>) (m2: MatchFunc<'Match, 'Result>) =
     let orLabel = sprintf "%s or %s" m1.Label m2.Label
     Match (orLabel, fun item ->
-        let result1 = result (m1, item)
+        let result1 = evaluateMatch m1 item
 
         match result1 with
-        | Failure _ -> result (m2, item)
+        | Failure _ -> evaluateMatch m2 item
         | Success _ -> result1)
 
 // Matches with the specified function, then converts the result of the match to another value.
 let mapMatch (resultMap: 'Result1 -> 'Result2) (f: MatchFunc<'Match, 'Result1>) =
-    let label = sprintf "bind %s" f.Label
+    let label = sprintf "map %s" f.Label
     Match (label, fun (item: Item<'Match>) ->
-        match result (f, item) with
+        match evaluateMatch f item with
         | Success (success, nextItem) ->
             Success (resultMap success, nextItem)
-        | Failure msg -> Failure msg)
+        | Failure (_, msg) -> Failure (label, msg))
+
+let matchAsSeq (f: MatchFunc<'Match, 'Result>) =
+    f |> mapMatch (fun r -> seq { yield r })
 
 /// Matches against each of the specified functions, and returns the first success found.
 let matchAny (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, 'Result> =
@@ -154,7 +157,7 @@ let matchAny (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, 'Resu
     Match (anyLabel, fun item ->
         let results =
             matches
-            |> Seq.map(fun f -> result (f, item))
+            |> Seq.map(fun f -> evaluateMatch f item)
             |> Seq.cache
         match results |> Seq.tryFind isSuccess with
         | Some result -> result
@@ -163,7 +166,7 @@ let matchAny (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, 'Resu
 let matchAnyOf (items: seq<'Match>) (f: 'Match -> MatchFunc<'Match, 'Result>) =
     items |> Seq.map f |> matchAny
 
-/// Matches 1 or more of the specified function.
+/// Matches one or more of the specified function.
 let matchMany (f: MatchFunc<'Match, 'Result>): MatchFunc<'Match, seq<'Result>> =
     let manyLabel = sprintf "many %s" f.Label
 
@@ -171,7 +174,7 @@ let matchMany (f: MatchFunc<'Match, 'Result>): MatchFunc<'Match, seq<'Result>> =
         if item.ReachedEnd then
             None
         else
-            let currentMatch = result (f, item)
+            let currentMatch = evaluateMatch f item
             match currentMatch with
             | Success (_, nextItem) ->
                 Some (currentMatch, nextItem)
@@ -191,7 +194,7 @@ let matchMany (f: MatchFunc<'Match, 'Result>): MatchFunc<'Match, seq<'Result>> =
 
         if matches |> Seq.isEmpty then
             let mapToSeq = mapMatch (fun item -> [item] |> Seq.ofList)
-            result (mapToSeq f, item)
+            evaluateMatch (mapToSeq f) item
         else
             Success (matches, lastItem))
 
@@ -199,9 +202,9 @@ let matchMany (f: MatchFunc<'Match, 'Result>): MatchFunc<'Match, seq<'Result>> =
 let matchOptional (f: MatchFunc<'Match, 'Result>) =
     let optionalLabel = sprintf "optional %s" f.Label
     Match (optionalLabel, fun item ->
-        let r = result (f, item)
+        let result = evaluateMatch f item
 
-        match r with
+        match result with
         | Success (success, nextItem) ->
             Success (Some success, nextItem)
         | Failure _ ->
@@ -210,67 +213,44 @@ let matchOptional (f: MatchFunc<'Match, 'Result>) =
 /// Matches against the first function in the sequence, then feeds the resulting item into the next and so on,
 /// until the last function is called or any of the functions fails.
 let matchChain (matches: seq<MatchFunc<'Match, 'Result>>) =
+    let nextResult (prevItem: Item<'Match> option) (f: MatchFunc<'Match, 'Result>) =
+        match prevItem with
+        | Some item ->
+            let currentResult = evaluateMatch f item
+            match currentResult with
+            | Success (success, nextItem) ->
+                Some success, Some nextItem
+            | Failure _ -> None, None
+        | None -> None, None
+
     let chainLabel = sprintf "chain [%s]" (matches |> labelsOfMatches |> String.concat ", ")
     Match (chainLabel, fun item ->
-        result(matches |> Seq.reduce andMatch, item))
+        let (results, lastItem) =
+            matches |> Seq.mapFold nextResult (Some item)
+        
+        match lastItem with
+        | Some finalItem -> // TODO: Clean up this mess right here.
+            Success (results |> Seq.filter (fun r -> r.IsSome) |> Seq.map (fun r -> r.Value), finalItem)
+        | None ->
+            evaluateMatch (matches |> Seq.head |> matchAsSeq) item)
 
-/// Matches against the function until it is a success, exclusive.
-let matchUntil (f: MatchFunc<'Match, 'Result>) =
-    let untilLabel = sprintf "until %s" f.Label
-    Match (untilLabel, fun startItem ->
-        match startItem with
-        | Item _ ->
-            startItem.AsSequence()
-            |> Seq.pick (fun item ->
-                let currentMatch = result (f, item)
-                match currentMatch with
-                | Success _ -> Some (Success item) // Returned item is the first item in the success.
-                | Failure (msg, _) ->
-                    // Check if the last item was reached.
-                    if currentMatch.Item.Next.ReachedEnd
-                    then Some (Failure (msg, startItem))
-                    else None)
-        | End _ ->
-            result (f, startItem))
-
-/// Matches until the end of the item sequence is reached.
-let matchUntilEnd =
-    Match ("untilEnd", fun (item: Item<'T>) ->
-        if item.ReachedEnd then
-            Success item
-        else
-            Success (item.AsSequence() |> Seq.last).Next)
-
-/// Matches against the function until it is a success, inclusive.
-let matchTo f = andMatch (matchUntil f) f
-
-let matchWithout (filter: MatchFunc<'Match, 'Result>) (matchFunc) =
-    let withoutLabel = sprintf "%s without %s" matchFunc.Label filter.Label
-    Match (withoutLabel, fun item ->
-        let initialResult = result (matchFunc, item)
-        match initialResult with
-        | Success _ ->
-            match result (matchUntil filter, item) with
-            | Success filterMatch ->
-                if filterMatch.Index <= initialResult.Item.Index
-                then Failure ("The inverted match failed.", item)
-                else initialResult
-            | Failure _ -> initialResult
-        | Failure _ -> initialResult)
-
+/// Lazily evaluates the given matching function.
 let matchLazy (f: Lazy<MatchFunc<'Match, 'Result>>) =
-    Match ("lazy", fun item -> result (f.Value, item))
+    let lazyLabel state = sprintf "lazy (%s)" state
+    Match (lazyLabel "unevaluated", fun item ->
+        let result = evaluateMatch f.Value item
+        match result with
+        | Failure (label, msg) ->
+            Failure (lazyLabel label, msg)
+        | Success _ -> result)
 
 /// Matches an item and returns the generated result if the predicate is satisfied.
-let matchPredicate (predicate: 'Match -> bool) label (result: 'Match -> 'Result) =
-    let failWith msg =
-        Failure (sprintf "Error matching '%s'. %s" label msg)
-
+let matchPredicate (predicate: 'Match -> bool) label =
     Match (label, fun item ->
         match item with
         | Item (current, _, next) ->
             if predicate current then
-                Success (result current, next.Value)
+                Success (current, next.Value)
             else
-                failWith "The predicate was not satified."
-        | End _ -> failWith "The end of the sequence was unexpectedly reached.")
+                Failure (label, "The predicate was not satified.")
+        | End _ -> Failure (label, "The end of the sequence was unexpectedly reached."))

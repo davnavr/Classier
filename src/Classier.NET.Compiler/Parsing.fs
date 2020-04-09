@@ -15,6 +15,7 @@
 module Classier.NET.Compiler.Parsing
 
 open Classier.NET.Compiler.Lexing
+open Classier.NET.Compiler.Matching
 
 /// Provides line and position information for a token.
 type ParsedToken<'T> =
@@ -29,7 +30,7 @@ type Node<'T> =
     {
         Tokens: seq<ParsedToken<'T>>
         Children: seq<Node<'T>>
-        Info: 'T // TODO: Change this to a different type.
+        Info: 'T // TODO: Change this from 'T to something like 'Info.
     }
 
 /// Turns a sequence of tokens into a sequence of nodes.
@@ -51,3 +52,7 @@ let lineInfo (tokens: seq<Token<'T>>) isNewline =
 let parse (parser: Parser<'T>) tokens =
     let (Parser parseFunc) = parser
     parseFunc tokens
+
+let matchToken (t: 'T) =
+    let label = sprintf "token %s" (t.ToString())
+    matchPredicate (fun token -> token.Type = t) label
