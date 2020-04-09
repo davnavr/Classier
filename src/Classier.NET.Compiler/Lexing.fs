@@ -51,7 +51,7 @@ let matchStr str =
     str
     |> Seq.map matchChar
     |> matchChain
-    |> mapMatch (fun chars -> String(chars |> Array.ofSeq))
+    |> mapMatch String.Concat
     |> labelMatch strLabel
 
 let matchStrSeq (f: MatchFunc<'Match, seq<string>>) =

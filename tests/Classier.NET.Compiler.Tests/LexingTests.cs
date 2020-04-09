@@ -21,6 +21,9 @@ namespace Classier.NET.Compiler
     using static Classier.NET.Compiler.Grammar;
     using static Classier.NET.Compiler.Lexing;
     using static Classier.NET.Compiler.Matching;
+    using static Classier.NET.Compiler.Parsing;
+    using FailureResult = FailureResult<Lexing.Token<Grammar.TokenType>, Lexing.Token<Grammar.TokenType>>;
+    using SuccessResult = SuccessResult<Lexing.Token<Grammar.TokenType>, Lexing.Token<Grammar.TokenType>>;
 
     public class LexingTests
     {
@@ -59,10 +62,10 @@ namespace Classier.NET.Compiler
         public void MatchTokenIsSuccessForMatchingType()
         {
             // Arrange
-            var tokens = new[] { new Token<TokenType>("this can be anything", TokenType.Whitespace) };
+            var tokens = new[] { new Token<TokenType>(TokenType.Whitespace, "this can be anything") };
 
             // Act
-            var success = (MatchResult<Token<TokenType>>.Success)result(matchToken(TokenType.Whitespace), itemFrom(tokens));
+            var success = new SuccessResult(evaluateMatch(matchToken(TokenType.Whitespace), itemFrom(tokens)));
 
             // Assert
             Assert.Equal(1, success.Item.Index);
@@ -74,15 +77,14 @@ namespace Classier.NET.Compiler
             // Arrange
             var actual = TokenType.Unknown;
             var expected = TokenType.WrdClass;
-            var tokens = new[] { new Token<TokenType>("about:blank", actual) };
+            var tokens = new[] { new Token<TokenType>(actual, "about:blank") };
 
             // Act
-            var failure = (MatchResult<Token<TokenType>>.Failure)result(matchToken(expected), itemFrom(tokens));
+            var failure = new FailureResult(evaluateMatch(matchToken(expected), itemFrom(tokens)));
 
             // Assert
-            Assert.Equal(0, failure.Item2.Index);
-            Assert.Contains(actual.ToString(), failure.Item1);
-            Assert.Contains(expected.ToString(), failure.Item1);
+            Assert.Contains(actual.ToString(), failure.Message);
+            Assert.Contains(expected.ToString(), failure.Message);
         }
 
         [Fact]
@@ -93,12 +95,11 @@ namespace Classier.NET.Compiler
             var tokens = new Token<TokenType>[0];
 
             // Act
-            var failure = (MatchResult<Token<TokenType>>.Failure)result(matchToken(expected), itemFrom(tokens));
+            var failure = new FailureResult(evaluateMatch(matchToken(expected), itemFrom(tokens)));
 
             // Assert
-            Assert.Equal(0, failure.Item2.Index);
-            Assert.Contains("end of the token sequence", failure.Item1);
-            Assert.Contains(expected.ToString(), failure.Item1);
+            Assert.Contains("end of the sequence", failure.Message);
+            Assert.Contains(expected.ToString(), failure.Message);
         }
     }
 }

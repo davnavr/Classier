@@ -24,6 +24,8 @@ namespace Classier.NET.Compiler
     using static Classier.NET.Compiler.Lexing;
     using static Classier.NET.Compiler.Matching;
     using static Classier.NET.Compiler.Program;
+    using FailureResult = Classier.NET.Compiler.FailureResult<char, string>;
+    using SuccessResult = Classier.NET.Compiler.SuccessResult<char, string>;
 
     public class MatchingTests
     {
@@ -33,14 +35,16 @@ namespace Classier.NET.Compiler
         public void MatchAnyOfFailsWithLastResult(string[] matches, string text)
         {
             // Arrange
-            var matchStrFunc = new InteropFunc<string, MatchFunc<char>>(matchStr);
+            var func = new InteropFunc<string, MatchFunc<char, string>>(matchStr);
 
             // Act
-            var failure = (MatchResult<char>.Failure)result(matchAnyOf(matches, matchStrFunc), itemFrom(text));
+            var failure = new FailureResult(
+                evaluateMatch(
+                    matchAnyOf(matches, func),
+                    itemFrom(text)));
 
             // Assert
-            Assert.Contains(matches[matches.Length - 1], failure.Item1);
-            Assert.Equal(0, failure.Item2.Index);
+            Assert.Contains(matches[matches.Length - 1], failure.Message);
         }
 
         [InlineData("cs", "cscscs", 3)]
@@ -53,11 +57,16 @@ namespace Classier.NET.Compiler
         public void MatchManyIsSuccessForRepeated(string expected, string text, int repeatCount)
         {
             // Act
-            var success = (MatchResult<char>.Success)result(matchMany(matchStr(expected)), itemFrom(text));
+            var success = new SuccessResult(
+                evaluateMatch(
+                    matchStrSeq(
+                        matchMany(
+                            matchStr(expected))),
+                    itemFrom(text)));
 
             // Assert
             Assert.Equal(expected.Length * repeatCount, success.Item.Index);
-            Assert.Equal(string.Concat(Enumerable.Repeat(expected, repeatCount)), text.Substring(0, expected.Length * repeatCount));
+            Assert.Equal(success.Result, text.Substring(0, expected.Length * repeatCount));
         }
 
         [InlineData("sedan", "truck", 0)]
@@ -169,7 +178,6 @@ namespace Classier.NET.Compiler
             Assert.Equal(1, success.Item.Index);
         }
 
-        // TODO: Check for the bad char surrounded by quotes ''.
         [InlineData('a', "ABC")]
         [InlineData(' ', "This is testing")]
         [Theory]

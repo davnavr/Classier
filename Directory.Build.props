@@ -26,7 +26,8 @@
   
   <!-- C# project properties -->
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
-    <LangVersion>7.2</LangVersion>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>enable</Nullable>
     <ProjectLang>csharp</ProjectLang>
   </PropertyGroup>
 
