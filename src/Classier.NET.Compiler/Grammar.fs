@@ -111,15 +111,15 @@ let tokenIsNewline (token: Token<TokenType>) = token.Type = TokenType.NewLine
 
 let matchTokenType t = lazy (tokenizerDefs.Item t) |> matchLazy
 
-let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
+let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
     [
-        TokenType.``a-fA-F0-9``, matchAny [matchTokenType TokenType.``0-9``; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'];
-        TokenType.``a-zA-Z``, matchCharRange 'A' 'Z' |> orMatch (matchCharRange 'a' 'z');
-        TokenType.``0-9``, matchCharRange '0' '9';
+        TokenType.``a-fA-F0-9``, matchAny [matchTokenType TokenType.``0-9``; matchCharRange ('a', 'f'); matchCharRange ('A', 'F')];
+        TokenType.``a-zA-Z``, matchCharRange ('A', 'Z') |> orMatch (matchCharRange ('a', 'z'));
+        TokenType.``0-9``, matchCharRange ('0', '9');
 
         TokenType.MLCommentStart, matchStr "/*";
         TokenType.MLCommentEnd, matchStr "*/";
-        TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchTokenType TokenType.NewLine |> matchUntil) (matchUntilEnd)];
+        //TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchTokenType TokenType.NewLine |> matchUntil) (matchUntilEnd)];
 
         TokenType.AccPublic, matchStr "public";
         TokenType.AccInternal, matchStr "internal";
@@ -141,10 +141,10 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.LCBracket, matchChar '{';
         TokenType.RCBracket, matchChar '}';
 
-        TokenType.StrLit, andMatch (matchChar '"') (matchTo (matchChar '"') |> matchWithout (matchTokenType TokenType.NewLine));
-        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany)];
-        TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchTokenType TokenType.``a-fA-F0-9``; matchTokenType TokenType.``a-fA-F0-9`` |> orMatch (matchChar '_') |> matchMany];
-        TokenType.IntLit, matchChain [matchTokenType TokenType.``0-9``; matchOptional (matchAny [matchChar '_'; matchTokenType TokenType.``0-9``] |> matchMany)];
+        //TokenType.StrLit, andMatch (matchChar '"') (matchTo (matchChar '"') |> matchWithout (matchTokenType TokenType.NewLine));
+        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
+        TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchTokenType TokenType.``a-fA-F0-9``; matchTokenType TokenType.``a-fA-F0-9`` |> orMatch (matchChar '_') |> matchMany |> matchStrSeq] |> matchStrSeq;
+        TokenType.IntLit, matchChain [matchTokenType TokenType.``0-9``; matchOptional (matchAny [matchChar '_'; matchTokenType TokenType.``0-9``] |> matchMany |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
         TokenType.TrueLit, matchStr "true";
         TokenType.FalseLit, matchStr "false";
 
@@ -153,56 +153,16 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.Period, matchChar '.';
         TokenType.Comma, matchChar ',';
 
-        TokenType.Whitespace, matchAnyChar [' '; '\t'] |> matchMany;
+        TokenType.Whitespace, matchAnyChar [' '; '\t'] |> matchMany |> matchStrSeq;
         TokenType.NewLine, matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr;
         
-        TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchOptional (matchMany (matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_']))];
+        TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchOptional (matchMany (matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_']) |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
     ] |> Map.ofList
 
-let tokenizer =
+let tokenizer: Tokenizer<TokenType> =
     createTokenizer(
         tokenizerDefs
             |> Map.toSeq
             |> Seq.filter (fun (t, _) -> t > TokenType.Unknown)
-            |> Seq.map (fun (t, f) -> { Type = t; Match = f }),
+            |> Seq.map (fun (t, f) -> t, f |> mapMatch (fun str -> { Type = t; Content = str })),
         TokenType.Unknown)
-
-/// Indicates the type of a node in the syntax tree.
-type NodeType = // TODO: Replace this with a union?
-    /// The node contains tokens that are unknown or are skipped.
-    | Unknown = 0
-    /// The node consists of whitespace tokens.
-    | Whitespace = 1
-    /// The node represents one or more single-line comments, or one multi-line comment.
-    | Comment = 2
-    /// The node is an identifier.
-    | Identifier = 20
-    /// The node allows for the use of types without their fully qualified names.
-    | UseStatement = 40
-    /// The node is a namespace declaration.
-    | NamespaceDecl = 41
-    /// The node is a class declaration.
-    | ClassDecl = 42
-    /// The node is a field declaration.
-    | FieldDecl = 43
-    /// The node is a method declaration.
-    | MethodDecl = 44
-
-let matchNodeType t = lazy (parserDefs.Item t) |> matchLazy
-
-let parserDefs: Map<NodeType, MatchFunc<Token<TokenType>>> =
-    [
-         NodeType.Whitespace, matchToken TokenType.Whitespace |> matchMany;
-         NodeType.Comment, matchToken TokenType.SLComment |> orMatch (matchChain [matchToken TokenType.MLCommentStart; matchToken TokenType.MLCommentEnd |> matchTo]);
-    ] |> Map.ofList
-
-let parser =
-    Parser (fun tokens ->
-        let parseSkipped = matchOptional (matchAny [matchNodeType NodeType.Whitespace; matchNodeType NodeType.Comment])
-
-        if tokens |> Seq.isEmpty then
-            Seq.empty
-        else
-            let start = itemFrom tokens
-            
-            Seq.empty)

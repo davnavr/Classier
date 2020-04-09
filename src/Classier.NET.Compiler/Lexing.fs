@@ -26,10 +26,14 @@ type TokenDef<'T> = 'T * MatchFunc<char, Token<'T>>
 /// Turns a sequence of characters into a sequence of tokens.
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
+let matchAsStr (f: MatchFunc<'Match, 'Result>) =
+    f |> mapMatch (fun r -> r.ToString())
+
 /// Matches against the specified character.
 let matchChar c =
     let charLabel = sprintf "char '%c'" c
     matchPredicate (fun ch -> c = ch) charLabel
+    |> matchAsStr
 
 /// Matches against any of the specified characters.
 let matchAnyChar chars = matchAnyOf chars matchChar
@@ -49,6 +53,18 @@ let matchStr str =
     |> matchChain
     |> mapMatch (fun chars -> String(chars |> Array.ofSeq))
     |> labelMatch strLabel
+
+let matchStrSeq (f: MatchFunc<'Match, seq<string>>) =
+    f |> mapMatch String.Concat
+
+let matchStrPair (f: MatchFunc<'Match, string * string>) =
+    f |> mapMatch (fun (s1, s2) -> s1 + s2)
+
+let matchStrOptional (f: MatchFunc<'Match, string option>) =
+    f |> mapMatch (fun optstr ->
+        match optstr with
+        | Some str -> str
+        | None -> String.Empty)
 
 let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
     Tokenizer (fun chars ->

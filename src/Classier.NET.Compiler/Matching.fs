@@ -37,15 +37,6 @@ type Item<'T> =
         | Item _ -> false
         | End _ -> true
 
-    [<System.Obsolete("Use MatchResult<Match, Result>.Success instead to get the result of a successful match.")>]
-    member this.AsSequence() =
-        seq {
-            let mutable item = this
-            while not item.ReachedEnd do
-                yield item
-                item <- item.Next
-        }
-
 type MatchResult<'Match, 'Result> =
     | Success of 'Result * Item<'Match>
     | Failure of string * string
@@ -71,22 +62,6 @@ let itemFrom (items: seq<'T>): Item<'T> =
             enumerator.Dispose() |> ignore
             End index
     nextItem 0
-
-// exclusive
-[<System.Obsolete("Use MatchResult<Match, Result>.Success instead to get the result of a successful match.")>]
-let rec selectItems (fromItem: Item<'T>) (toItem: Item<'T>): seq<'T> =
-    if fromItem.Index > toItem.Index then
-        selectItems toItem fromItem
-    else
-        match fromItem with
-        | Item _ ->
-            fromItem.AsSequence()
-            |> Seq.takeWhile(fun item -> item.Index < toItem.Index)
-            |> Seq.map(fun entry ->
-                match entry with
-                | Item (item, _, _) -> item
-                | End index -> invalidOp (sprintf "The entry at index '%i' should not indicate the end of the collection." index))
-        | End _ -> Seq.empty
 
 /// Determines whether a result is a success.
 let isSuccess (result: MatchResult<'Match, 'Result>) =
@@ -163,7 +138,7 @@ let matchAny (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, 'Resu
         | Some result -> result
         | None -> results |> Seq.last)
 
-let matchAnyOf (items: seq<'Match>) (f: 'Match -> MatchFunc<'Match, 'Result>) =
+let matchAnyOf (items: seq<'T>) (f: 'T -> MatchFunc<'Match, 'Result>) =
     items |> Seq.map f |> matchAny
 
 /// Matches one or more of the specified function.
