@@ -293,9 +293,21 @@ let matchTo (f: MatchFunc<'Match, 'Result>) =
 
 /// Skips items in the sequence until the specified function returns a success, and returns the skipped items.
 let matchUntil (f: MatchFunc<'Match, 'Result>) =
-    matchTo f
-    |> labelMatch (sprintf "until %s" f.Label)
-    |> mapMatch (fun (matches, _) -> matches)
+    let untilLabel = sprintf "until %s" f.Label
+    Match (untilLabel, fun item ->
+        match evaluateMatch (matchTo f) item with
+        | Success ((matches, _), _) ->
+            let lastItem =
+                item.AsSequence()
+                |> Seq.map (fun (i, _, _) -> i.Next)
+                |> Seq.zip matches
+                |> Seq.map (fun (_, i) -> i)
+                |> Seq.tryLast
+                |> Option.orElse (Some item)
+
+            Success (matches, lastItem.Value);
+        | Failure (_, msg) ->
+            Failure (untilLabel, msg))
 
 /// Lazily evaluates the given matching function.
 let matchLazy (f: Lazy<MatchFunc<'Match, 'Result>>) =

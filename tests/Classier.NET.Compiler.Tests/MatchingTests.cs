@@ -124,38 +124,45 @@ namespace Classier.NET.Compiler
             Assert.StartsWith("chain [", failure.Label);
         }
 
-#if false
         [InlineData("indented", "\t\t\tindented", 3)]
         [InlineData("one", "onetoomany", 0)]
         [InlineData("+", "1 + 1", 2)]
         [Theory]
-        public void MatchUntilIsSuccessAndExcludesFinalMatch(string expected, string actual, int expectedIndex)
+        public void MatchUntilIsSuccessAndExcludesFinalMatch(string untilStr, string actual, int expectedIndex)
         {
             // Act
-            var success = new SuccessResult(evaluateMatch(matchUntil(matchStr(expected)), itemFrom(actual)));
+            var success = new SuccessResult<char, IEnumerable<char>>(
+                matchUntil(
+                    matchStr(untilStr)),
+                itemFrom(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
+            Assert.Equal(actual.Substring(success.Result.Count(), untilStr.Length), untilStr);
         }
 
-        [InlineData("content", "")]
+        [InlineData("content", "conten")]
         [InlineData("123", "EFGHI")]
         [Theory]
         public void MatchUntilIsFailureForNoMatch(string expected, string actual)
         {
             // Act
-            var failure = (MatchResult<char>.Failure)result(matchUntil(matchStr(expected)), itemFrom(actual));
+            var failure = new FailureResult(
+                matchCharSeq(
+                    matchUntil(
+                        matchStr(expected))),
+                itemFrom(actual));
 
             // Assert
-            Assert.Equal(0, failure.Item2.Index);
+            Assert.Contains("until ", failure.Label);
         }
-#endif
 
         [InlineData("Data", "[InlineData]", 11)]
         [InlineData("nbsp", "nbsp", 4)]
         [InlineData("matchStr", "\n\nmatchStr(expected)", 10)]
         [InlineData("z", "abcxyz", 6)]
         [InlineData("es", "languages", 9)]
+        [InlineData("1", "012345678910", 2)]
         [Theory]
         public void MatchToIsSuccessAndIncludesFinalMatch(string expected, string actual, int expectedIndex)
         {
@@ -171,11 +178,10 @@ namespace Classier.NET.Compiler
             Assert.Equal(actual.Substring(skippedChars.Count(), expected.Length), result);
         }
 
-        [InlineData("System", "Xunit.Abstractions")]
-        [InlineData("digital", "analog")]
-        [InlineData("String.IsNullOrEmpty", "")]
+        [InlineData("System", "Xunit.Abstractions", 's')]
+        [InlineData("digital", "analog", 'g')]
         [Theory]
-        public void MatchToIsFailureWhenNoSuccessFound(string expected, string actual)
+        public void MatchToIsFailureWhenNoSuccessFound(string expected, string actual, char badChar)
         {
             // Act
             var failure = new FailureResult<char, Tuple<IEnumerable<char>, string>>(
@@ -185,6 +191,21 @@ namespace Classier.NET.Compiler
 
             // Assert
             Assert.StartsWith("to ", failure.Label);
+            Assert.Contains($"'{badChar}'", failure.Message);
+        }
+
+        [Fact]
+        public void MatchToIsFailureForEmptyString()
+        {
+            // Act
+            var failure = new FailureResult<char, Tuple<IEnumerable<char>, string>>(
+                matchTo(
+                    matchStr("not emptyiness")),
+                itemFrom(string.Empty));
+
+            // Assert
+            Assert.StartsWith("to ", failure.Label);
+            Assert.Contains("end of", failure.Message);
         }
 
 #if false

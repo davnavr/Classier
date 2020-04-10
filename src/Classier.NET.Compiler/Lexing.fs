@@ -33,6 +33,11 @@ let matchChar c =
     |> mapMatch (fun ch -> ch.ToString())
     |> addFailMsg (sprintf "Error parsing character '%c'." c)
 
+let matchCharSeq (f: MatchFunc<'Match, seq<char>>) =
+    f
+    |> mapMatch String.Concat
+    |> labelMatch f.Label
+
 /// Matches against any of the specified characters.
 let matchAnyChar chars = matchAnyOf chars matchChar
 
@@ -57,9 +62,6 @@ let matchStrSeq (f: MatchFunc<'Match, seq<string>>) =
     f
     |> mapMatch String.Concat
     |> labelMatch f.Label
-
-let matchStrPair (f: MatchFunc<'Match, string * string>) =
-    f |> mapMatch (fun (s1, s2) -> s1 + s2)
 
 let matchStrOptional (f: MatchFunc<'Match, string option>) =
     f |> mapMatch (fun optstr ->
