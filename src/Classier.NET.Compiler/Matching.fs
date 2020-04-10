@@ -139,6 +139,10 @@ let mapMatch (resultMap: 'Result1 -> 'Result2) (f: MatchFunc<'Match, 'Result1>) 
             Success (resultMap success, nextItem)
         | Failure (_, msg) -> Failure (label, msg))
 
+let resultAsMatch (result: MatchResult<'Match, 'Result>) =
+    let label = sprintf "return %A" result
+    Match (label, fun _ -> result)
+
 let matchAsSeq (f: MatchFunc<'Match, 'Result>) =
     f |> mapMatch (fun r -> seq { yield r })
 
@@ -184,8 +188,7 @@ let matchMany (f: MatchFunc<'Match, 'Result>): MatchFunc<'Match, seq<'Result>> =
             |> Seq.mapFold nextResult item
 
         if matches |> Seq.isEmpty then
-            let mapToSeq = mapMatch (fun item -> [item] |> Seq.ofList)
-            evaluateMatch (mapToSeq f) item
+            evaluateMatch (matchAsSeq f) item
         else
             Success (matches, lastItem))
 
@@ -203,27 +206,35 @@ let matchOptional (f: MatchFunc<'Match, 'Result>) =
 
 /// Matches against the first function in the sequence, then feeds the resulting item into the next and so on,
 /// until the last function is called or any of the functions fails.
-let matchChain (matches: seq<MatchFunc<'Match, 'Result>>) =
-    let nextResult (prevItem: Item<'Match> option) (f: MatchFunc<'Match, 'Result>) =
-        match prevItem with
-        | Some item ->
-            let currentResult = evaluateMatch f item
-            match currentResult with
+let matchChain (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, seq<'Result>> =
+    let next (prevResult, item) f: 'Result option * (MatchResult<'Match, 'Result> * Item<'Match> option) =
+        match item with
+        | Some currentItem ->
+            let result = evaluateMatch f currentItem
+            match result with
             | Success (success, nextItem) ->
-                Some success, Some nextItem
-            | Failure _ -> None, None
-        | None -> None, None
+                Some success, (result, Some nextItem)
+            | Failure _ ->
+                None, (result, None)
+        | None ->
+            None, (prevResult, None)
 
     let chainLabel = sprintf "chain [%s]" (matches |> labelsOfMatches |> String.concat ", ")
     Match (chainLabel, fun item ->
-        let (results, lastItem) =
-            matches |> Seq.mapFold nextResult (Some item)
-        
+        let (matchResults, (lastResult, lastItem)) =
+            matches
+            |> Seq.mapFold next (Failure (chainLabel, "The match collection was empty."), Some item)
+
         match lastItem with
-        | Some finalItem -> // TODO: Clean up this mess right here.
-            Success (results |> Seq.filter (fun r -> r.IsSome) |> Seq.map (fun r -> r.Value), finalItem)
+        | Some lastItem ->
+            let results =
+                matchResults
+                |> Seq.where (fun result -> result.IsSome)
+                |> Seq.map (fun result -> result.Value)
+            Success (results, lastItem)
         | None ->
-            evaluateMatch (matches |> Seq.head |> matchAsSeq) item)
+            let failure = resultAsMatch lastResult |> matchAsSeq
+            evaluateMatch failure item)
 
 /// Lazily evaluates the given matching function.
 let matchLazy (f: Lazy<MatchFunc<'Match, 'Result>>) =
