@@ -54,7 +54,9 @@ let matchStr str =
     |> addFailMsg (sprintf "Error parsing string '%s'." str)
 
 let matchStrSeq (f: MatchFunc<'Match, seq<string>>) =
-    f |> mapMatch String.Concat
+    f
+    |> mapMatch String.Concat
+    |> labelMatch f.Label
 
 let matchStrPair (f: MatchFunc<'Match, string * string>) =
     f |> mapMatch (fun (s1, s2) -> s1 + s2)

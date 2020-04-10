@@ -93,8 +93,11 @@ let mapResult (resultMap: 'Result1 -> 'Result2) (result: MatchResult<'Match, 'Re
     | Failure (label, msg) ->
         Failure (label, msg)
 
-let labelsOfMatches (matches: seq<MatchFunc<'Match, 'Result>>) =
-    matches |> Seq.map (fun m -> m.Label)
+let labelResult label (result: MatchResult<'Match, 'Result>) =
+    match result with
+    | Success _ -> result
+    | Failure (_, msg) ->
+        Failure (label, msg)
 
 /// Returns a match that is always successful.
 let success label (result: 'Result) =
@@ -107,11 +110,11 @@ let failure label msg: MatchFunc<'Match, 'Result> =
 /// Changes the label of the specified match.
 let labelMatch label (m: MatchFunc<'Match, 'Result>) =
     Match (label, fun item ->
-        let result = evaluateMatch m item
-        match result with
-        | Success _ -> result
-        | Failure (_, msg)->
-            Failure (label, msg))
+        evaluateMatch m item
+        |> labelResult label)
+
+let labelsOfMatches (matches: seq<MatchFunc<'Match, 'Result>>) =
+    matches |> Seq.map (fun m -> m.Label)
 
 /// Inserts the specified message into the beginning of the message used when the specified match function fails.
 let addFailMsg msg (f: MatchFunc<'Match, 'Result>) =
@@ -252,6 +255,8 @@ let matchChain (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, seq
         | None ->
             lastResult |> mapResult Seq.singleton)
 
+/// Skips items in the sequence until the specified function returns a success,
+/// and returns the skipped items along with the result of the function.
 let matchTo (f: MatchFunc<'Match, 'Result>) =
     let toLabel = sprintf "to %s" f.Label
     Match (toLabel, fun startItem ->
@@ -268,7 +273,7 @@ let matchTo (f: MatchFunc<'Match, 'Result>) =
                     match currentMatch with
                     | Success (success, nextItem) -> Some (item, Success (success, nextItem))
                     | Failure (_, msg) ->
-                        if item.ReachedEnd
+                        if item.Next.ReachedEnd
                         then Some (item, Failure (toLabel, msg))
                         else None)
             
@@ -283,16 +288,14 @@ let matchTo (f: MatchFunc<'Match, 'Result>) =
                 lastResult |> mapToResult
         | End _ ->
             evaluateMatch f startItem
-            |> mapToResult)
+            |> mapToResult
+            |> labelResult toLabel)
 
+/// Skips items in the sequence until the specified function returns a success, and returns the skipped items.
 let matchUntil (f: MatchFunc<'Match, 'Result>) =
-    let untilLabel = sprintf "until %s" f.Label
-    Match (untilLabel, fun item ->
-        match evaluateMatch (matchTo f) item with
-        | Success ((matches, _), nextItem) ->
-            Success (matches, nextItem)
-        | Failure (_, msg) ->
-            Failure (untilLabel, msg))
+    matchTo f
+    |> labelMatch (sprintf "until %s" f.Label)
+    |> mapMatch (fun (matches, _) -> matches)
 
 /// Lazily evaluates the given matching function.
 let matchLazy (f: Lazy<MatchFunc<'Match, 'Result>>) =
