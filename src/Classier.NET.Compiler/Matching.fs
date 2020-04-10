@@ -233,8 +233,8 @@ let matchChain (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, seq
                 |> Seq.map (fun result -> result.Value)
             Success (results, lastItem)
         | None ->
-            let failure = resultAsMatch lastResult |> matchAsSeq
-            evaluateMatch failure item)
+            let fail = resultAsMatch lastResult |> matchAsSeq
+            evaluateMatch fail item)
 
 /// Lazily evaluates the given matching function.
 let matchLazy (f: Lazy<MatchFunc<'Match, 'Result>>) =

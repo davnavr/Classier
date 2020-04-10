@@ -21,10 +21,10 @@ open Classier.NET.Compiler.Matching
 
 type Token<'T> = { Type: 'T; Content: string }
 
-type TokenDef<'T> = 'T * MatchFunc<char, Token<'T>>
-
 /// Turns a sequence of characters into a sequence of tokens.
 type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
+
+type TokenDef<'T> = MatchFunc<char, Token<'T>>
 
 let matchAsStr (f: MatchFunc<'Match, 'Result>) =
     f |> mapMatch (fun r -> r.ToString())
@@ -69,8 +69,29 @@ let matchStrOptional (f: MatchFunc<'Match, string option>) =
         | None -> String.Empty)
 
 let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
+    let tokenDefs = definitions |> Seq.cache
+    let nextToken (item: Item<char>) =
+        let results =
+            tokenDefs
+            |> Seq.map (fun f -> evaluateMatch f item)
+            |> Seq.where (fun r -> isSuccess r)
+            |> Seq.map (fun r ->
+                let (Success (result, item)) = r
+                result, item)
+            |> Seq.cache
+
+        if results |> Seq.isEmpty then
+            invalidOp "Cannot handle unknown tokens yet."
+        else
+            let longestToken =
+                results
+            None
+
     Tokenizer (fun chars ->
-        Seq.empty)
+        itemFrom chars
+        |>
+        Seq.unfold (fun item ->
+            None))
 
 let tokenize (tokenizer: Tokenizer<'T>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer

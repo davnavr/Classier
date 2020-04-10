@@ -164,5 +164,5 @@ let tokenizer: Tokenizer<TokenType> =
         tokenizerDefs
             |> Map.toSeq
             |> Seq.filter (fun (t, _) -> t > TokenType.Unknown)
-            |> Seq.map (fun (t, f) -> t, f |> mapMatch (fun str -> { Type = t; Content = str })),
+            |> Seq.map (fun (t, f) -> f |> mapMatch (fun str -> { Type = t; Content = str })),
         TokenType.Unknown)
