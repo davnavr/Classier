@@ -37,6 +37,18 @@ type Item<'T> =
         | Item _ -> false
         | End _ -> true
 
+    /// Converts this item into a sequence containing the current item all the way to the last item.
+    member this.AsSequence() =
+        match this with
+        | Item _ ->
+            this
+            |> Seq.unfold (fun item ->
+                match item with
+                | Item (thing, index, next) ->
+                    Some ((item, thing, index), next.Value)
+                | End _ -> None)
+        | End _ -> Seq.empty
+
 type MatchResult<'Match, 'Result> =
     | Success of 'Result * Item<'Match>
     | Failure of string * string
@@ -48,11 +60,7 @@ type MatchFunc<'Match, 'Result> =
         let (Match (label, _)) = this
         label
 
-/// <summary>
 /// Creates an item containing the first element of the specified sequence.
-/// </summary>
-/// <param name="items">The sequence contains the items.</param>
-/// <returns>An <see cref="Item{T}.Item"/> containing the first element of the sequence; or <see cref="Item{T}.End"/> if the sequence has no items.</returns>
 let itemFrom (items: seq<'T>): Item<'T> =
     let enumerator = items.GetEnumerator()
     let rec nextItem index =
@@ -62,6 +70,11 @@ let itemFrom (items: seq<'T>): Item<'T> =
             enumerator.Dispose() |> ignore
             End index
     nextItem 0
+
+let itemsTo (startItem: Item<'T>) endItem =
+    match startItem with
+    | Item _ -> Seq.empty
+    | End _ -> Seq.empty
 
 /// Determines whether a result is a success.
 let isSuccess (result: MatchResult<'Match, 'Result>) =

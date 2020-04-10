@@ -95,7 +95,33 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
                         (t2, item2))
             Some longestToken
 
-    let unknownFrom (item: Item<char>) = null
+    let unknownFrom (startItem: Item<char>) =
+        let nextKnown =
+            startItem.AsSequence()
+            |> Seq.map (fun (item, ch, _) -> item, ch, tokenFrom item)
+            |> Seq.tryFind (fun (_, _, token) -> token.IsSome)
+
+        let defaultResult() =
+            let content =
+                startItem.AsSequence()
+                |> Seq.map (fun (_, ch, _) -> ch)
+                |> String.Concat
+            { Type = defaultVal; Content = content }, End -1, None
+
+        match nextKnown with
+        | Some (tokenStart, _, nextToken) ->
+            match nextToken with
+            | Some (knownToken, nextItem) ->
+                let content =
+                    startItem.AsSequence()
+                    |> Seq.takeWhile (fun (_, _, index) -> index < tokenStart.Index)
+                    |> Seq.map (fun (_, ch, _) -> ch)
+                    |> String.Concat
+                { Type = defaultVal; Content = content }, nextItem, Some knownToken
+            | None ->
+                defaultResult()
+        | None ->
+            defaultResult()
 
     Tokenizer (fun chars ->
         (itemFrom chars, None)
@@ -108,7 +134,9 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
                     match tokenFrom item with
                     | Some (token, nextItem) ->
                         Some (token, (nextItem, None))
-                    | None -> None // TODO: Emit an unknown token
+                    | None ->
+                        let (unknownToken, nextItem, nextToken) = unknownFrom item
+                        Some (unknownToken, (nextItem, nextToken))
                 | Some token ->
                     Some (token, (item, None))
             | End _ -> None))
