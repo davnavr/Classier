@@ -119,7 +119,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
 
         TokenType.MLCommentStart, matchStr "/*";
         TokenType.MLCommentEnd, matchStr "*/";
-        //TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchTokenType TokenType.NewLine |> matchUntil) (matchUntilEnd)];
+        //TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchTokenType TokenType.NewLine |> matchUntil) (matchUntilEnd)]; // TODO: Find out how we can succeed if the end of the sequence is reached.
 
         TokenType.AccPublic, matchStr "public";
         TokenType.AccInternal, matchStr "internal";
@@ -141,7 +141,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
         TokenType.LCBracket, matchChar '{';
         TokenType.RCBracket, matchChar '}';
 
-        //TokenType.StrLit, matchChain [matchChar '"'; matchTo (matchChar '"') |> matchWithout (matchTokenType TokenType.NewLine)];
+        TokenType.StrLit, matchChain [matchChar '"'; matchTo (matchChar '"') |> matchCharSeqAndStr |> matchWithout (matchTokenType TokenType.NewLine)] |> matchStrSeq;
         TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
         TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchTokenType TokenType.``a-fA-F0-9``; matchTokenType TokenType.``a-fA-F0-9`` |> orMatch (matchChar '_') |> matchMany |> matchStrSeq] |> matchStrSeq;
         TokenType.IntLit, matchChain [matchTokenType TokenType.``0-9``; matchOptional (matchAny [matchChar '_'; matchTokenType TokenType.``0-9``] |> matchMany |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;

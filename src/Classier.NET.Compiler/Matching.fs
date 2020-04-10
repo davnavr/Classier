@@ -153,6 +153,16 @@ let orMatch (m1: MatchFunc<'Match, 'Result>) (m2: MatchFunc<'Match, 'Result>) =
         | Failure _ -> evaluateMatch m2 item
         | Success _ -> result1)
 
+/// Succeeds if the current item indicates the end of the sequence.
+let matchEnd result: MatchFunc<'Match, 'Result> = // TODO: Check if this is usable.
+    let endLabel = "end"
+    Match (endLabel, fun item ->
+        match item with
+        | End _ -> Success (result, item)
+        | Item (item, index, _) ->
+            let msg = sprintf "Expected the end of sequence at index %i for item %A." index item
+            Failure (endLabel, msg))
+
 // Matches with the specified function, then converts the result of the match to another value.
 let mapMatch (resultMap: 'Result1 -> 'Result2) (f: MatchFunc<'Match, 'Result1>) =
     let label = sprintf "map %s" f.Label
@@ -308,6 +318,27 @@ let matchUntil (f: MatchFunc<'Match, 'Result>) =
             Success (matches, lastItem.Value);
         | Failure (_, msg) ->
             Failure (untilLabel, msg))
+
+/// Matches against the first function, then matches with the specfiied filter function.
+/// If the filter function fails or has a success outside of the range of the first result,
+/// then the match succeeds.
+let matchWithout (filter: MatchFunc<'Match, 'Result>) (f: MatchFunc<'Match, 'Result>) =
+    let withoutLabel = sprintf "%s without %s" f.Label filter.Label
+    Match (withoutLabel, fun startItem ->
+        let firstResult = evaluateMatch f startItem
+        match firstResult with
+        | Success (_, lastItem) ->
+            match evaluateMatch (matchUntil filter) startItem with
+            | Success (_, item) ->
+                if item.Index <= lastItem.Index then
+                    let msg = sprintf "Unexpected %s." filter.Label
+                    Failure (withoutLabel, msg)
+                else
+                    firstResult
+            | Failure _ ->
+                firstResult
+        | Failure (_, msg) ->
+            Failure (withoutLabel, msg))
 
 /// Lazily evaluates the given matching function.
 let matchLazy (f: Lazy<MatchFunc<'Match, 'Result>>) =

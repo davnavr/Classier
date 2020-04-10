@@ -38,6 +38,11 @@ let matchCharSeq (f: MatchFunc<'Match, seq<char>>) =
     |> mapMatch String.Concat
     |> labelMatch f.Label
 
+let matchCharSeqAndStr (f: MatchFunc<'Match, seq<char> * string>) =
+    f
+    |> mapMatch (fun (chars, str) -> (String.Concat chars) + str)
+    |> labelMatch f.Label
+
 /// Matches against any of the specified characters.
 let matchAnyChar chars = matchAnyOf chars matchChar
 

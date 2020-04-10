@@ -208,37 +208,35 @@ namespace Classier.NET.Compiler
             Assert.Contains("end of", failure.Message);
         }
 
-#if false
         [InlineData("crafting", "circles", "mining & crafting", 17)]
         [InlineData("no", " ", "hasnospaces", 5)]
         [Theory]
         public void MatchWithoutIsSuccessWhenFilterFails(string expected, string without, string actual, int expectedIndex)
         {
-            // Arrange
-            var func = matchTo(matchStr(expected));
-
             // Act
-            var success = (MatchResult<char>.Success)result(matchWithout(matchStr(without), func), itemFrom(actual));
+            var success = new SuccessResult(
+                matchWithout(
+                    matchStr(without),
+                    matchCharSeqAndStr(
+                        matchTo(
+                            matchStr(expected)))),
+                itemFrom(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
         }
 
         [InlineData("has_tabs", "\t", "should\tnot_has_tabs")]
+        [InlineData("</head>", "<script>", "<script>Uh oh</script></head>")]
         [Theory]
         public void MatchWithoutIsFailureWhenFilterIsSuccess(string expected, string without, string actual)
         {
-            // Arrange
-            var func = matchTo(matchStr(expected));
-
             // Act
-            var failure = (MatchResult<char>.Failure)result(matchWithout(matchStr(without), func), itemFrom(actual));
+            var failure = new FailureResult(matchWithout(matchStr(without), matchCharSeqAndStr(matchTo(matchStr(expected)))), itemFrom(actual));
 
             // Assert
-            Assert.Equal(0, failure.Item2.Index);
-            Assert.Contains("inverted match", failure.Item1);
+            Assert.Contains(" without ", failure.Label);
         }
-#endif
 
         [InlineData('T', "Test")]
         [InlineData('\r', "\r\n")]
