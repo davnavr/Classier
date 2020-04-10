@@ -164,5 +164,8 @@ let tokenizer: Tokenizer<TokenType> =
         tokenizerDefs
             |> Map.toSeq
             |> Seq.filter (fun (t, _) -> t > TokenType.Unknown)
-            |> Seq.map (fun (t, f) -> f |> mapMatch (fun str -> { Type = t; Content = str })),
+            |> Seq.map (fun (t, f) ->
+                f
+                |> mapMatch (fun str -> { Type = t; Content = str })
+                |> labelMatch (sprintf "%A (%s)" t f.Label)),
         TokenType.Unknown)

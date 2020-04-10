@@ -87,6 +87,9 @@ namespace Classier.NET.Compiler
         }
 
         [InlineData(new[] { "type", "of", "(", "object)" }, "typeof(object)")]
+        [InlineData(new[] { "one fish" }, "one fish")]
+        [InlineData(new string[0], "")]
+        [InlineData(new string[0], "whatever I want to be")]
         [Theory]
         public void MatchChainIsSuccess(string[] expected, string actual)
         {
@@ -128,6 +131,7 @@ namespace Classier.NET.Compiler
             // Assert
             Assert.Equal(0, failure.Item2.Index);
         }
+#endif
 
         [InlineData("Data", "[InlineData]", 11)]
         [InlineData("nbsp", "nbsp", 4)]
@@ -136,12 +140,18 @@ namespace Classier.NET.Compiler
         public void MatchToIsSuccessAndIncludesFinalMatch(string expected, string actual, int expectedIndex)
         {
             // Act
-            var success = (MatchResult<char>.Success)result(matchTo(matchStr(expected)), itemFrom(actual));
+            var success = new SuccessResult<char, Tuple<IEnumerable<char>, string>>(
+                matchTo(
+                    matchStr(expected)),
+                itemFrom(expected));
+            var (skippedChars, result) = success.Result;
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
+            Assert.Equal(actual.Substring(skippedChars.Count(), expected.Length), result);
         }
 
+#if false
         [InlineData("crafting", "circles", "mining & crafting", 17)]
         [InlineData("no", " ", "hasnospaces", 5)]
         [Theory]

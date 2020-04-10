@@ -82,9 +82,16 @@ let isSuccess (result: MatchResult<'Match, 'Result>) =
     | Success _ -> true
     | Failure _ -> false
 
-let evaluateMatch (f: MatchFunc<'Match, 'Result>) item = // TODO: Return the label as well?
+let evaluateMatch (f: MatchFunc<'Match, 'Result>) item =
     let (Match (_, matchFunc)) = f
     matchFunc(item)
+
+let mapResult (resultMap: 'Result1 -> 'Result2) (result: MatchResult<'Match, 'Result1>) =
+    match result with
+    | Success (success, item) ->
+        Success (resultMap success, item);
+    | Failure (label, msg) ->
+        Failure (label, msg)
 
 let labelsOfMatches (matches: seq<MatchFunc<'Match, 'Result>>) =
     matches |> Seq.map (fun m -> m.Label)
@@ -151,10 +158,6 @@ let mapMatch (resultMap: 'Result1 -> 'Result2) (f: MatchFunc<'Match, 'Result1>) 
         | Success (success, nextItem) ->
             Success (resultMap success, nextItem)
         | Failure (_, msg) -> Failure (label, msg))
-
-let resultAsMatch (result: MatchResult<'Match, 'Result>) =
-    let label = sprintf "return %A" result
-    Match (label, fun _ -> result)
 
 let matchAsSeq (f: MatchFunc<'Match, 'Result>) =
     f |> mapMatch (fun r -> Seq.singleton r)
@@ -236,7 +239,7 @@ let matchChain (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, seq
     Match (chainLabel, fun item ->
         let (matchResults, (lastResult, lastItem)) =
             matches
-            |> Seq.mapFold next (Failure (chainLabel, "The match collection was empty."), Some item)
+            |> Seq.mapFold next (Failure (chainLabel, "This should be ignored."), Some item)
 
         match lastItem with
         | Some lastItem ->
@@ -244,10 +247,52 @@ let matchChain (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, seq
                 matchResults
                 |> Seq.where (fun result -> result.IsSome)
                 |> Seq.map (fun result -> result.Value)
+
             Success (results, lastItem)
         | None ->
-            let fail = resultAsMatch lastResult |> matchAsSeq
-            evaluateMatch fail item)
+            lastResult |> mapResult Seq.singleton)
+
+let matchTo (f: MatchFunc<'Match, 'Result>) =
+    let toLabel = sprintf "to %s" f.Label
+    Match (toLabel, fun startItem ->
+        let mapToResult result =
+            result
+            |> mapResult (fun r -> Seq.empty, r)
+
+        match startItem with
+        | Item _ ->
+            let (lastItem, lastResult) =
+                startItem.AsSequence()
+                |> Seq.pick (fun (item, _, _) ->
+                    let currentMatch = evaluateMatch f item
+                    match currentMatch with
+                    | Success (success, nextItem) -> Some (item, Success (success, nextItem))
+                    | Failure (_, msg) ->
+                        if item.ReachedEnd
+                        then Some (item, Failure (toLabel, msg))
+                        else None)
+            
+            match lastResult with
+            | Success (success, nextItem) ->
+                let matchesBefore =
+                    startItem.AsSequence()
+                    |> Seq.takeWhile (fun (_, _, index) -> index < lastItem.Index)
+                    |> Seq.map (fun (_, m, _) -> m)
+                Success ((matchesBefore, success), nextItem)
+            | Failure _ ->
+                lastResult |> mapToResult
+        | End _ ->
+            evaluateMatch f startItem
+            |> mapToResult)
+
+let matchUntil (f: MatchFunc<'Match, 'Result>) =
+    let untilLabel = sprintf "until %s" f.Label
+    Match (untilLabel, fun item ->
+        match evaluateMatch (matchTo f) item with
+        | Success ((matches, _), nextItem) ->
+            Success (matches, nextItem)
+        | Failure (_, msg) ->
+            Failure (untilLabel, msg))
 
 /// Lazily evaluates the given matching function.
 let matchLazy (f: Lazy<MatchFunc<'Match, 'Result>>) =

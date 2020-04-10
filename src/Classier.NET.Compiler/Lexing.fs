@@ -26,14 +26,11 @@ type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
 
 type TokenDef<'T> = MatchFunc<char, Token<'T>>
 
-let matchAsStr (f: MatchFunc<'Match, 'Result>) =
-    f |> mapMatch (fun r -> r.ToString())
-
 /// Matches against the specified character.
 let matchChar c =
     let charLabel = sprintf "char '%c'" c
     matchPredicate (fun ch -> c = ch) charLabel
-    |> matchAsStr
+    |> mapMatch (fun ch -> ch.ToString())
     |> addFailMsg (sprintf "Error parsing character '%c'." c)
 
 /// Matches against any of the specified characters.
@@ -117,7 +114,7 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
                     |> Seq.takeWhile (fun (_, _, index) -> index < tokenStart.Index)
                     |> Seq.map (fun (_, ch, _) -> ch)
                     |> String.Concat
-                { Type = defaultVal; Content = content }, nextItem, Some knownToken // Note: knownToken returned here is valid, problem of missing last token is in the Tokenizer unfold.
+                { Type = defaultVal; Content = content }, nextItem, Some knownToken
             | None ->
                 defaultResult()
         | None ->
