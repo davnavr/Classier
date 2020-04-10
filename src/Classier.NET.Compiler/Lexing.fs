@@ -117,7 +117,7 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
                     |> Seq.takeWhile (fun (_, _, index) -> index < tokenStart.Index)
                     |> Seq.map (fun (_, ch, _) -> ch)
                     |> String.Concat
-                { Type = defaultVal; Content = content }, nextItem, Some knownToken
+                { Type = defaultVal; Content = content }, nextItem, Some knownToken // Note: knownToken returned here is valid, problem of missing last token is in the Tokenizer unfold.
             | None ->
                 defaultResult()
         | None ->
@@ -127,19 +127,19 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
         (itemFrom chars, None)
         |>
         Seq.unfold (fun (item, next: Token<'T> option) ->
-            match item with
-            | Item _ ->
-                match next with
+            match next with
                 | None ->
-                    match tokenFrom item with
-                    | Some (token, nextItem) ->
-                        Some (token, (nextItem, None))
-                    | None ->
-                        let (unknownToken, nextItem, nextToken) = unknownFrom item
-                        Some (unknownToken, (nextItem, nextToken))
+                    match item with
+                    | Item _ ->
+                        match tokenFrom item with
+                        | Some (token, nextItem) ->
+                            Some (token, (nextItem, None))
+                        | None ->
+                            let (unknownToken, nextItem, nextToken) = unknownFrom item
+                            Some (unknownToken, (nextItem, nextToken))
+                    | End _ -> None
                 | Some token ->
-                    Some (token, (item, None))
-            | End _ -> None))
+                    Some (token, (item, None))))
 
 let tokenize (tokenizer: Tokenizer<'T>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer
