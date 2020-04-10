@@ -70,28 +70,48 @@ let matchStrOptional (f: MatchFunc<'Match, string option>) =
 
 let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
     let tokenDefs = definitions |> Seq.cache
-    let nextToken (item: Item<char>) =
+    let tokenFrom (item: Item<char>) =
         let results =
             tokenDefs
-            |> Seq.map (fun f -> evaluateMatch f item)
-            |> Seq.where (fun r -> isSuccess r)
-            |> Seq.map (fun r ->
-                let (Success (result, item)) = r
-                result, item)
+            |> Seq.map (fun f ->
+                let r = evaluateMatch f item
+                match r with
+                | Success (token, nextItem) ->
+                    Some (token, nextItem)
+                | Failure _ -> None)
+            |> Seq.where (fun r -> r.IsSome)
+            |> Seq.map (fun r -> r.Value)
             |> Seq.cache
-
+            
         if results |> Seq.isEmpty then
-            invalidOp "Cannot handle unknown tokens yet."
+            None
         else
             let longestToken =
                 results
-            None
+                |> Seq.reduce (fun (t1, item1) (t2, item2) ->
+                    if t1.Content.Length >= t2.Content.Length then // TODO: Ensure that the first items have priority over later items if they have the same length.
+                        (t1, item1)
+                    else
+                        (t2, item2))
+            Some longestToken
+
+    let unknownFrom (item: Item<char>) = null
 
     Tokenizer (fun chars ->
-        itemFrom chars
+        (itemFrom chars, None)
         |>
-        Seq.unfold (fun item ->
-            None))
+        Seq.unfold (fun (item, next: Token<'T> option) ->
+            match item with
+            | Item _ ->
+                match next with
+                | None ->
+                    match tokenFrom item with
+                    | Some (token, nextItem) ->
+                        Some (token, (nextItem, None))
+                    | None -> None // TODO: Emit an unknown token
+                | Some token ->
+                    Some (token, (item, None))
+            | End _ -> None))
 
 let tokenize (tokenizer: Tokenizer<'T>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer

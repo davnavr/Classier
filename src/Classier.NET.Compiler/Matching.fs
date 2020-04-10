@@ -144,7 +144,7 @@ let resultAsMatch (result: MatchResult<'Match, 'Result>) =
     Match (label, fun _ -> result)
 
 let matchAsSeq (f: MatchFunc<'Match, 'Result>) =
-    f |> mapMatch (fun r -> seq { yield r })
+    f |> mapMatch (fun r -> Seq.singleton r)
 
 /// Matches against each of the specified functions, and returns the first success found.
 let matchAny (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, 'Result> =
