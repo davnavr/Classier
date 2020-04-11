@@ -15,19 +15,45 @@
 module Classier.NET.Compiler.Parsing
 
 open Classier.NET.Compiler.Lexing
+open Classier.NET.Compiler.Matching
+
+/// Provides line and position information for a token.
+type ParsedToken<'T> =
+    {
+        Token: Token<'T>
+        /// Zero-based index indicating the line that this token is on.
+        Line: int
+        Pos: int
+    }
 
 type Node<'T> =
     {
-        Tokens: seq<Token<'T>>
+        Tokens: seq<ParsedToken<'T>>
         Children: seq<Node<'T>>
-        Type: 'T
+        Info: 'T // TODO: Change this from 'T to something like 'Info.
     }
 
 /// Turns a sequence of tokens into a sequence of nodes.
-type Parser<'T> = Parser of (seq<Token<'T>> -> seq<Node<'T>>)
+type Parser<'T> = Parser of (seq<ParsedToken<'T>> -> seq<Node<'T>>)
 
-// let createParser 
+/// Adds line number and position information to a sequence of tokens.
+let lineInfo (tokens: seq<Token<'T>>) isNewline =
+    let nextToken (newline, line, pos) token =
+        let (nextLine, nextPos) =
+            if newline
+            then line + 1, 0
+            else line, pos
+        { Token = token; Line = nextLine; Pos = nextPos }, (isNewline token, nextLine, nextPos + token.Content.Length)
 
+    let (parsedTokens, _) = tokens |> Seq.mapFold nextToken  (true, -1, 0)
+    parsedTokens
+
+/// Parses the specfified tokens with the specified parser.
 let parse (parser: Parser<'T>) tokens =
     let (Parser parseFunc) = parser
     parseFunc tokens
+
+let matchToken (t: 'T) =
+    let label = sprintf "token %s" (t.ToString())
+    matchPredicate (fun token -> token.Type = t) label
+    |> addFailMsg (sprintf "Error parsing %s." label)

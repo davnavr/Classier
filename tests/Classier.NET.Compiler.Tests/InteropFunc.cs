@@ -30,7 +30,7 @@ namespace Classier.NET.Compiler
 
         public InteropFunc(Func<T, TResult> func)
         {
-            this.func = func ?? throw new ArgumentNullException(nameof(func));
+            this.func = func;
         }
 
         public override TResult Invoke(T func) => this.func.Invoke(func);

@@ -18,9 +18,11 @@ module rec Classier.NET.Compiler.Grammar
 
 open Classier.NET.Compiler.Lexing
 open Classier.NET.Compiler.Matching
+open Classier.NET.Compiler.Parsing
 
 /// Indicates the type of a token.
 type TokenType =
+    | ``a-fA-F0-9`` = -3
     /// Matches any character of the English alphabet, regardless of case.
     | ``a-zA-Z`` = -2
     /// Matches any numeric character.
@@ -47,8 +49,10 @@ type TokenType =
     | WrdLet = 25
     /// The token is a keyword that indicates the declaration of a namespace.
     | WrdNamespace = 26
+    /// The token is a keyword that allows the use of types without their fully qualified names.
+    | WrdUse = 27
     /// The token is a modifier.
-    | Modifier = 27
+    | Modifier = 28
 
     /// The token is a plus sign.
     | AddOp = 40
@@ -66,6 +70,10 @@ type TokenType =
     | OrOp = 46
     /// The token indicates logical negation.
     | NotOp = 47
+    /// The token is a left curly bracket <c>U+007B</c>.
+    | LCBracket = 48
+    /// The token is a right curly bracket <c>U+007D</c>.
+    | RCBracket = 49
 
     /// The token is a string literal.
     | StrLit = 60
@@ -99,16 +107,19 @@ type TokenType =
     /// The token is an identifier.
     | Identifier = 110
 
-let matchType t = lazy (tokenizerDefs.Item t) |> matchLazy
+let tokenIsNewline (token: Token<TokenType>) = token.Type = TokenType.NewLine
 
-let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
+let matchTokenType t = lazy (tokenizerDefs.Item t) |> matchLazy
+
+let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
     [
-        TokenType.``a-zA-Z``, matchCharRange 'A' 'Z' |> orMatch (matchCharRange 'a' 'z');
-        TokenType.``0-9``, matchCharRange '0' '9';
+        TokenType.``a-fA-F0-9``, matchAny [matchTokenType TokenType.``0-9``; matchCharRange ('a', 'f'); matchCharRange ('A', 'F')];
+        TokenType.``a-zA-Z``, matchCharRange ('A', 'Z') |> orMatch (matchCharRange ('a', 'z'));
+        TokenType.``0-9``, matchCharRange ('0', '9');
 
         TokenType.MLCommentStart, matchStr "/*";
         TokenType.MLCommentEnd, matchStr "*/";
-        TokenType.SLComment, matchStr "//";
+        TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchTokenType TokenType.NewLine |> matchUntil |> (matchCharSeq)) (matchToEnd |> matchCharSeq)] |> matchStrSeq;
 
         TokenType.AccPublic, matchStr "public";
         TokenType.AccInternal, matchStr "internal";
@@ -116,6 +127,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.WrdClass, matchStr "class";
         TokenType.WrdLet, matchStr "let";
         TokenType.WrdNamespace, matchStr "namespace";
+        TokenType.WrdUse, matchStr "use";
         TokenType.Modifier, matchAnyOf ["extends"; "implements"; "mutable"; "virtual"] matchStr;
 
         TokenType.AddOp, matchChar '+';
@@ -126,11 +138,13 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.AndOp, matchStr "and";
         TokenType.OrOp, matchStr "or";
         TokenType.NotOp, matchStr "not";
+        TokenType.LCBracket, matchChar '{';
+        TokenType.RCBracket, matchChar '}';
 
-        TokenType.StrLit, andMatch (matchChar '"') (matchTo (matchChar '"') |> matchWithout (matchType TokenType.NewLine));
-        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['_'; '0'; '1'] |> matchMany];
-        TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchAny [matchChar '_'; matchType TokenType.``0-9``; matchCharRange 'a' 'f'; matchCharRange 'A' 'F'] |> matchMany];
-        TokenType.IntLit, matchChain [matchType TokenType.``0-9``; matchOptional (matchMany (matchAny [matchChar '_'; matchType TokenType.``0-9``]))];
+        TokenType.StrLit, matchChain [matchChar '"'; matchTo (matchChar '"') |> matchCharSeqAndStr |> matchWithout (matchTokenType TokenType.NewLine)] |> matchStrSeq;
+        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
+        TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchTokenType TokenType.``a-fA-F0-9``; matchTokenType TokenType.``a-fA-F0-9`` |> orMatch (matchChar '_') |> matchMany |> matchStrSeq] |> matchStrSeq;
+        TokenType.IntLit, matchChain [matchTokenType TokenType.``0-9``; matchOptional (matchAny [matchChar '_'; matchTokenType TokenType.``0-9``] |> matchMany |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
         TokenType.TrueLit, matchStr "true";
         TokenType.FalseLit, matchStr "false";
 
@@ -139,33 +153,19 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.Period, matchChar '.';
         TokenType.Comma, matchChar ',';
 
-        TokenType.Whitespace, matchAnyChar [' '; '\t'] |> matchMany;
+        TokenType.Whitespace, matchAnyChar [' '; '\t'] |> matchMany |> matchStrSeq;
         TokenType.NewLine, matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr;
         
-        TokenType.Identifier, matchChain [matchType TokenType.``a-zA-Z``; matchOptional (matchMany (matchAny [matchType TokenType.``a-zA-Z``; matchType TokenType.``0-9``; matchChar '_']))];
+        TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchOptional (matchMany (matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_']) |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
     ] |> Map.ofList
 
-let tokenizer =
+let tokenizer: Tokenizer<TokenType> =
     createTokenizer(
         tokenizerDefs
             |> Map.toSeq
             |> Seq.filter (fun (t, _) -> t > TokenType.Unknown)
-            |> Seq.map (fun (t, f) -> { Type = t; Match = f }),
+            |> Seq.map (fun (t, f) ->
+                f
+                |> mapMatch (fun str -> { Type = t; Content = str })
+                |> labelMatch (sprintf "%A (%s)" t f.Label)),
         TokenType.Unknown)
-
-(*
-/// Indicates the type of a node in the syntax tree.
-type NodeType =
-    /// The node contains tokens that are unknown or are skipped.
-    | Unknown = 0
-    /// The node allows for the use of types without their fully qualified names.
-    | UseStatement = 1
-    /// The node is a namespace declaration.
-    | NamespaceDecl = 2
-    /// The node is a class declaration.
-    | ClassDecl = 3
-    /// The node is a field declaration.
-    | FieldDecl = 4
-    /// The node is a method declaration.
-    | MethodDecl = 5
-*)
