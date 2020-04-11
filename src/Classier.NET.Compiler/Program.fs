@@ -16,13 +16,7 @@ module Classier.NET.Compiler.Program
 
 open System
 
-/// <summary>
 /// The entry point of the compiler.
-/// </summary>
-/// <param name="args">
-/// The command line arguments.
-/// TODO: Describe the arguments in a list here.
-/// </param>
 [<EntryPoint>]
 let main args =
     -1

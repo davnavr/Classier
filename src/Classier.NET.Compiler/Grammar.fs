@@ -119,7 +119,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
 
         TokenType.MLCommentStart, matchStr "/*";
         TokenType.MLCommentEnd, matchStr "*/";
-        //TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchTokenType TokenType.NewLine |> matchUntil) (matchUntilEnd)]; // TODO: Find out how we can succeed if the end of the sequence is reached.
+        TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchTokenType TokenType.NewLine |> matchUntil |> (matchCharSeq)) (matchToEnd |> matchCharSeq)] |> matchStrSeq;
 
         TokenType.AccPublic, matchStr "public";
         TokenType.AccInternal, matchStr "internal";

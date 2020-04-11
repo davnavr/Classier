@@ -95,7 +95,7 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
             let longestToken =
                 results
                 |> Seq.reduce (fun (t1, item1) (t2, item2) ->
-                    if t1.Content.Length >= t2.Content.Length then // TODO: Ensure that the first items have priority over later items if they have the same length.
+                    if t1.Content.Length >= t2.Content.Length then
                         (t1, item1)
                     else
                         (t2, item2))

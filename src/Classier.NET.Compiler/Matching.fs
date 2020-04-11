@@ -153,16 +153,6 @@ let orMatch (m1: MatchFunc<'Match, 'Result>) (m2: MatchFunc<'Match, 'Result>) =
         | Failure _ -> evaluateMatch m2 item
         | Success _ -> result1)
 
-/// Succeeds if the current item indicates the end of the sequence.
-let matchEnd result: MatchFunc<'Match, 'Result> = // TODO: Check if this is usable.
-    let endLabel = "end"
-    Match (endLabel, fun item ->
-        match item with
-        | End _ -> Success (result, item)
-        | Item (item, index, _) ->
-            let msg = sprintf "Expected the end of sequence at index %i for item %A." index item
-            Failure (endLabel, msg))
-
 // Matches with the specified function, then converts the result of the match to another value.
 let mapMatch (resultMap: 'Result1 -> 'Result2) (f: MatchFunc<'Match, 'Result1>) =
     let label = sprintf "map %s" f.Label
@@ -173,7 +163,7 @@ let mapMatch (resultMap: 'Result1 -> 'Result2) (f: MatchFunc<'Match, 'Result1>) 
         | Failure (_, msg) -> Failure (label, msg))
 
 let matchAsSeq (f: MatchFunc<'Match, 'Result>) =
-    f |> mapMatch (fun r -> Seq.singleton r)
+    f |> mapMatch Seq.singleton
 
 /// Matches against each of the specified functions, and returns the first success found.
 let matchAny (matches: seq<MatchFunc<'Match, 'Result>>): MatchFunc<'Match, 'Result> =
@@ -300,6 +290,17 @@ let matchTo (f: MatchFunc<'Match, 'Result>) =
             evaluateMatch f startItem
             |> mapToResult
             |> labelResult toLabel)
+
+let matchToEnd: MatchFunc<'Match, seq<'Match>> =
+    Match ("end", fun item ->
+        match item with
+        | Item _ ->
+            let (matches, lastItem) =
+                item.AsSequence()
+                |> Seq.mapFold (fun _ (currentItem, m, _) -> m, currentItem.Next) (End -1)
+            Success (matches, lastItem)
+        | End _ ->
+            Success (Seq.empty, item))
 
 /// Skips items in the sequence until the specified function returns a success, and returns the skipped items.
 let matchUntil (f: MatchFunc<'Match, 'Result>) =
