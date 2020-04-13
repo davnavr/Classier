@@ -19,11 +19,9 @@ namespace Classier.NET.Compiler
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using Microsoft.FSharp.Core;
     using Xunit;
     using static Classier.NET.Compiler.Lexing;
     using static Classier.NET.Compiler.Matching;
-    using static Classier.NET.Compiler.Program;
     using FailureResult = Classier.NET.Compiler.FailureResult<char, string>;
     using SuccessResult = Classier.NET.Compiler.SuccessResult<char, string>;
 
@@ -77,7 +75,7 @@ namespace Classier.NET.Compiler
         {
             // Act
             var success = new SuccessResult(
-                matchStrOptional(
+                matchStrOption(
                     matchOptional(
                         matchStr(expected))),
                 itemFrom(actual));
@@ -208,6 +206,23 @@ namespace Classier.NET.Compiler
             Assert.Contains("end of", failure.Message);
         }
 
+        [InlineData("To the end of the road.")]
+        [InlineData("am I success?")]
+        [InlineData("")]
+        [Theory]
+        public void MatchToEndIsAlwaysSuccessful(string text)
+        {
+            // Act
+            var success = new SuccessResult(
+                matchCharSeq(
+                    matchToEnd<char>()),
+                itemFrom(text));
+
+            // Assert
+            Assert.Equal(text, success.Result);
+            Assert.Equal(text.Length, success.Item.Index);
+        }
+
         [InlineData("crafting", "circles", "mining & crafting", 17)]
         [InlineData("no", " ", "hasnospaces", 5)]
         [Theory]
@@ -232,7 +247,13 @@ namespace Classier.NET.Compiler
         public void MatchWithoutIsFailureWhenFilterIsSuccess(string expected, string without, string actual)
         {
             // Act
-            var failure = new FailureResult(matchWithout(matchStr(without), matchCharSeqAndStr(matchTo(matchStr(expected)))), itemFrom(actual));
+            var failure = new FailureResult(
+                matchWithout(
+                    matchStr(without),
+                    matchCharSeqAndStr(
+                        matchTo(
+                            matchStr(expected)))),
+                itemFrom(actual));
 
             // Assert
             Assert.Contains(" without ", failure.Label);

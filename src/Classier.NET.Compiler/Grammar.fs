@@ -142,9 +142,9 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
         TokenType.RCBracket, matchChar '}';
 
         TokenType.StrLit, matchChain [matchChar '"'; matchTo (matchChar '"') |> matchCharSeqAndStr |> matchWithout (matchTokenType TokenType.NewLine)] |> matchStrSeq;
-        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
+        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany |> matchStrSeq) |> matchStrOption] |> matchStrSeq;
         TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchTokenType TokenType.``a-fA-F0-9``; matchTokenType TokenType.``a-fA-F0-9`` |> orMatch (matchChar '_') |> matchMany |> matchStrSeq] |> matchStrSeq;
-        TokenType.IntLit, matchChain [matchTokenType TokenType.``0-9``; matchOptional (matchAny [matchChar '_'; matchTokenType TokenType.``0-9``] |> matchMany |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
+        TokenType.IntLit, matchChain [matchTokenType TokenType.``0-9``; matchOptional (matchAny [matchChar '_'; matchTokenType TokenType.``0-9``] |> matchMany |> matchStrSeq) |> matchStrOption] |> matchStrSeq;
         TokenType.TrueLit, matchStr "true";
         TokenType.FalseLit, matchStr "false";
 
@@ -156,7 +156,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
         TokenType.Whitespace, matchAnyChar [' '; '\t'] |> matchMany |> matchStrSeq;
         TokenType.NewLine, matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr;
         
-        TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchOptional (matchMany (matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_']) |> matchStrSeq) |> matchStrOptional] |> matchStrSeq;
+        TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchOptional (matchMany (matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_']) |> matchStrSeq) |> matchStrOption] |> matchStrSeq;
     ] |> Map.ofList
 
 let tokenizer: Tokenizer<TokenType> =
@@ -169,3 +169,5 @@ let tokenizer: Tokenizer<TokenType> =
                 |> mapMatch (fun str -> { Type = t; Content = str })
                 |> labelMatch (sprintf "%A (%s)" t f.Label)),
         TokenType.Unknown)
+
+let parser = null

@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/// Turns tokens into a concrete syntax tree.
 module Classier.NET.Compiler.Parsing
+
+open System
 
 open Classier.NET.Compiler.Lexing
 open Classier.NET.Compiler.Matching
@@ -36,6 +39,8 @@ type Node<'T> =
 /// Turns a sequence of tokens into a sequence of nodes.
 type Parser<'T> = Parser of (seq<ParsedToken<'T>> -> seq<Node<'T>>)
 
+type TokenMatch<'T> = MatchFunc<ParsedToken<'T>, Node<'T>>
+
 /// Adds line number and position information to a sequence of tokens.
 let lineInfo (tokens: seq<Token<'T>>) isNewline =
     let nextToken (newline, line, pos) token =
@@ -48,6 +53,9 @@ let lineInfo (tokens: seq<Token<'T>>) isNewline =
     let (parsedTokens, _) = tokens |> Seq.mapFold nextToken  (true, -1, 0)
     parsedTokens
 
+let parserFrom (matchTokens: seq<TokenMatch<'T>>) (matchChildren: seq<TokenMatch<'T>>) =
+    null
+
 /// Parses the specfified tokens with the specified parser.
 let parse (parser: Parser<'T>) tokens =
     let (Parser parseFunc) = parser
@@ -57,3 +65,22 @@ let matchToken (t: 'T) =
     let label = sprintf "token %s" (t.ToString())
     matchPredicate (fun token -> token.Type = t) label
     |> addFailMsg (sprintf "Error parsing %s." label)
+
+/// Ignores tokens that cause the specified predicate to return <c>true</c>.
+let ignoreTokens (predicate: ParsedToken<'T> -> bool) f =
+    let label = sprintf "ignored %A" predicate
+    Match (label, fun item ->
+        let startItem =
+            item.AsSequence()
+            |> Seq.choose (fun (_, token, _) ->
+                if predicate token
+                then None
+                else Some token)
+            |> itemFrom
+
+        evaluateMatch f startItem
+        |> labelResult label)
+
+/// Ignores tokens with the specified types.
+let ignoreTokenTypes (types: 'T list) f =
+    ignoreTokens (fun t -> types |> List.contains t.Token.Type) f

@@ -68,7 +68,7 @@ let matchStrSeq (f: MatchFunc<'Match, seq<string>>) =
     |> mapMatch String.Concat
     |> labelMatch f.Label
 
-let matchStrOptional (f: MatchFunc<'Match, string option>) =
+let matchStrOption (f: MatchFunc<'Match, string option>) =
     f |> mapMatch (fun optstr ->
         match optstr with
         | Some str -> str

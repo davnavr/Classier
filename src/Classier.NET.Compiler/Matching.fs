@@ -25,7 +25,7 @@ type Item<'T> =
         | Item (_, index, _) -> index
         | End index -> index
 
-    /// Gets the next item after the current item, or the current item if it indicates the end of the sequence..
+    /// Gets the next item after the current item, or the current item if it indicates the end of the sequence.
     member this.Next =
         match this with
         | Item (_, _, next) -> next.Value
