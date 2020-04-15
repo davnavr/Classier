@@ -14,40 +14,7 @@
 
 module Classier.NET.Compiler.Matching
 
-type Item<'T> =
-    | Item of 'T * int * Lazy<Item<'T>>
-    /// Indicates the end of a sequence.
-    | End of int
-
-    /// Gets the index of the specified item.
-    member this.Index =
-        match this with
-        | Item (_, index, _) -> index
-        | End index -> index
-
-    /// Gets the next item after the current item, or the current item if it indicates the end of the sequence.
-    member this.Next =
-        match this with
-        | Item (_, _, next) -> next.Value
-        | End _ -> this
-        
-    /// Gets a value indicating whether the current item indicates the end of the sequence.
-    member this.ReachedEnd =
-        match this with
-        | Item _ -> false
-        | End _ -> true
-
-    /// Converts this item into a sequence containing the current item all the way to the last item.
-    member this.AsSequence() =
-        match this with
-        | Item _ ->
-            this
-            |> Seq.unfold (fun item ->
-                match item with
-                | Item (thing, index, next) ->
-                    Some ((item, thing, index), next.Value)
-                | End _ -> None)
-        | End _ -> Seq.empty
+open Classier.NET.Compiler.Item
 
 type MatchResult<'Match, 'Result> =
     | Success of 'Result * Item<'Match>
@@ -59,22 +26,6 @@ type MatchFunc<'Match, 'Result> =
     member this.Label =
         let (Match (label, _)) = this
         label
-
-/// Creates an item containing the first element of the specified sequence.
-let itemFrom (items: seq<'T>): Item<'T> =
-    let enumerator = items.GetEnumerator()
-    let rec nextItem index =
-        if enumerator.MoveNext() then
-            Item(enumerator.Current, index, lazy nextItem (index + 1))
-        else
-            enumerator.Dispose() |> ignore
-            End index
-    nextItem 0
-
-let itemsTo (startItem: Item<'T>) endItem =
-    match startItem with
-    | Item _ -> Seq.empty
-    | End _ -> Seq.empty
 
 /// Determines whether a result is a success.
 let isSuccess (result: MatchResult<'Match, 'Result>) =

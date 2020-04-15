@@ -23,6 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Item.fs" />
     <Compile Include="Matching.fs" />
     <Compile Include="Lexing.fs" />
     <Compile Include="Parsing.fs" />
