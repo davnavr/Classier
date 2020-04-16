@@ -17,34 +17,40 @@
 namespace Classier.NET.Compiler
 {
     using System;
+    using System.Collections.Generic;
+    using Microsoft.FSharp.Core;
+    using static Classier.NET.Compiler.Item;
     using static Classier.NET.Compiler.Matching;
 
     /// <summary>
-    /// Wraps a <see cref="MatchResult{Match, Result}"/> value, and assumes it is a <see cref="MatchResult{Match, Result}.Success"/>.
+    /// Wraps a <see cref="MatchResult{T}"/> value, and assumes it is a <see cref="MatchResult{T}.Success"/>.
     /// </summary>
-    /// <typeparam name="TMatch">The type of the items in the sequence.</typeparam>
-    /// <typeparam name="TResult">The type of the item produced from a successful match.</typeparam>
-    public sealed class SuccessResult<TMatch, TResult>
+    /// <typeparam name="T">The type of the items in the sequence.</typeparam>
+    public sealed class SuccessResult<T>
     {
-        private readonly MatchResult<TMatch, TResult> result;
+        private readonly MatchResult<T> result;
 
-        public SuccessResult(MatchFunc<TMatch, TResult> func, Item<TMatch> item)
+        public SuccessResult(MatchFunc<T> func, Item<T> item)
         {
             this.result = evaluateMatch(func, item);
         }
 
-        public Item<TMatch> Item => this.CastSuccess().Item2;
+        public Item<T> Item => this.ItemOption.Value;
 
-        public TResult Result => this.CastSuccess().Item1;
+        public bool HasItem => FSharpOption<Item<T>>.get_IsSome(this.ItemOption);
 
-        private MatchResult<TMatch, TResult>.Success CastSuccess()
+        public IEnumerable<T> Result => this.CastSuccess().Item1;
+
+        private FSharpOption<Item<T>> ItemOption => this.CastSuccess().Item2;
+
+        private MatchResult<T>.Success CastSuccess()
         {
-            if (this.result is MatchResult<TMatch, TResult>.Failure failure)
+            if (this.result is MatchResult<T>.Failure failure)
             {
                 throw new InvalidOperationException($"Unexpected failure for ({failure.Item1}). {failure.Item2}");
             }
 
-            return (MatchResult<TMatch, TResult>.Success)this.result;
+            return (MatchResult<T>.Success)this.result;
         }
     }
 }

@@ -22,8 +22,6 @@ namespace Classier.NET.Compiler
     using Xunit;
     using static Classier.NET.Compiler.Lexing;
     using static Classier.NET.Compiler.Matching;
-    using FailureResult = Classier.NET.Compiler.FailureResult<char, string>;
-    using SuccessResult = Classier.NET.Compiler.SuccessResult<char, string>;
 
     public class MatchingTests
     {
@@ -33,75 +31,119 @@ namespace Classier.NET.Compiler
         public void MatchAnyOfFailsWithLastResult(string[] matches, string text)
         {
             // Arrange
-            var func = new InteropFunc<string, MatchFunc<char, string>>(matchStr);
+            var func = new InteropFunc<string, MatchFunc<char>>(matchStr);
 
             // Act
-            var failure = new FailureResult(
+            var failure = new FailureResult<char>(
                     matchAnyOf(matches, func),
-                    itemFrom(text));
+                    Item.fromSeq(text).Value);
 
             // Assert
             Assert.Contains(matches[matches.Length - 1], failure.Message);
         }
 
-        [InlineData("cs", "cscscs", 3)]
-        [InlineData("work", "work", 1)]
-        [InlineData("two", "twotwo", 2)]
-        [InlineData(" ", "      ", 6)]
         [InlineData("return", "returnreturnret", 2)]
-        [InlineData("menu", "menumenumenumenumenumenumenumenumenumenumenumenu", 12)]
+        [InlineData("lambda", "lambdalambdalambdal", 3)]
         [Theory]
-        public void MatchManyIsSuccessForRepeated(string expected, string text, int repeatCount)
+        public void MatchManyIsSuccessForRepeatedPartOfString(string expected, string text, int repeatCount)
         {
             // Act
-            var success = new SuccessResult(
-                    matchStrSeq(
-                        matchMany(
-                            matchStr(expected))),
-                    itemFrom(text));
+            var success = new SuccessResult<char>(
+                matchMany(
+                    matchStr(expected)),
+                Item.fromSeq(text).Value);
 
             // Assert
             Assert.Equal(expected.Length * repeatCount, success.Item.Index);
             Assert.Equal(text.Substring(0, expected.Length * repeatCount), success.Result);
         }
 
-        [InlineData("sedan", "truck", 0)]
-        [InlineData("something", "", 0)]
-        [InlineData("success", "success", 7)]
-        [InlineData("done", "donut", 0)]
-        [InlineData("win", "winner", 3)]
+        [InlineData("cs", "cscscs")]
+        [InlineData("work", "work")]
+        [InlineData("two", "twotwo")]
+        [InlineData(" ", "      ")]
+        [InlineData("menu", "menumenumenumenumenumenumenumenumenumenumenumenu")]
         [Theory]
-        public void MatchOptionalIsAlwaysSuccess(string expected, string actual, int expectedIndex)
+        public void MatchManyIsSuccessForRepeatedEntireString(string expected, string text)
         {
             // Act
-            var success = new SuccessResult(
-                matchStrOption(
-                    matchOptional(
-                        matchStr(expected))),
-                itemFrom(actual));
+            var success = new SuccessResult<char>(
+                matchMany(
+                    matchStr(expected)),
+                Item.fromSeq(text).Value);
+
+            // Assert
+            Assert.False(success.HasItem);
+            Assert.Equal(text, success.Result);
+        }
+
+        [InlineData("sedan", "truck", 0)]
+        [InlineData("something", "", 0)]
+        [InlineData("done", "donut", 0)]
+        [InlineData("win", "winner", 3)]
+        [InlineData("\u5678", "\u9101", 0)]
+        [Theory]
+        public void MatchOptionalIsSuccessForPartOfString(string expected, string actual, int expectedIndex)
+        {
+            // Act
+            var success = new SuccessResult<char>(
+                matchOptional(
+                    matchStr(expected)),
+                Item.fromSeq(actual).Value);
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
         }
 
-        [InlineData(new[] { "type", "of", "(", "object)" }, "typeof(object)")]
-        [InlineData(new[] { "one fish" }, "one fish")]
-        [InlineData(new[] { "bad" }, "bad syntax")]
-        [InlineData(new string[0], "")]
-        [InlineData(new string[0], "whatever I want to be")]
+        [InlineData("success", "success")]
+        [InlineData("\u1234", "\u1234")]
         [Theory]
-        public void MatchChainIsSuccessIfAllMatchesSucceed(string[] expected, string actual)
+        public void MatchOptionalIsSuccessForEntireString(string expected, string actual)
         {
             // Act
-            var success = new SuccessResult(
-                matchStrSeq(
-                    matchChain(
-                        expected
-                        .Select(str => matchStr(str)))),
-                itemFrom(actual));
+            var success = new SuccessResult<char>(
+                matchOptional(
+                    matchStr(expected)),
+                Item.fromSeq(actual).Value);
 
             // Assert
-            Assert.Equal(expected.Select(str => str.Length).Sum(), success.Item.Index);
+            Assert.False(success.HasItem);
+            Assert.Equal(actual, success.Result);
+        }
+
+        [InlineData(new[] { "bad" }, "bad syntax", 3)]
+        [InlineData(new string[0], "whatever I want to be", 0)]
+        [Theory]
+        public void MatchChainIsSuccessIfAllMatchesSucceedForPartOfString(string[] expected, string actual, int expectedIndex)
+        {
+            // Act
+            var success = new SuccessResult<char>(
+                matchChain(
+                    expected
+                    .Select(str => matchStr(str))),
+                Item.fromSeq(actual).Value);
+
+            // Assert
+            Assert.Equal(expectedIndex, success.Item.Index);
+            Assert.Equal(actual.Substring(0, expectedIndex), success.Result);
+        }
+
+        [InlineData(new[] { "type", "of", "(", "object)" }, "typeof(object)")]
+        [InlineData(new[] { "one fish" }, "one fish")]
+        [InlineData(new string[0], "")]
+        [Theory]
+        public void MatchChainIsSuccessIfAllMatchesSucceedForEntireString(string[] expected, string actual)
+        {
+            // Act
+            var success = new SuccessResult<char>(
+                matchChain(
+                    expected
+                    .Select(str => matchStr(str))),
+                Item.fromSeq(actual).Value);
+
+            // Assert
+            Assert.False(success.HasItem);
+            Assert.Equal(actual, success.Result);
         }
 
         [InlineData(new[] { "good", "design" }, "good design", ' ')]
@@ -110,33 +152,48 @@ namespace Classier.NET.Compiler
         public void MatchChainIsFailureIfAnyMatchFails(string[] expected, string actual, char badChar)
         {
             // Act
-            var failure = new FailureResult(
-                matchStrSeq(
-                    matchChain(
-                        expected
-                        .Select(str => matchStr(str)))),
-                itemFrom(actual));
+            var failure = new FailureResult<char>(
+                matchChain(
+                    expected
+                    .Select(str => matchStr(str))),
+                Item.fromSeq(actual).Value);
 
             // Assert
             Assert.Contains($"'{badChar}'", failure.Message);
             Assert.StartsWith("chain [", failure.Label);
         }
 
-        [InlineData("indented", "\t\t\tindented", 3)]
         [InlineData("one", "onetoomany", 0)]
         [InlineData("+", "1 + 1", 2)]
+        [InlineData("the", "be the roundabout", 3)]
         [Theory]
-        public void MatchUntilIsSuccessAndExcludesFinalMatch(string untilStr, string actual, int expectedIndex)
+        public void MatchUntilIsSuccessAndExcludesFinalMatchForPartOfString(string untilStr, string actual, int expectedIndex)
         {
             // Act
-            var success = new SuccessResult<char, IEnumerable<char>>(
+            var success = new SuccessResult<char>(
                 matchUntil(
                     matchStr(untilStr)),
-                itemFrom(actual));
+                Item.fromSeq(actual).Value);
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
             Assert.Equal(actual.Substring(success.Result.Count(), untilStr.Length), untilStr);
+        }
+
+        [InlineData("indented", "\t\t\tindented")]
+        [InlineData("end", "if true then print('wow') end")]
+        [Theory]
+        public void MatchUntilIsSuccessAndExcludesFinalMatchForEntireString(string untilStr, string actual)
+        {
+            // Act
+            var success = new SuccessResult<char>(
+                matchUntil(
+                    matchStr(untilStr)),
+                Item.fromSeq(actual).Value);
+
+            // Assert
+            Assert.False(success.HasItem);
+            Assert.EndsWith(untilStr, actual);
         }
 
         [InlineData("content", "conten")]
@@ -145,11 +202,10 @@ namespace Classier.NET.Compiler
         public void MatchUntilIsFailureForNoMatch(string expected, string actual)
         {
             // Act
-            var failure = new FailureResult(
-                matchCharSeq(
-                    matchUntil(
-                        matchStr(expected))),
-                itemFrom(actual));
+            var failure = new FailureResult<char>(
+                matchUntil(
+                    matchStr(expected)),
+                Item.fromSeq(actual).Value);
 
             // Assert
             Assert.Contains("until ", failure.Label);

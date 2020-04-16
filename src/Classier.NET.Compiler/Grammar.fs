@@ -159,16 +159,15 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_'] |> matchMany |> matchOptional];
     ] |> Map.ofList
 
-let tokenizer: Tokenizer<TokenType> = tokenizerFrom
-
-(*
-tokenizerDefs
-|> Map.toSeq
-|> Seq.filter (fun (t, _) -> t > TokenType.Unknown)
-|> Seq.map (fun (_, f) ->
-    f
-    |> mapMatch (fun str -> { Type = t; Content = str })
-    |> labelMatch (sprintf "%A (%s)" t f.Label))
-*)
+let tokenizer: Tokenizer<TokenType * seq<char>> =
+    tokenizerFrom
+        (tokenizerDefs
+        |> Map.toSeq
+        |> Seq.filter (fun (t, _) -> t > TokenType.Unknown))
+        (fun (_, m) -> m)
+        (fun def chars ->
+            match def with
+            | Some (t, _) -> t, chars
+            | None -> TokenType.Unknown, chars)
 
 let parser = null

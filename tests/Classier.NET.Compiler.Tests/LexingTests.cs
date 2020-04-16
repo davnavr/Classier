@@ -16,14 +16,14 @@
 
 namespace Classier.NET.Compiler
 {
+    using System;
+    using System.Collections.Generic;
     using System.Linq;
     using Xunit;
     using static Classier.NET.Compiler.Grammar;
     using static Classier.NET.Compiler.Lexing;
     using static Classier.NET.Compiler.Matching;
     using static Classier.NET.Compiler.Parsing;
-    using FailureResult = FailureResult<Lexing.Token<Grammar.TokenType>, Lexing.Token<Grammar.TokenType>>;
-    using SuccessResult = SuccessResult<Lexing.Token<Grammar.TokenType>, Lexing.Token<Grammar.TokenType>>;
 
     public class LexingTests
     {
@@ -52,60 +52,24 @@ namespace Classier.NET.Compiler
             var tokens = tokenize(Grammar.tokenizer, source);
 
             // Assert
-            Assert.Equal(source, string.Concat(tokens.Select(token => token.Content)));
-            Assert.Equal(expectedTypes, tokens.Select(token => token.Type));
+            Assert.Equal(
+                source,
+                string.Concat(
+                    tokens.Select(token =>
+                    {
+                        var (_, content) = token;
+                        return content;
+                    })));
+
+            Assert.Equal(
+                expectedTypes,
+                tokens.Select((token) =>
+                    {
+                        var (type, _) = token;
+                        return type;
+                    }));
         }
 
 #pragma warning restore IDE0002 // Name can be simplified
-
-        [Fact]
-        public void MatchTokenIsSuccessForMatchingType()
-        {
-            // Arrange
-            var tokens = new[] { new Token<TokenType>(TokenType.Whitespace, "this can be anything") };
-
-            // Act
-            var success = new SuccessResult(
-                matchToken(TokenType.Whitespace),
-                itemFrom(tokens));
-
-            // Assert
-            Assert.Equal(1, success.Item.Index);
-        }
-
-        [Fact]
-        public void MatchTokenIsFailureForIncorrectType()
-        {
-            // Arrange
-            var actual = TokenType.Unknown;
-            var expected = TokenType.WrdClass;
-            var tokens = new[] { new Token<TokenType>(actual, "about:blank") };
-
-            // Act
-            var failure = new FailureResult(
-                matchToken(expected),
-                itemFrom(tokens));
-
-            // Assert
-            Assert.Contains(actual.ToString(), failure.Message);
-            Assert.Contains(expected.ToString(), failure.Message);
-        }
-
-        [Fact]
-        public void MatchTokenIsFailureForEndOfSequence()
-        {
-            // Arrange
-            var expected = TokenType.WrdClass;
-            var tokens = new Token<TokenType>[0];
-
-            // Act
-            var failure = new FailureResult(
-                matchToken(expected),
-                itemFrom(tokens));
-
-            // Assert
-            Assert.Contains("end of the sequence", failure.Message);
-            Assert.Contains(expected.ToString(), failure.Message);
-        }
     }
 }

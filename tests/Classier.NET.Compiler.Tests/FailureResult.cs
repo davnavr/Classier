@@ -17,20 +17,20 @@
 namespace Classier.NET.Compiler
 {
     using System;
+    using static Classier.NET.Compiler.Item;
     using static Classier.NET.Compiler.Matching;
 
     /// <summary>
-    /// Wraps a <see cref="MatchResult{Match, Result}"/> value, and assumes it is a <see cref="MatchResult{Match, Result}.Success"/>.
+    /// Wraps a <see cref="MatchResult{T}"/> value, and assumes it is a <see cref="MatchResult{T}.Success"/>.
     /// </summary>
-    /// <typeparam name="TMatch">The type of the items in the sequence.</typeparam>
-    /// <typeparam name="TResult">The type of the item produced from a successful match.</typeparam>
-    public sealed class FailureResult<TMatch, TResult>
+    /// <typeparam name="T">The type of the items in the sequence.</typeparam>
+    public sealed class FailureResult<T>
     {
-        private readonly MatchFunc<TMatch, TResult> func;
+        private readonly MatchFunc<T> func;
 
-        private readonly MatchResult<TMatch, TResult> result;
+        private readonly MatchResult<T> result;
 
-        public FailureResult(MatchFunc<TMatch, TResult> func, Item<TMatch> item)
+        public FailureResult(MatchFunc<T> func, Item<T> item)
         {
             this.func = func;
             this.result = evaluateMatch(this.func, item);
@@ -40,14 +40,14 @@ namespace Classier.NET.Compiler
 
         public string Message => this.CastFailure().Item2;
 
-        private MatchResult<TMatch, TResult>.Failure CastFailure()
+        private MatchResult<T>.Failure CastFailure()
         {
-            if (this.result is MatchResult<TMatch, TResult>.Success success)
+            if (this.result is MatchResult<T>.Success success)
             {
                 throw new InvalidOperationException($"Unexpected success when matching ({this.func.Label}), the result is '{success.Item1}'.");
             }
 
-            return (MatchResult<TMatch, TResult>.Failure)this.result;
+            return (MatchResult<T>.Failure)this.result;
         }
     }
 }

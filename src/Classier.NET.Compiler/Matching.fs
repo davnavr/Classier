@@ -139,7 +139,7 @@ let matchChain (matches: seq<MatchFunc<'T>>) =
 
 /// Skips items in the sequence until the specified function returns a success,
 /// and returns the skipped items along with the result of the function.
-let matchTo (f: MatchFunc<'T>) =
+let matchTo (f: MatchFunc<'T>): MatchFunc<'T> =
     let toLabel = sprintf "to %s" f.Label
     Match (toLabel, fun startItem ->
         Failure (toLabel, "NOT IMPLEMENTED"))
@@ -149,7 +149,7 @@ let matchToEnd: MatchFunc<'T> =
         Failure ("end", "NOT IMPLEMENTED"))
 
 /// Skips items in the sequence until the specified function returns a success, and returns the skipped items.
-let matchUntil (f: MatchFunc<'T>) =
+let matchUntil (f: MatchFunc<'T>): MatchFunc<'T> =
     let untilLabel = sprintf "until %s" f.Label
     Match (untilLabel, fun item ->
         Failure (untilLabel, "NOT IMPLEMENTED"))
@@ -157,7 +157,7 @@ let matchUntil (f: MatchFunc<'T>) =
 /// Matches against the first function, then matches with the specfiied filter function.
 /// If the filter function fails or has a success outside of the range of the first result,
 /// then the match succeeds.
-let matchWithout (filter: MatchFunc<'T>) (f: MatchFunc<'T>) =
+let matchWithout (filter: MatchFunc<'T>) (f: MatchFunc<'T>): MatchFunc<'T> =
     let withoutLabel = sprintf "%s without %s" f.Label filter.Label
     Match (withoutLabel, fun startItem ->
         Failure (withoutLabel, "NOT IMPLEMENTED"))
