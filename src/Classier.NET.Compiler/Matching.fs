@@ -67,16 +67,6 @@ let labelMatch label (m: MatchFunc<'T>) =
 let labelsOfMatches (matches: seq<MatchFunc<'T>>) =
     matches |> Seq.map (fun m -> m.Label)
 
-/// Inserts the specified message into the beginning of the message used when the specified match function fails.
-let addFailMsg msg (f: MatchFunc<'T>) =
-    Match (f.Label, fun item ->
-        let result = evaluateMatch f (Some item)
-        match result with
-        | Success _ -> result
-        | Failure (label, oldMsg) ->
-            let combinedMsg = sprintf "%s %s" msg oldMsg
-            Failure (label, combinedMsg))
-
 /// Matches with the first function, then feeds the resulting item into the second function.
 let andMatch (m1: MatchFunc<'T>) (m2: MatchFunc<'T>) =
     let andLabel = sprintf "%s and %s" m1.Label m2.Label

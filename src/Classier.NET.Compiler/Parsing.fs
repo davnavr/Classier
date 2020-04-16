@@ -20,6 +20,7 @@ open System
 open Classier.NET.Compiler.Lexing
 open Classier.NET.Compiler.Matching
 
+(*
 /// Provides line and position information for a token.
 type ParsedToken<'T> =
     {
@@ -66,6 +67,7 @@ let matchToken (t: 'T) =
     matchPredicate (fun token -> token.Type = t) label
     |> addFailMsg (sprintf "Error parsing %s." label)
 
+
 /// Ignores tokens that cause the specified predicate to return <c>true</c>.
 let ignoreTokens (predicate: ParsedToken<'T> -> bool) f =
     let label = sprintf "ignored %A" predicate
@@ -84,3 +86,4 @@ let ignoreTokens (predicate: ParsedToken<'T> -> bool) f =
 /// Ignores tokens with the specified types.
 let ignoreTokenTypes (types: 'T list) f =
     ignoreTokens (fun t -> types |> List.contains t.Token.Type) f
+*)

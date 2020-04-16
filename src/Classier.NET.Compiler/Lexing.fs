@@ -27,7 +27,6 @@ type Tokenizer<'Token> = Tokenizer of (seq<char> -> seq<'Token>)
 let matchChar c =
     (fun ch -> c = ch)
     |> matchPredicate (sprintf "char '%c'" c)
-    |> addFailMsg (sprintf "Error parsing character '%c'." c)
 
 /// Matches against any of the specified characters.
 let matchAnyChar chars = matchAnyOf chars matchChar
@@ -45,81 +44,39 @@ let matchStr str =
     |> Seq.map matchChar
     |> matchChain
     |> labelMatch (sprintf "string '%s'" str)
-    |> addFailMsg (sprintf "Error parsing string '%s'." str)
 
-let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
-    let tokenDefs = definitions |> Seq.cache
-    let tokenFrom (item: Item<char>) =
-        let results =
-            tokenDefs
-            |> Seq.map (fun f ->
-                let r = evaluateMatch f item
-                match r with
-                | Success (token, nextItem) ->
-                    Some (token, nextItem)
-                | Failure _ -> None)
-            |> Seq.where (fun r -> r.IsSome)
-            |> Seq.map (fun r -> r.Value)
-            |> Seq.cache
-            
-        if results |> Seq.isEmpty then
-            None
-        else
-            let longestToken =
-                results
-                |> Seq.reduce (fun (t1, item1) (t2, item2) ->
-                    if t1.Content.Length >= t2.Content.Length then
-                        (t1, item1)
-                    else
-                        (t2, item2))
-            Some longestToken
+let tokenizerFrom (definitions: seq<'Definition>) (definitionMap: 'Definition -> MatchFunc<char>) (generator: 'Definition option -> seq<char> -> 'Token) =
+    let tokenFrom item =
+        let results = None
 
-    let unknownFrom (startItem: Item<char>) =
-        let nextKnown =
-            startItem.AsSequence()
-            |> Seq.map (fun (item, ch, _) -> item, ch, tokenFrom item)
-            |> Seq.tryFind (fun (_, _, token) -> token.IsSome)
+        None
 
-        let defaultResult() =
-            let content =
-                startItem.AsSequence()
-                |> Seq.map (fun (_, ch, _) -> ch)
-                |> String.Concat
-            { Type = defaultVal; Content = content }, End -1, None
-
-        match nextKnown with
-        | Some (tokenStart, _, nextToken) ->
-            match nextToken with
-            | Some (knownToken, nextItem) ->
-                let content =
-                    startItem.AsSequence()
-                    |> Seq.takeWhile (fun (_, _, index) -> index < tokenStart.Index)
-                    |> Seq.map (fun (_, ch, _) -> ch)
-                    |> String.Concat
-                { Type = defaultVal; Content = content }, nextItem, Some knownToken
-            | None ->
-                defaultResult()
-        | None ->
-            defaultResult()
+    let unknownFrom startItem = invalidOp "Not yet implemented."
 
     Tokenizer (fun chars ->
-        (fromSeq chars, None)
-        |>
-        Seq.unfold (fun (item, next: Token<'T> option) ->
-            match next with
+        if Seq.isEmpty definitions then
+            generator None chars |> Seq.singleton
+        else
+            (Item.fromSeq chars, None)
+            |> Seq.unfold (fun (item, next: 'Token option) ->
+                let nextVal token nextItem nextToken =
+                    Some (token, (nextItem, nextToken))
+
+                // Check if we have to emit an unknown token.
+                match next with
                 | None ->
                     match item with
-                    | Item _ ->
+                    | Some currentItem ->
                         match tokenFrom item with
                         | Some (token, nextItem) ->
-                            Some (token, (nextItem, None))
+                            nextVal token nextItem None
                         | None ->
                             let (unknownToken, nextItem, nextToken) = unknownFrom item
-                            Some (unknownToken, (nextItem, nextToken))
-                    | End _ -> None
+                            nextVal unknownToken nextItem nextToken
+                    | None -> None
                 | Some token ->
-                    Some (token, (item, None))))
+                    nextVal token item None))
 
-let tokenize (tokenizer: Tokenizer<'T>) chars =
+let tokenize (tokenizer: Tokenizer<'Token>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer
     tokenizeFunc chars

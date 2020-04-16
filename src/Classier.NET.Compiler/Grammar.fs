@@ -107,19 +107,19 @@ type TokenType =
     /// The token is an identifier.
     | Identifier = 110
 
-let tokenIsNewline (token: Token<TokenType>) = token.Type = TokenType.NewLine
+//let tokenIsNewline (token: Token<TokenType>) = token.Type = TokenType.NewLine
 
 let matchTokenType t = lazy (tokenizerDefs.Item t) |> matchLazy
 
-let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
+let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
     [
         TokenType.``a-fA-F0-9``, matchAny [matchTokenType TokenType.``0-9``; matchCharRange ('a', 'f'); matchCharRange ('A', 'F')];
-        TokenType.``a-zA-Z``, matchCharRange ('A', 'Z') |> orMatch (matchCharRange ('a', 'z'));
+        TokenType.``a-zA-Z``, matchCharRange ('A', 'Z') |> orMatch <| matchCharRange ('a', 'z');
         TokenType.``0-9``, matchCharRange ('0', '9');
 
         TokenType.MLCommentStart, matchStr "/*";
         TokenType.MLCommentEnd, matchStr "*/";
-        TokenType.SLComment, matchChain [matchStr "//"; orMatch (matchTokenType TokenType.NewLine |> matchUntil |> (matchCharSeq)) (matchToEnd |> matchCharSeq)] |> matchStrSeq;
+        TokenType.SLComment, matchChain [matchStr "//"; matchTokenType TokenType.NewLine |> matchUntil |> orMatch <| matchToEnd];
 
         TokenType.AccPublic, matchStr "public";
         TokenType.AccInternal, matchStr "internal";
@@ -141,10 +141,10 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
         TokenType.LCBracket, matchChar '{';
         TokenType.RCBracket, matchChar '}';
 
-        TokenType.StrLit, matchChain [matchChar '"'; matchTo (matchChar '"') |> matchCharSeqAndStr |> matchWithout (matchTokenType TokenType.NewLine)] |> matchStrSeq;
-        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchOptional (matchAnyChar ['_'; '0'; '1'] |> matchMany |> matchStrSeq) |> matchStrOption] |> matchStrSeq;
-        TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchTokenType TokenType.``a-fA-F0-9``; matchTokenType TokenType.``a-fA-F0-9`` |> orMatch (matchChar '_') |> matchMany |> matchStrSeq] |> matchStrSeq;
-        TokenType.IntLit, matchChain [matchTokenType TokenType.``0-9``; matchOptional (matchAny [matchChar '_'; matchTokenType TokenType.``0-9``] |> matchMany |> matchStrSeq) |> matchStrOption] |> matchStrSeq;
+        TokenType.StrLit, matchChain [matchChar '"'; matchTo (matchChar '"') |> matchWithout (matchTokenType TokenType.NewLine)];
+        TokenType.BinLit, matchChain [matchChar '0'; matchAnyChar ['b'; 'B']; matchAnyChar ['0'; '1']; matchAnyChar ['_'; '0'; '1'] |> matchMany |> matchOptional];
+        TokenType.HexLit, matchChain [matchChar '0'; matchAnyChar ['x'; 'X']; matchTokenType TokenType.``a-fA-F0-9``; matchTokenType TokenType.``a-fA-F0-9`` |> orMatch (matchChar '_') |> matchMany];
+        TokenType.IntLit, matchChain [matchTokenType TokenType.``0-9``; matchAny [matchChar '_'; matchTokenType TokenType.``0-9``] |> matchMany |> matchOptional];
         TokenType.TrueLit, matchStr "true";
         TokenType.FalseLit, matchStr "false";
 
@@ -153,21 +153,22 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char, string>> =
         TokenType.Period, matchChar '.';
         TokenType.Comma, matchChar ',';
 
-        TokenType.Whitespace, matchAnyChar [' '; '\t'] |> matchMany |> matchStrSeq;
+        TokenType.Whitespace, matchAnyChar [' '; '\t'] |> matchMany;
         TokenType.NewLine, matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr;
         
-        TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchOptional (matchMany (matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_']) |> matchStrSeq) |> matchStrOption] |> matchStrSeq;
+        TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_'] |> matchMany |> matchOptional];
     ] |> Map.ofList
 
-let tokenizer: Tokenizer<TokenType> =
-    createTokenizer(
-        tokenizerDefs
-            |> Map.toSeq
-            |> Seq.filter (fun (t, _) -> t > TokenType.Unknown)
-            |> Seq.map (fun (t, f) ->
-                f
-                |> mapMatch (fun str -> { Type = t; Content = str })
-                |> labelMatch (sprintf "%A (%s)" t f.Label)),
-        TokenType.Unknown)
+let tokenizer: Tokenizer<TokenType> = tokenizerFrom
+
+(*
+tokenizerDefs
+|> Map.toSeq
+|> Seq.filter (fun (t, _) -> t > TokenType.Unknown)
+|> Seq.map (fun (_, f) ->
+    f
+    |> mapMatch (fun str -> { Type = t; Content = str })
+    |> labelMatch (sprintf "%A (%s)" t f.Label))
+*)
 
 let parser = null

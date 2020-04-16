@@ -259,6 +259,7 @@ namespace Classier.NET.Compiler
             Assert.Contains(" without ", failure.Label);
         }
 
+        // TODO: Move tests for char and str in LexingTests.
         [InlineData('T', "Test")]
         [InlineData('\r', "\r\n")]
         [Theory]

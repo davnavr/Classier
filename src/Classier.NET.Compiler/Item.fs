@@ -25,7 +25,7 @@ let fromSeq (source: seq<'T>): Item<'T> option =
     let enumerator = source.GetEnumerator()
     let rec next index =
         if enumerator.MoveNext() then
-            Some { Value = enumerator.Current |> Seq.head;
+            Some { Value = enumerator.Current;
                    Index = index;
                    Next = lazy next (index + 1) }
         else
