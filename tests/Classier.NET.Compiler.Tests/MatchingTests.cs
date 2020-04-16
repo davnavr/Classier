@@ -39,7 +39,7 @@ namespace Classier.NET.Compiler
                     Item.fromSeq(text));
 
             // Assert
-            Assert.Contains(matches[matches.Length - 1], failure.Message);
+            Assert.Contains(matches[matches.Length - 1], failure.Label);
         }
 
         [InlineData("return", "returnreturnret", 2)]
@@ -78,7 +78,6 @@ namespace Classier.NET.Compiler
         }
 
         [InlineData("sedan", "truck", 0)]
-        [InlineData("something", "", 0)]
         [InlineData("done", "donut", 0)]
         [InlineData("win", "winner", 3)]
         [InlineData("\u5678", "\u9101", 0)]
@@ -131,7 +130,6 @@ namespace Classier.NET.Compiler
 
         [InlineData(new[] { "type", "of", "(", "object)" }, "typeof(object)")]
         [InlineData(new[] { "one fish" }, "one fish")]
-        [InlineData(new string[0], "")]
         [Theory]
         public void MatchChainIsSuccessForEntireStringIfAllMatchesSucceed(string[] expected, string actual)
         {
@@ -148,7 +146,7 @@ namespace Classier.NET.Compiler
         }
 
         [InlineData(new[] { "good", "design" }, "good design", ' ')]
-        [InlineData(new[] { "wonderful UI" }, "bad UI", 'w')]
+        [InlineData(new[] { "wonderful UI" }, "bad UI", 'b')]
         [Theory]
         public void MatchChainIsFailureIfAnyMatchFails(string[] expected, string actual, char badChar)
         {
@@ -372,10 +370,24 @@ namespace Classier.NET.Compiler
         }
 
         [InlineData("Test", "Test")]
+        [InlineData("\r", "\r")]
+        [Theory]
+        public void MatchStrIsSuccessWhenMatchingEntireString(string expected, string text)
+        {
+            // Act
+            var success = new SuccessResult<char>(
+                    matchStr(expected),
+                    Item.fromSeq(text));
+
+            // Assert
+            Assert.False(success.HasItem);
+            Assert.Equal(expected, success.Result);
+        }
+
         [InlineData("s", "string")]
         [InlineData("class MyClass", "class MyClass extends")]
         [Theory]
-        public void MatchStrIsSuccessForMatching(string expected, string text)
+        public void MatchStrIsSuccessWhenMatchingPartOfString(string expected, string text)
         {
             // Act
             var success = new SuccessResult<char>(
@@ -387,10 +399,10 @@ namespace Classier.NET.Compiler
             Assert.Equal(expected, success.Result);
         }
 
-        [InlineData("")]
+        [InlineData("\u0085")]
         [InlineData("hello")]
         [Theory]
-        public void MatchStrIsSuccessWhenMatchingEmptyString(string text)
+        public void MatchStrIsSuccessWhenMatchingWithEmptyString(string text)
         {
             // Act
             var success = new SuccessResult<char>(
@@ -417,7 +429,7 @@ namespace Classier.NET.Compiler
             Assert.Equal($"string '{expected}'", failure.Label);
         }
 
-        [InlineData("oh no", "oh\rno", '\r')]
+        [InlineData("oh no", "oh!no", '!')]
         [InlineData("self", " elf", ' ')]
         [InlineData("abcd", "efgh", 'e')]
         [InlineData("world", "_world", '_')]

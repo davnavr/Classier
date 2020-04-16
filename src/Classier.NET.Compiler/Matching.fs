@@ -178,4 +178,4 @@ let matchPredicate label (predicate: 'T -> bool) =
         if predicate item.Value then
             Success (item.Value |> Seq.singleton, item.Next.Value)
         else
-            Failure (label, sprintf "Unexpected '%A'." item.Value))
+            Failure (label, sprintf "Unexpected %A." item.Value))
