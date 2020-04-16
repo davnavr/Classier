@@ -17,31 +17,17 @@ module Classier.NET.Compiler.Lexing
 
 open System
 
+open Classier.NET.Compiler.Item
 open Classier.NET.Compiler.Matching
 
-type Token<'T> = { Type: 'T; Content: string }
-
 /// Turns a sequence of characters into a sequence of tokens.
-type Tokenizer<'T> = Tokenizer of (seq<char> -> seq<Token<'T>>)
-
-type TokenDef<'T> = MatchFunc<char, Token<'T>>
+type Tokenizer<'Token> = Tokenizer of (seq<char> -> seq<'Token>)
 
 /// Matches against the specified character.
 let matchChar c =
-    let charLabel = sprintf "char '%c'" c
-    matchPredicate (fun ch -> c = ch) charLabel
-    |> mapMatch (fun ch -> ch.ToString())
+    (fun ch -> c = ch)
+    |> matchPredicate (sprintf "char '%c'" c)
     |> addFailMsg (sprintf "Error parsing character '%c'." c)
-
-let matchCharSeq (f: MatchFunc<'Match, seq<char>>) =
-    f
-    |> mapMatch String.Concat
-    |> labelMatch f.Label
-
-let matchCharSeqAndStr (f: MatchFunc<'Match, seq<char> * string>) =
-    f
-    |> mapMatch (fun (chars, str) -> (String.Concat chars) + str)
-    |> labelMatch f.Label
 
 /// Matches against any of the specified characters.
 let matchAnyChar chars = matchAnyOf chars matchChar
@@ -55,24 +41,11 @@ let rec matchCharRange (c1, c2) =
 
 /// Matches against the specified string.
 let matchStr str =
-    let strLabel = sprintf "string '%s'" str
     str
     |> Seq.map matchChar
     |> matchChain
-    |> mapMatch String.Concat
-    |> labelMatch strLabel
+    |> labelMatch (sprintf "string '%s'" str)
     |> addFailMsg (sprintf "Error parsing string '%s'." str)
-
-let matchStrSeq (f: MatchFunc<'Match, seq<string>>) =
-    f
-    |> mapMatch String.Concat
-    |> labelMatch f.Label
-
-let matchStrOption (f: MatchFunc<'Match, string option>) =
-    f |> mapMatch (fun optstr ->
-        match optstr with
-        | Some str -> str
-        | None -> String.Empty)
 
 let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
     let tokenDefs = definitions |> Seq.cache
@@ -130,7 +103,7 @@ let createTokenizer (definitions: seq<TokenDef<'T>>, defaultVal: 'T) =
             defaultResult()
 
     Tokenizer (fun chars ->
-        (itemFrom chars, None)
+        (fromSeq chars, None)
         |>
         Seq.unfold (fun (item, next: Token<'T> option) ->
             match next with
