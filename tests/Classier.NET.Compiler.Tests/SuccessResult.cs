@@ -30,7 +30,7 @@ namespace Classier.NET.Compiler
     {
         private readonly MatchResult<T> result;
 
-        public SuccessResult(MatchFunc<T> func, Item<T> item)
+        public SuccessResult(MatchFunc<T> func, FSharpOption<Item<T>> item)
         {
             this.result = evaluateMatch(func, item);
         }

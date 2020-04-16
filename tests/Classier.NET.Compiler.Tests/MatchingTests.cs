@@ -36,7 +36,7 @@ namespace Classier.NET.Compiler
             // Act
             var failure = new FailureResult<char>(
                     matchAnyOf(matches, func),
-                    Item.fromSeq(text).Value);
+                    Item.fromSeq(text));
 
             // Assert
             Assert.Contains(matches[matches.Length - 1], failure.Message);
@@ -45,13 +45,13 @@ namespace Classier.NET.Compiler
         [InlineData("return", "returnreturnret", 2)]
         [InlineData("lambda", "lambdalambdalambdal", 3)]
         [Theory]
-        public void MatchManyIsSuccessForRepeatedPartOfString(string expected, string text, int repeatCount)
+        public void MatchManyIsSuccessForPartOfString(string expected, string text, int repeatCount)
         {
             // Act
             var success = new SuccessResult<char>(
                 matchMany(
                     matchStr(expected)),
-                Item.fromSeq(text).Value);
+                Item.fromSeq(text));
 
             // Assert
             Assert.Equal(expected.Length * repeatCount, success.Item.Index);
@@ -64,13 +64,13 @@ namespace Classier.NET.Compiler
         [InlineData(" ", "      ")]
         [InlineData("menu", "menumenumenumenumenumenumenumenumenumenumenumenu")]
         [Theory]
-        public void MatchManyIsSuccessForRepeatedEntireString(string expected, string text)
+        public void MatchManyIsSuccessForEntireStringFor(string expected, string text)
         {
             // Act
             var success = new SuccessResult<char>(
                 matchMany(
                     matchStr(expected)),
-                Item.fromSeq(text).Value);
+                Item.fromSeq(text));
 
             // Assert
             Assert.False(success.HasItem);
@@ -89,7 +89,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchOptional(
                     matchStr(expected)),
-                Item.fromSeq(actual).Value);
+                Item.fromSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -104,7 +104,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchOptional(
                     matchStr(expected)),
-                Item.fromSeq(actual).Value);
+                Item.fromSeq(actual));
 
             // Assert
             Assert.False(success.HasItem);
@@ -112,16 +112,17 @@ namespace Classier.NET.Compiler
         }
 
         [InlineData(new[] { "bad" }, "bad syntax", 3)]
+        [InlineData(new[] { "what", "ever", " ", "I" }, "whatever I want to be", 10)]
         [InlineData(new string[0], "whatever I want to be", 0)]
         [Theory]
-        public void MatchChainIsSuccessIfAllMatchesSucceedForPartOfString(string[] expected, string actual, int expectedIndex)
+        public void MatchChainIsSuccessForPartOfStringIfAllMatchesSucceed(string[] expected, string actual, int expectedIndex)
         {
             // Act
             var success = new SuccessResult<char>(
                 matchChain(
                     expected
                     .Select(str => matchStr(str))),
-                Item.fromSeq(actual).Value);
+                Item.fromSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -132,14 +133,14 @@ namespace Classier.NET.Compiler
         [InlineData(new[] { "one fish" }, "one fish")]
         [InlineData(new string[0], "")]
         [Theory]
-        public void MatchChainIsSuccessIfAllMatchesSucceedForEntireString(string[] expected, string actual)
+        public void MatchChainIsSuccessForEntireStringIfAllMatchesSucceed(string[] expected, string actual)
         {
             // Act
             var success = new SuccessResult<char>(
                 matchChain(
                     expected
                     .Select(str => matchStr(str))),
-                Item.fromSeq(actual).Value);
+                Item.fromSeq(actual));
 
             // Assert
             Assert.False(success.HasItem);
@@ -156,7 +157,7 @@ namespace Classier.NET.Compiler
                 matchChain(
                     expected
                     .Select(str => matchStr(str))),
-                Item.fromSeq(actual).Value);
+                Item.fromSeq(actual));
 
             // Assert
             Assert.Contains($"'{badChar}'", failure.Message);
@@ -167,13 +168,13 @@ namespace Classier.NET.Compiler
         [InlineData("+", "1 + 1", 2)]
         [InlineData("the", "be the roundabout", 3)]
         [Theory]
-        public void MatchUntilIsSuccessAndExcludesFinalMatchForPartOfString(string untilStr, string actual, int expectedIndex)
+        public void MatchUntilIsSuccessForPartOfStringAndExcludesFinalMatch(string untilStr, string actual, int expectedIndex)
         {
             // Act
             var success = new SuccessResult<char>(
                 matchUntil(
                     matchStr(untilStr)),
-                Item.fromSeq(actual).Value);
+                Item.fromSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -183,13 +184,13 @@ namespace Classier.NET.Compiler
         [InlineData("indented", "\t\t\tindented")]
         [InlineData("end", "if true then print('wow') end")]
         [Theory]
-        public void MatchUntilIsSuccessAndExcludesFinalMatchForEntireString(string untilStr, string actual)
+        public void MatchUntilIsSuccessForEntireStringAndExcludesFinalMatch(string untilStr, string actual)
         {
             // Act
             var success = new SuccessResult<char>(
                 matchUntil(
                     matchStr(untilStr)),
-                Item.fromSeq(actual).Value);
+                Item.fromSeq(actual));
 
             // Assert
             Assert.False(success.HasItem);
@@ -205,31 +206,46 @@ namespace Classier.NET.Compiler
             var failure = new FailureResult<char>(
                 matchUntil(
                     matchStr(expected)),
-                Item.fromSeq(actual).Value);
+                Item.fromSeq(actual));
 
             // Assert
             Assert.Contains("until ", failure.Label);
         }
 
-        [InlineData("Data", "[InlineData]", 11)]
-        [InlineData("nbsp", "nbsp", 4)]
-        [InlineData("matchStr", "\n\nmatchStr(expected)", 10)]
-        [InlineData("z", "abcxyz", 6)]
-        [InlineData("es", "languages", 9)]
-        [InlineData("1", "012345678910", 2)]
+        [InlineData("Data", "[InlineData]", 6, 11)]
+        [InlineData("matchStr", "\n\nmatchStr(expected)", 2, 10)]
+        [InlineData("1", "012345678910", 10, 2)]
         [Theory]
-        public void MatchToIsSuccessAndIncludesFinalMatch(string expected, string actual, int expectedIndex)
+        public void MatchToIsSuccessForPartOfStringAndIncludesFinalMatch(string expected, string actual, int skipLength, int expectedIndex)
         {
             // Act
-            var success = new SuccessResult<char, Tuple<IEnumerable<char>, string>>(
+            var success = new SuccessResult<char>(
                 matchTo(
                     matchStr(expected)),
-                itemFrom(actual));
-            var (skippedChars, result) = success.Result;
+                Item.fromSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
-            Assert.Equal(actual.Substring(skippedChars.Count(), expected.Length), result);
+            Assert.Equal(actual.Substring(skipLength, expected.Length), success.Result);
+        }
+
+        [InlineData("nbsp", "nbsp", 0)]
+        [InlineData("z", "abcxyz", 5)]
+        [InlineData("es", "languages", 7)]
+        [InlineData("3", "123-123-123", 10)]
+        [Theory]
+        public void MatchToIsSuccessForEntireStringAndIncludesFinalMatch(string expected, string actual, int skipLength)
+        {
+            // Act
+            var success = new SuccessResult<char>(
+                matchTo(
+                    matchStr(expected)),
+                Item.fromSeq(actual));
+
+            // Assert
+            Assert.False(success.HasItem);
+            Assert.Equal(actual, success.Result);
+            Assert.Equal(actual.Length, skipLength + success.Result.Count());
         }
 
         [InlineData("System", "Xunit.Abstractions", 's')]
@@ -238,10 +254,10 @@ namespace Classier.NET.Compiler
         public void MatchToIsFailureWhenNoSuccessFound(string expected, string actual, char badChar)
         {
             // Act
-            var failure = new FailureResult<char, Tuple<IEnumerable<char>, string>>(
+            var failure = new FailureResult<char>(
                 matchTo(
                     matchStr(expected)),
-                itemFrom(actual));
+                Item.fromSeq(actual));
 
             // Assert
             Assert.StartsWith("to ", failure.Label);
@@ -252,10 +268,10 @@ namespace Classier.NET.Compiler
         public void MatchToIsFailureForEmptyString()
         {
             // Act
-            var failure = new FailureResult<char, Tuple<IEnumerable<char>, string>>(
+            var failure = new FailureResult<char>(
                 matchTo(
                     matchStr("not emptyiness")),
-                itemFrom(string.Empty));
+                Item.fromSeq(string.Empty));
 
             // Assert
             Assert.StartsWith("to ", failure.Label);
@@ -269,14 +285,13 @@ namespace Classier.NET.Compiler
         public void MatchToEndIsAlwaysSuccessful(string text)
         {
             // Act
-            var success = new SuccessResult(
-                matchCharSeq(
-                    matchToEnd<char>()),
-                itemFrom(text));
+            var success = new SuccessResult<char>(
+                matchToEnd<char>(),
+                Item.fromSeq(text));
 
             // Assert
+            Assert.False(success.HasItem);
             Assert.Equal(text, success.Result);
-            Assert.Equal(text.Length, success.Item.Index);
         }
 
         [InlineData("crafting", "circles", "mining & crafting", 17)]
@@ -285,13 +300,12 @@ namespace Classier.NET.Compiler
         public void MatchWithoutIsSuccessWhenFilterFails(string expected, string without, string actual, int expectedIndex)
         {
             // Act
-            var success = new SuccessResult(
+            var success = new SuccessResult<char>(
                 matchWithout(
                     matchStr(without),
-                    matchCharSeqAndStr(
-                        matchTo(
-                            matchStr(expected)))),
-                itemFrom(actual));
+                    matchTo(
+                        matchStr(expected))),
+                Item.fromSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -303,13 +317,12 @@ namespace Classier.NET.Compiler
         public void MatchWithoutIsFailureWhenFilterIsSuccess(string expected, string without, string actual)
         {
             // Act
-            var failure = new FailureResult(
+            var failure = new FailureResult<char>(
                 matchWithout(
                     matchStr(without),
-                    matchCharSeqAndStr(
-                        matchTo(
-                            matchStr(expected)))),
-                itemFrom(actual));
+                    matchTo(
+                        matchStr(expected))),
+                Item.fromSeq(actual));
 
             // Assert
             Assert.Contains(" without ", failure.Label);
@@ -322,13 +335,13 @@ namespace Classier.NET.Compiler
         public void MatchCharIsSuccessForMatching(char expected, string text)
         {
             // Act
-            var success = new SuccessResult(
+            var success = new SuccessResult<char>(
                     matchChar(expected),
-                    itemFrom(text));
+                    Item.fromSeq(text));
 
             // Assert
             Assert.Equal(1, success.Item.Index);
-            Assert.Equal(text[0], success.Result[0]);
+            Assert.Equal(text[0], success.Result.First());
         }
 
         [InlineData('a', "ABC")]
@@ -337,9 +350,9 @@ namespace Classier.NET.Compiler
         public void MatchCharIsFailureForIncorrectChar(char expected, string text)
         {
             // Act
-            var failure = new FailureResult(
+            var failure = new FailureResult<char>(
                     matchChar(expected),
-                    itemFrom(text));
+                    Item.fromSeq(text));
 
             // Assert
             Assert.Contains($"Unexpected '{text[0]}'", failure.Message);
@@ -350,9 +363,9 @@ namespace Classier.NET.Compiler
         public void MatchCharIsFailureForEmptyText()
         {
             // Act
-            var failure = new FailureResult(
+            var failure = new FailureResult<char>(
                     matchChar('a'),
-                    itemFrom(string.Empty));
+                    Item.fromSeq(string.Empty));
 
             // Assert
             Assert.Contains("end of", failure.Message);
@@ -365,9 +378,9 @@ namespace Classier.NET.Compiler
         public void MatchStrIsSuccessForMatching(string expected, string text)
         {
             // Act
-            var success = new SuccessResult(
+            var success = new SuccessResult<char>(
                     matchStr(expected),
-                    itemFrom(text));
+                    Item.fromSeq(text));
 
             // Assert
             Assert.Equal(expected.Length, success.Item.Index);
@@ -379,16 +392,13 @@ namespace Classier.NET.Compiler
         [Theory]
         public void MatchStrIsSuccessWhenMatchingEmptyString(string text)
         {
-            // Arrange
-            Item<char> startItem = itemFrom(text);
-
             // Act
-            var success = new SuccessResult(
+            var success = new SuccessResult<char>(
                     matchStr(string.Empty),
-                    startItem);
+                    Item.fromSeq(text));
 
             // Assert
-            Assert.Equal(startItem.Index, success.Item.Index);
+            Assert.Equal(0, success.HasItem ? success.Item.Index : 0);
             Assert.Empty(success.Result);
         }
 
@@ -397,13 +407,10 @@ namespace Classier.NET.Compiler
         [Theory]
         public void MatchStrIsFailureForEndOfText(string expected, string text)
         {
-            // Arrange
-            Item<char> startItem = itemFrom(text);
-
             // Act
-            var failure = new FailureResult(
+            var failure = new FailureResult<char>(
                     matchStr(expected),
-                    startItem);
+                    Item.fromSeq(text));
 
             // Assert
             Assert.Contains("end of the sequence", failure.Message);
@@ -417,13 +424,10 @@ namespace Classier.NET.Compiler
         [Theory]
         public void MatchStrIsFailureForIncorrect(string expected, string text, char badChar)
         {
-            // Arrange
-            Item<char> startItem = itemFrom(text);
-
             // Act
-            var failure = new FailureResult(
+            var failure = new FailureResult<char>(
                     matchStr(expected),
-                    startItem);
+                    Item.fromSeq(text));
 
             // Assert
             Assert.Contains($"Unexpected '{badChar}'", failure.Message);

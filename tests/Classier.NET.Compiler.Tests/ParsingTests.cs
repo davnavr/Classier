@@ -28,6 +28,7 @@ namespace Classier.NET.Compiler
     {
 #pragma warning disable IDE0002 // Name can be simplified
 
+#if false
         [InlineData("I am one line", 1, new[] { 0, 1, 2, 4, 5, 8, 9 })]
         [InlineData("This file\nis licensed\nunder some\nlicense", 4, new[] { 0, 4, 5, 9, 0, 2, 3, 11, 0, 5, 6, 10, 0 })]
         [InlineData("This\nshould\nbe three\n", 3, new[] { 0, 4, 0, 6, 0, 2, 3, 8 })]
@@ -46,6 +47,7 @@ namespace Classier.NET.Compiler
             Assert.Equal(expectedLineCount, parsedTokens.Last().Line + 1);
             Assert.Equal(expectedTokenPositions, parsedTokens.Select(token => token.Pos));
         }
+#endif
 
 #pragma warning restore IDE0002 // Name can be simplified
     }

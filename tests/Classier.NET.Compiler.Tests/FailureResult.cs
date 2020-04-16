@@ -17,6 +17,7 @@
 namespace Classier.NET.Compiler
 {
     using System;
+    using Microsoft.FSharp.Core;
     using static Classier.NET.Compiler.Item;
     using static Classier.NET.Compiler.Matching;
 
@@ -30,7 +31,7 @@ namespace Classier.NET.Compiler
 
         private readonly MatchResult<T> result;
 
-        public FailureResult(MatchFunc<T> func, Item<T> item)
+        public FailureResult(MatchFunc<T> func, FSharpOption<Item<T>> item)
         {
             this.func = func;
             this.result = evaluateMatch(this.func, item);
