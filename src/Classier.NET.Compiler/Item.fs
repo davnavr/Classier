@@ -41,3 +41,17 @@ let toSeq (start: Item<'T> option) =
             Some ((currentItem.Value, currentItem.Index), currentItem.Next.Value)
         | None -> None
     Seq.unfold next start
+
+let selectItems (fromItem: Item<'T>) (toItem: Item<'T> option) =
+    let items = Some fromItem |> toSeq
+    match toItem with
+    | Some endItem ->
+        items
+        |> Seq.takeWhile (fun (_, index) ->
+            index <= endItem.Index)
+    | None ->
+        items
+
+let selectElements (fromItem: Item<'T>) (toItem: Item<'T> option) =
+    selectItems fromItem toItem
+    |> Seq.map (fun (elem, _) -> elem)

@@ -113,11 +113,6 @@ let matchAnyOf items (f: 'Match -> MatchFunc<'T>) =
 let matchMany (f: MatchFunc<'T>): MatchFunc<'T> =
     let manyLabel = sprintf "many %s" f.Label
     Match (manyLabel, fun startItem ->
-        let items f: seq<'T> =
-            Some startItem
-            |> toSeq
-            |> f
-            |> Seq.map (fun (element, _) -> element)
         let endItem =
             Some startItem
             |> Seq.unfold (fun item ->
@@ -131,12 +126,16 @@ let matchMany (f: MatchFunc<'T>): MatchFunc<'T> =
         | Some lastItem ->
             match lastItem with
             | Some _ ->
-                let filter = Seq.takeWhile (fun (_, i) -> i < lastItem.Value.Index)
-                Success (items filter, lastItem);
+                let items =
+                    Item.selectItems startItem lastItem // TODO: Simplify this, should just exclude very last element
+                    |> Seq.takeWhile (fun (_, i) -> i < lastItem.Value.Index)
+                    |> Seq.map (fun (elem, _) -> elem)
+                Success (items, lastItem);
             | None ->
-                Success (items id, lastItem);
+                Success (Item.selectElements startItem lastItem, lastItem);
         | None ->
-            evaluateMatch f (Some startItem))
+            evaluateMatch f (Some startItem)
+            |> labelResult manyLabel)
 
 /// Matches against the specified function, and returns an empty success if the function fails.
 let matchOptional (f: MatchFunc<'T>) =
@@ -164,7 +163,26 @@ let matchChain (matches: seq<MatchFunc<'T>>) =
 let matchTo (f: MatchFunc<'T>): MatchFunc<'T> =
     let toLabel = sprintf "to %s" f.Label
     Match (toLabel, fun startItem ->
-        Failure (toLabel, "NOT IMPLEMENTED"))
+        let lastItem =
+            Some startItem
+            |> Seq.unfold (fun item ->
+                match item with
+                | Some currentItem ->
+                    Some (currentItem, currentItem.Next.Value)
+                | None ->
+                    None)
+            |> Seq.tryPick (fun item ->
+                match evaluateMatch f (Some item) with
+                | Success (_, nextItem) ->
+                    Some nextItem
+                | Failure _ ->
+                    None)
+
+        match lastItem with
+        | Some _ ->
+            Success (Item.selectElements startItem lastItem.Value, lastItem.Value)
+        | None ->
+            evaluateMatch f (Some startItem))
 
 let matchToEnd: MatchFunc<'T> =
     Match ("end", fun item ->
