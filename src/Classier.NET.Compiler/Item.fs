@@ -41,14 +41,3 @@ let toSeq (start: Item<'T> option) =
             Some ((currentItem.Value, currentItem.Index), currentItem.Next.Value)
         | None -> None
     Seq.unfold next start
-
-let toSeqWhile predicate (start: Item<'T> option) =
-    toSeq start
-    |> Seq.takeWhile predicate
-
-/// Returns a sequence ranging from the specified start item to the item with the specified index, inclusive.
-let seqTo (start: Item<'T>) toIndex =
-    if start.Index < toIndex then
-        toSeqWhile (fun (_, index) -> index <= toIndex) (Some start)
-    else
-        Seq.empty

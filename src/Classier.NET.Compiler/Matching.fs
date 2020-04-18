@@ -112,9 +112,31 @@ let matchAnyOf items (f: 'Match -> MatchFunc<'T>) =
 /// Matches one or more of the specified function.
 let matchMany (f: MatchFunc<'T>): MatchFunc<'T> =
     let manyLabel = sprintf "many %s" f.Label
-
-    Match (manyLabel, fun item ->
-        Failure (manyLabel, "Not implemented."))
+    Match (manyLabel, fun startItem ->
+        let items f: seq<'T> =
+            Some startItem
+            |> toSeq
+            |> f
+            |> Seq.map (fun (element, _) -> element)
+        let endItem =
+            Some startItem
+            |> Seq.unfold (fun item ->
+                match evaluateMatch f item with
+                | Success (_, next) ->
+                    Some (next, next)
+                | Failure _ -> None)
+            |> Seq.tryLast
+        
+        match endItem with
+        | Some lastItem ->
+            match lastItem with
+            | Some _ ->
+                let filter = Seq.takeWhile (fun (_, i) -> i < lastItem.Value.Index)
+                Success (items filter, lastItem);
+            | None ->
+                Success (items id, lastItem);
+        | None ->
+            evaluateMatch f (Some startItem))
 
 /// Matches against the specified function, and returns an empty success if the function fails.
 let matchOptional (f: MatchFunc<'T>) =
