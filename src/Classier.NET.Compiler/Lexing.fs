@@ -79,10 +79,29 @@ let tokenizerFrom (definitions: seq<'Definition>) (definitionMap: 'Definition ->
                         token1)
             Some (generator (Some def) chars, nextItem)
 
-    let unknownFrom startItem = invalidOp "Not yet implemented."
+    let unknownFrom startItem: 'Token * Item<char> option * 'Token option =
+        let nextKnown =
+            startItem
+            |> Item.toItemSeq
+            |> Seq.map (fun item ->
+                item, tokenFrom (Some item))
+            |> Seq.tryFind (fun (_, token) -> token.IsSome)
+
+        let defaultResult() =
+            let chars = startItem |> Item.toValSeq
+            generator None chars, None, None
+
+        match nextKnown with
+        | Some (tokenStart, next) ->
+            let (nextToken, nextItem) = next.Value
+            let chars =
+                startItem
+                |> Item.takeVals (tokenStart.Index - startItem.Value.Index)
+            (generator None chars), nextItem, Some nextToken
+        | None ->
+            defaultResult()
 
     Tokenizer (fun chars ->
-
         if Seq.isEmpty definitions then
             generator None chars |> Seq.singleton
         else

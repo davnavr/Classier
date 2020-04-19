@@ -54,19 +54,11 @@ namespace Classier.NET.Compiler
             // Assert
             Assert.Equal(
                 source,
-                tokens.SelectMany(token =>
-                    {
-                        var (_, content) = token;
-                        return content;
-                    }));
+                tokens.SelectMany(token => token.Content));
 
             Assert.Equal(
                 expectedTypes,
-                tokens.Select((token) =>
-                    {
-                        var (type, _) = token;
-                        return type;
-                    }));
+                tokens.Select(token => token.Type));
         }
 
 #pragma warning restore IDE0002 // Name can be simplified

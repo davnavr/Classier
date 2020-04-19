@@ -16,6 +16,8 @@ module rec Classier.NET.Compiler.Grammar
 
 #nowarn "40"
 
+open System
+
 open Classier.NET.Compiler.Lexing
 open Classier.NET.Compiler.Matching
 open Classier.NET.Compiler.Parsing
@@ -107,6 +109,10 @@ type TokenType =
     /// The token is an identifier.
     | Identifier = 110
 
+type Token =
+    { Content: string
+      Type: TokenType }
+
 //let tokenIsNewline (token: Token<TokenType>) = token.Type = TokenType.NewLine
 
 let matchTokenType t = lazy (tokenizerDefs.Item t) |> matchLazy
@@ -159,15 +165,16 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_'] |> matchMany |> matchOptional];
     ] |> Map.ofList
 
-let tokenizer: Tokenizer<TokenType * seq<char>> =
+let tokenizer: Tokenizer<Token> =
     tokenizerFrom
         (tokenizerDefs
         |> Map.toSeq
         |> Seq.filter (fun (t, _) -> t > TokenType.Unknown))
         (fun (_, m) -> m)
         (fun def chars ->
+            let token t = { Content = String.Concat chars; Type = t }
             match def with
-            | Some (t, _) -> t, chars
-            | None -> TokenType.Unknown, chars)
+            | Some (t, _) -> token t
+            | None -> token TokenType.Unknown)
 
 let parser = null
