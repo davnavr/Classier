@@ -54,12 +54,11 @@ namespace Classier.NET.Compiler
             // Assert
             Assert.Equal(
                 source,
-                string.Concat(
-                    tokens.Select(token =>
+                tokens.SelectMany(token =>
                     {
                         var (_, content) = token;
                         return content;
-                    })));
+                    }));
 
             Assert.Equal(
                 expectedTypes,

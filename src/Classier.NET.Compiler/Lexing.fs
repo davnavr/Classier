@@ -46,14 +46,43 @@ let matchStr str =
     |> labelMatch (sprintf "string '%s'" str)
 
 let tokenizerFrom (definitions: seq<'Definition>) (definitionMap: 'Definition -> MatchFunc<char>) (generator: 'Definition option -> seq<char> -> 'Token) =
-    let tokenFrom item =
-        let results = None
+    let tokenDefs =
+        definitions
+        |> Seq.map (fun def -> def, definitionMap def)
 
-        None
+    let tokenFrom item =
+        let results =
+            tokenDefs
+            |> Seq.map (fun (def, f) ->
+                match evaluateMatch f item with
+                | Success (chars, nextItem) ->
+                    Some (def, chars, nextItem)
+                | Failure _ -> None)
+            |> Seq.choose id
+
+        if results |> Seq.isEmpty then
+            None
+        else
+            let (def, chars, nextItem) =
+                results
+                |> Seq.reduce (fun token1 token2 ->
+                    let (_, _, item1) = token1
+                    let (_, _, item2) = token2
+                    match item1 with
+                    | Some _ when item2.IsSome ->
+                        if item1.Value.Index >= item2.Value.Index
+                        then token1
+                        else token2
+                    | Some _ when item2.IsNone ->
+                        token2
+                    | _ ->
+                        token1)
+            Some (generator (Some def) chars, nextItem)
 
     let unknownFrom startItem = invalidOp "Not yet implemented."
 
     Tokenizer (fun chars ->
+
         if Seq.isEmpty definitions then
             generator None chars |> Seq.singleton
         else
@@ -66,7 +95,7 @@ let tokenizerFrom (definitions: seq<'Definition>) (definitionMap: 'Definition ->
                 match next with
                 | None ->
                     match item with
-                    | Some currentItem ->
+                    | Some _ ->
                         match tokenFrom item with
                         | Some (token, nextItem) ->
                             nextVal token nextItem None
