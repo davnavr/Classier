@@ -126,7 +126,7 @@ let matchMany (f: MatchFunc<'T>): MatchFunc<'T> =
         | Some _ ->
             let items =
                 Some startItem
-                |> Item.takeElemsWhile (fun (_, i) ->
+                |> Item.takeValsWhile (fun (_, i) ->
                     match endItem.Value with
                     | Some actualEndItem -> i < actualEndItem.Index
                     | None -> true)
@@ -163,12 +163,7 @@ let matchTo (f: MatchFunc<'T>): MatchFunc<'T> =
     Match (toLabel, fun startItem ->
         let lastItem =
             Some startItem
-            |> Seq.unfold (fun item ->
-                match item with
-                | Some currentItem ->
-                    Some (currentItem, currentItem.Next.Value)
-                | None ->
-                    None)
+            |> Item.toItemSeq
             |> Seq.tryPick (fun item ->
                 match evaluateMatch f (Some item) with
                 | Success (_, nextItem) ->
@@ -178,9 +173,21 @@ let matchTo (f: MatchFunc<'T>): MatchFunc<'T> =
 
         match lastItem with
         | Some _ ->
-            Success (Item.selectElems startItem lastItem.Value, lastItem.Value)
+            let items =
+                match lastItem.Value with
+                | Some actualEndItem ->
+                    Some startItem
+                    |> Item.takeVals actualEndItem.Index
+                | None ->
+                    Some startItem |> Item.toValSeq
+            Success (items, lastItem.Value)
         | None ->
-            evaluateMatch f (Some startItem))
+            Some startItem
+            |> Item.toItemSeq
+            |> Seq.last
+            |> Some
+            |> evaluateMatch f
+            |> labelResult toLabel)
 
 let matchToEnd: MatchFunc<'T> =
     Match ("end", fun item ->

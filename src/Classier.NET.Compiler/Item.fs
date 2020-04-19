@@ -48,28 +48,47 @@ let toElemSeq (start: Item<'T> option) =
     |> Seq.map (fun item ->
         item.Value, item.Index)
 
-/// Returns a sequence containing the values and indices of the items ranging from the starting item to the ending item, inclusive.
+let toValSeq (start: Item<'T> option) =
+    start
+    |> toItemSeq
+    |> Seq.map (fun item -> item.Value)
+
+/// Returns a sequence containing the items ranging from the starting item to the ending item, inclusive.
 let selectItems (fromItem: Item<'T>) (toItem: Item<'T> option) =
-    let items = Some fromItem |> toElemSeq
+    let items = Some fromItem |> toItemSeq
     match toItem with
     | Some endItem ->
         items
-        |> Seq.takeWhile (fun (_, index) ->
-            index <= endItem.Index)
+        |> Seq.takeWhile (fun currentItem ->
+            currentItem.Index <= endItem.Index)
     | None ->
         items
 
-let private mapElems source =
-    source |> Seq.map (fun (elem, _) -> elem)
-
 /// Returns a sequence containing the values of the items ranging from the starting item to the ending item, inclusive.
-let selectElems (fromItem: Item<'T>) (toItem: Item<'T> option) =
+let selectVals (fromItem: Item<'T>) (toItem: Item<'T> option) =
     selectItems fromItem toItem
-    |> mapElems
+    |> Seq.map (fun item -> item.Value)
 
-/// Returns a sequence containing the elements that satisfy the predicate starting from the specified start item.
 let takeElemsWhile predicate (start: Item<'T> option) =
     start
     |> toElemSeq
     |> Seq.takeWhile predicate
-    |> mapElems
+
+let private mapVals source =
+    source |> Seq.map (fun (v, _) -> v)
+
+/// Returns a sequence containing the values that satisfy the predicate starting from the specified start item.
+let takeValsWhile predicate (start: Item<'T> option) =
+    start
+    |> takeElemsWhile predicate
+    |> mapVals
+
+let takeElems count (start: Item<'T> option) =
+    start
+    |> toElemSeq
+    |> Seq.take count
+
+let takeVals count (start: Item<'T> option) =
+    start
+    |> takeElems count
+    |> mapVals

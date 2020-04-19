@@ -210,11 +210,12 @@ namespace Classier.NET.Compiler
             Assert.Contains("until ", failure.Label);
         }
 
-        [InlineData("Data", "[InlineData]", 6, 11)]
-        [InlineData("matchStr", "\n\nmatchStr(expected)", 2, 10)]
-        [InlineData("1", "012345678910", 10, 2)]
+        [InlineData("Data", "[InlineData]", 11)]
+        [InlineData("matchStr", "\n\nmatchStr(expected)", 10)]
+        [InlineData("1", "012345678910", 2)]
+        [InlineData("3", "123-123-123", 3)]
         [Theory]
-        public void MatchToIsSuccessForPartOfStringAndIncludesFinalMatch(string expected, string actual, int skipLength, int expectedIndex)
+        public void MatchToIsSuccessForPartOfStringAndIncludesFinalMatch(string expected, string actual, int expectedIndex)
         {
             // Act
             var success = new SuccessResult<char>(
@@ -224,15 +225,14 @@ namespace Classier.NET.Compiler
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
-            Assert.Equal(actual.Substring(skipLength, expected.Length), success.Result);
+            Assert.Equal(actual.Substring(0, expectedIndex), success.Result);
         }
 
-        [InlineData("nbsp", "nbsp", 0)]
-        [InlineData("z", "abcxyz", 5)]
-        [InlineData("es", "languages", 7)]
-        [InlineData("3", "123-123-123", 10)]
+        [InlineData("nbsp", "nbsp")]
+        [InlineData("z", "abcxyz")]
+        [InlineData("es", "languages")]
         [Theory]
-        public void MatchToIsSuccessForEntireStringAndIncludesFinalMatch(string expected, string actual, int skipLength)
+        public void MatchToIsSuccessForEntireStringAndIncludesFinalMatch(string expected, string actual)
         {
             // Act
             var success = new SuccessResult<char>(
@@ -243,7 +243,6 @@ namespace Classier.NET.Compiler
             // Assert
             Assert.False(success.HasItem);
             Assert.Equal(actual, success.Result);
-            Assert.Equal(actual.Length, skipLength + success.Result.Count());
         }
 
         [InlineData("System", "Xunit.Abstractions", 's')]
