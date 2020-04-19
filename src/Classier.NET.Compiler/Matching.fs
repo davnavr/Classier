@@ -156,31 +156,31 @@ let matchChain (matches: seq<MatchFunc<'T>>) =
         |> Seq.reduce andMatch
         |> labelMatch chainLabel
 
+let private skippedItems (f: MatchFunc<'T>) startItem =
+    Some startItem
+    |> Item.toItemSeq
+    |> Seq.tryPick (fun item ->
+        match evaluateMatch f (Some item) with
+        | Success (_, nextItem) ->
+            Some (item, nextItem)
+        | Failure _ ->
+            None)
+
 /// Skips items in the sequence until the specified function returns a success,
 /// and returns the skipped items along with the result of the function.
 let matchTo (f: MatchFunc<'T>): MatchFunc<'T> =
     let toLabel = sprintf "to %s" f.Label
     Match (toLabel, fun startItem ->
-        let lastItem =
-            Some startItem
-            |> Item.toItemSeq
-            |> Seq.tryPick (fun item ->
-                match evaluateMatch f (Some item) with
-                | Success (_, nextItem) ->
-                    Some nextItem
-                | Failure _ ->
-                    None)
-
-        match lastItem with
-        | Some _ ->
+        match skippedItems f startItem with
+        | Some (_, lastItem) ->
             let items =
-                match lastItem.Value with
-                | Some actualEndItem ->
+                match lastItem with
+                | Some _ ->
                     Some startItem
-                    |> Item.takeVals actualEndItem.Index
+                    |> Item.takeVals (lastItem.Value.Index - startItem.Index)
                 | None ->
                     Some startItem |> Item.toValSeq
-            Success (items, lastItem.Value)
+            Success (items, lastItem)
         | None ->
             Some startItem
             |> Item.toItemSeq
@@ -189,15 +189,25 @@ let matchTo (f: MatchFunc<'T>): MatchFunc<'T> =
             |> evaluateMatch f
             |> labelResult toLabel)
 
+/// Returns the remaining items in the sequence.
 let matchToEnd: MatchFunc<'T> =
     Match ("end", fun item ->
-        Failure ("end", "NOT IMPLEMENTED"))
+        Success (Some item |> Item.toValSeq, None))
 
 /// Skips items in the sequence until the specified function returns a success, and returns the skipped items.
 let matchUntil (f: MatchFunc<'T>): MatchFunc<'T> =
     let untilLabel = sprintf "until %s" f.Label
-    Match (untilLabel, fun item ->
-        Failure (untilLabel, "NOT IMPLEMENTED"))
+    Match (untilLabel, fun startItem ->
+        match skippedItems f startItem with
+        | Some (lastItem, _) ->
+            let items =
+                Some startItem
+                |> Item.takeVals (lastItem.Index - startItem.Index)
+            Success (items, Some lastItem)
+        | None ->
+            Some startItem
+            |> evaluateMatch f
+            |> labelResult untilLabel)
 
 /// Matches against the first function, then matches with the specfiied filter function.
 /// If the filter function fails or has a success outside of the range of the first result,
@@ -205,7 +215,28 @@ let matchUntil (f: MatchFunc<'T>): MatchFunc<'T> =
 let matchWithout (filter: MatchFunc<'T>) (f: MatchFunc<'T>): MatchFunc<'T> =
     let withoutLabel = sprintf "%s without %s" f.Label filter.Label
     Match (withoutLabel, fun startItem ->
-        Failure (withoutLabel, "NOT IMPLEMENTED"))
+        let firstResult =
+            Some startItem
+            |> evaluateMatch f
+            |> labelResult withoutLabel
+
+        match firstResult with
+        | Success (_, lastItem) ->
+            let filterMatch =
+                Some startItem
+                |> evaluateMatch (matchUntil filter)
+            let fail = Failure (withoutLabel, sprintf "Unexpected %s." filter.Label)
+
+            match filterMatch with
+            | Success (_, item) ->
+                match lastItem with
+                | Some actualLastItem when (item.IsSome && item.Value.Index > actualLastItem.Index) ->
+                    firstResult
+                | _ ->
+                    fail
+            | Failure _ ->
+                firstResult
+        | Failure _ -> firstResult)
 
 /// Lazily evaluates the given matching function.
 let matchLazy (f: Lazy<MatchFunc<'T>>) =

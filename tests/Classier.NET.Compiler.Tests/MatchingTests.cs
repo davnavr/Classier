@@ -179,10 +179,10 @@ namespace Classier.NET.Compiler
             Assert.Equal(actual.Substring(success.Result.Count(), untilStr.Length), untilStr);
         }
 
-        [InlineData("indented", "\t\t\tindented")]
-        [InlineData("end", "if true then print('wow') end")]
+        [InlineData("indented", "\t\t\tindented", 3)]
+        [InlineData("end", "if true then print('wow') end", 26)]
         [Theory]
-        public void MatchUntilIsSuccessForEntireStringAndExcludesFinalMatch(string untilStr, string actual)
+        public void MatchUntilIsSuccessForEntireStringAndExcludesFinalMatch(string untilStr, string actual, int expectedIndex)
         {
             // Act
             var success = new SuccessResult<char>(
@@ -191,7 +191,7 @@ namespace Classier.NET.Compiler
                 Item.fromSeq(actual));
 
             // Assert
-            Assert.False(success.HasItem);
+            Assert.Equal(expectedIndex, success.Item.Index);
             Assert.EndsWith(untilStr, actual);
         }
 
@@ -277,7 +277,6 @@ namespace Classier.NET.Compiler
 
         [InlineData("To the end of the road.")]
         [InlineData("am I success?")]
-        [InlineData("")]
         [Theory]
         public void MatchToEndIsAlwaysSuccessful(string text)
         {
@@ -291,21 +290,21 @@ namespace Classier.NET.Compiler
             Assert.Equal(text, success.Result);
         }
 
-        [InlineData("crafting", "circles", "mining & crafting", 17)]
-        [InlineData("no", " ", "hasnospaces", 5)]
+        [InlineData("circles", "mining & crafting")]
+        [InlineData(" ", "hasnospaces")]
         [Theory]
-        public void MatchWithoutIsSuccessWhenFilterFails(string expected, string without, string actual, int expectedIndex)
+        public void MatchWithoutIsSuccessWhenFilterFails(string without, string actual)
         {
             // Act
             var success = new SuccessResult<char>(
                 matchWithout(
                     matchStr(without),
-                    matchTo(
-                        matchStr(expected))),
+                    matchStr(actual)),
                 Item.fromSeq(actual));
 
             // Assert
-            Assert.Equal(expectedIndex, success.Item.Index);
+            Assert.False(success.HasItem);
+            Assert.Equal(actual, success.Result);
         }
 
         [InlineData("has_tabs", "\t", "should\tnot_has_tabs")]
