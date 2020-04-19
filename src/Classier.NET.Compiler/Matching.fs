@@ -123,16 +123,14 @@ let matchMany (f: MatchFunc<'T>): MatchFunc<'T> =
             |> Seq.tryLast
         
         match endItem with
-        | Some lastItem ->
-            match lastItem with
-            | Some _ ->
-                let items =
-                    Item.selectItems startItem lastItem // TODO: Simplify this, should just exclude very last element
-                    |> Seq.takeWhile (fun (_, i) -> i < lastItem.Value.Index)
-                    |> Seq.map (fun (elem, _) -> elem)
-                Success (items, lastItem);
-            | None ->
-                Success (Item.selectElements startItem lastItem, lastItem);
+        | Some _ ->
+            let items =
+                Some startItem
+                |> Item.takeElemsWhile (fun (_, i) ->
+                    match endItem.Value with
+                    | Some actualEndItem -> i < actualEndItem.Index
+                    | None -> true)
+            Success (items, endItem.Value);
         | None ->
             evaluateMatch f (Some startItem)
             |> labelResult manyLabel)
@@ -180,7 +178,7 @@ let matchTo (f: MatchFunc<'T>): MatchFunc<'T> =
 
         match lastItem with
         | Some _ ->
-            Success (Item.selectElements startItem lastItem.Value, lastItem.Value)
+            Success (Item.selectElems startItem lastItem.Value, lastItem.Value)
         | None ->
             evaluateMatch f (Some startItem))
 

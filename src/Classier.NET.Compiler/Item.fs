@@ -33,17 +33,24 @@ let fromSeq (source: seq<'T>): Item<'T> option =
             None
     next 0
 
-/// Returns a sequence ranging from the specified start item to the last item.
-let toSeq (start: Item<'T> option) =
+let toItemSeq (start: Item<'T> option) =
     let next (item: Item<'T> option) =
         match item with
         | Some currentItem ->
-            Some ((currentItem.Value, currentItem.Index), currentItem.Next.Value)
+            Some (currentItem, currentItem.Next.Value)
         | None -> None
     Seq.unfold next start
 
+/// Returns a sequence ranging from the specified start item to the last item containing the elements and their corresponding indices.
+let toElemSeq (start: Item<'T> option) =
+    start
+    |> toItemSeq
+    |> Seq.map (fun item ->
+        item.Value, item.Index)
+
+/// Returns a sequence containing the values and indices of the items ranging from the starting item to the ending item, inclusive.
 let selectItems (fromItem: Item<'T>) (toItem: Item<'T> option) =
-    let items = Some fromItem |> toSeq
+    let items = Some fromItem |> toElemSeq
     match toItem with
     | Some endItem ->
         items
@@ -52,6 +59,17 @@ let selectItems (fromItem: Item<'T>) (toItem: Item<'T> option) =
     | None ->
         items
 
-let selectElements (fromItem: Item<'T>) (toItem: Item<'T> option) =
+let private mapElems source =
+    source |> Seq.map (fun (elem, _) -> elem)
+
+/// Returns a sequence containing the values of the items ranging from the starting item to the ending item, inclusive.
+let selectElems (fromItem: Item<'T>) (toItem: Item<'T> option) =
     selectItems fromItem toItem
-    |> Seq.map (fun (elem, _) -> elem)
+    |> mapElems
+
+/// Returns a sequence containing the elements that satisfy the predicate starting from the specified start item.
+let takeElemsWhile predicate (start: Item<'T> option) =
+    start
+    |> toElemSeq
+    |> Seq.takeWhile predicate
+    |> mapElems
