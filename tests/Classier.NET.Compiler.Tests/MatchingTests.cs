@@ -36,7 +36,7 @@ namespace Classier.NET.Compiler
             // Act
             var failure = new FailureResult<char>(
                     matchAnyOf(matches, func),
-                    Item.fromSeq(text));
+                    Item.ofSeq(text));
 
             // Assert
             Assert.Contains(matches[matches.Length - 1], failure.Label);
@@ -51,7 +51,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchMany(
                     matchStr(expected)),
-                Item.fromSeq(text));
+                Item.ofSeq(text));
 
             // Assert
             Assert.Equal(expected.Length * repeatCount, success.Item.Index);
@@ -70,7 +70,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchMany(
                     matchStr(expected)),
-                Item.fromSeq(text));
+                Item.ofSeq(text));
 
             // Assert
             Assert.False(success.HasItem);
@@ -88,7 +88,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchOptional(
                     matchStr(expected)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -103,7 +103,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchOptional(
                     matchStr(expected)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.False(success.HasItem);
@@ -121,7 +121,7 @@ namespace Classier.NET.Compiler
                 matchChain(
                     expected
                     .Select(str => matchStr(str))),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -138,7 +138,7 @@ namespace Classier.NET.Compiler
                 matchChain(
                     expected
                     .Select(str => matchStr(str))),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.False(success.HasItem);
@@ -155,7 +155,7 @@ namespace Classier.NET.Compiler
                 matchChain(
                     expected
                     .Select(str => matchStr(str))),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.Contains($"'{badChar}'", failure.Message);
@@ -172,7 +172,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchUntil(
                     matchStr(untilStr)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -188,7 +188,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchUntil(
                     matchStr(untilStr)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -204,7 +204,7 @@ namespace Classier.NET.Compiler
             var failure = new FailureResult<char>(
                 matchUntil(
                     matchStr(expected)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.Contains("until ", failure.Label);
@@ -221,7 +221,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchTo(
                     matchStr(expected)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.Equal(expectedIndex, success.Item.Index);
@@ -238,7 +238,7 @@ namespace Classier.NET.Compiler
             var success = new SuccessResult<char>(
                 matchTo(
                     matchStr(expected)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.False(success.HasItem);
@@ -254,7 +254,7 @@ namespace Classier.NET.Compiler
             var failure = new FailureResult<char>(
                 matchTo(
                     matchStr(expected)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.StartsWith("to ", failure.Label);
@@ -268,7 +268,7 @@ namespace Classier.NET.Compiler
             var failure = new FailureResult<char>(
                 matchTo(
                     matchStr("not emptyiness")),
-                Item.fromSeq(string.Empty));
+                Item.ofSeq(string.Empty));
 
             // Assert
             Assert.StartsWith("to ", failure.Label);
@@ -283,7 +283,7 @@ namespace Classier.NET.Compiler
             // Act
             var success = new SuccessResult<char>(
                 matchToEnd<char>(),
-                Item.fromSeq(text));
+                Item.ofSeq(text));
 
             // Assert
             Assert.False(success.HasItem);
@@ -300,7 +300,7 @@ namespace Classier.NET.Compiler
                 matchWithout(
                     matchStr(without),
                     matchStr(actual)),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.False(success.HasItem);
@@ -318,7 +318,7 @@ namespace Classier.NET.Compiler
                     matchStr(without),
                     matchTo(
                         matchStr(expected))),
-                Item.fromSeq(actual));
+                Item.ofSeq(actual));
 
             // Assert
             Assert.Contains(" without ", failure.Label);
@@ -333,7 +333,7 @@ namespace Classier.NET.Compiler
             // Act
             var success = new SuccessResult<char>(
                     matchChar(expected),
-                    Item.fromSeq(text));
+                    Item.ofSeq(text));
 
             // Assert
             Assert.Equal(1, success.Item.Index);
@@ -348,7 +348,7 @@ namespace Classier.NET.Compiler
             // Act
             var failure = new FailureResult<char>(
                     matchChar(expected),
-                    Item.fromSeq(text));
+                    Item.ofSeq(text));
 
             // Assert
             Assert.Contains($"Unexpected '{text[0]}'", failure.Message);
@@ -361,7 +361,7 @@ namespace Classier.NET.Compiler
             // Act
             var failure = new FailureResult<char>(
                     matchChar('a'),
-                    Item.fromSeq(string.Empty));
+                    Item.ofSeq(string.Empty));
 
             // Assert
             Assert.Contains("end of", failure.Message);
@@ -375,7 +375,7 @@ namespace Classier.NET.Compiler
             // Act
             var success = new SuccessResult<char>(
                     matchStr(expected),
-                    Item.fromSeq(text));
+                    Item.ofSeq(text));
 
             // Assert
             Assert.False(success.HasItem);
@@ -390,7 +390,7 @@ namespace Classier.NET.Compiler
             // Act
             var success = new SuccessResult<char>(
                     matchStr(expected),
-                    Item.fromSeq(text));
+                    Item.ofSeq(text));
 
             // Assert
             Assert.Equal(expected.Length, success.Item.Index);
@@ -405,7 +405,7 @@ namespace Classier.NET.Compiler
             // Act
             var success = new SuccessResult<char>(
                     matchStr(string.Empty),
-                    Item.fromSeq(text));
+                    Item.ofSeq(text));
 
             // Assert
             Assert.Equal(0, success.HasItem ? success.Item.Index : 0);
@@ -420,7 +420,7 @@ namespace Classier.NET.Compiler
             // Act
             var failure = new FailureResult<char>(
                     matchStr(expected),
-                    Item.fromSeq(text));
+                    Item.ofSeq(text));
 
             // Assert
             Assert.Contains("end of the sequence", failure.Message);
@@ -437,7 +437,7 @@ namespace Classier.NET.Compiler
             // Act
             var failure = new FailureResult<char>(
                     matchStr(expected),
-                    Item.fromSeq(text));
+                    Item.ofSeq(text));
 
             // Assert
             Assert.Contains($"Unexpected '{badChar}'", failure.Message);

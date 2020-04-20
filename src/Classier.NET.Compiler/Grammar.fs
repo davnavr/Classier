@@ -111,9 +111,10 @@ type TokenType =
 
 type Token =
     { Content: string
-      Type: TokenType }
-
-//let tokenIsNewline (token: Token<TokenType>) = token.Type = TokenType.NewLine
+      Type: TokenType
+      /// The zero-based number indicating the line that this token is on.
+      LineNum: int
+      LinePos: int}
 
 let matchTokenType t = lazy (tokenizerDefs.Item t) |> matchLazy
 
@@ -166,15 +167,24 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
     ] |> Map.ofList
 
 let tokenizer: Tokenizer<Token> =
-    tokenizerFrom
+    Lexing.ofDefinitions
         (tokenizerDefs
         |> Map.toSeq
         |> Seq.filter (fun (t, _) -> t > TokenType.Unknown))
         (fun (_, m) -> m)
         (fun def chars ->
-            let token t = { Content = String.Concat chars; Type = t }
             match def with
-            | Some (t, _) -> token t
-            | None -> token TokenType.Unknown)
+            | Some (t, _) -> t, chars
+            | None -> TokenType.Unknown, chars)
+    |> Lexing.mapScan (fun (newline, line, pos) (tokenType, tokenChars) ->
+        let (nextLine, nextPos) =
+            if newline
+            then line + 1, 0
+            else line, pos
+        let content = tokenChars |> Seq.toArray |> String
+        let nextToken = { Type = tokenType; Content = content; LineNum = nextLine; LinePos = nextPos }
+        let nextLineInfo = tokenType = TokenType.NewLine, nextLine, nextPos + content.Length
+        nextToken, nextLineInfo)
+        (true, -1, 0)
 
 let parser = null

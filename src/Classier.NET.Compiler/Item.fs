@@ -21,7 +21,7 @@ type Item<'T> =
       Next: Lazy<Item<'T> option> }
 
 /// Returns an item containing the first element of the specified sequence.
-let fromSeq (source: seq<'T>): Item<'T> option =
+let ofSeq (source: seq<'T>): Item<'T> option =
     let enumerator = source.GetEnumerator()
     let rec next index =
         if enumerator.MoveNext() then

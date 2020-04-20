@@ -45,7 +45,7 @@ let matchStr str =
     |> matchChain
     |> labelMatch (sprintf "string '%s'" str)
 
-let tokenizerFrom (definitions: seq<'Definition>) (definitionMap: 'Definition -> MatchFunc<char>) (generator: 'Definition option -> seq<char> -> 'Token) =
+let ofDefinitions (definitions: seq<'Definition>) (definitionMap: 'Definition -> MatchFunc<char>) (generator: 'Definition option -> seq<char> -> 'Token) =
     let tokenDefs =
         definitions
         |> Seq.map (fun def -> def, definitionMap def)
@@ -105,7 +105,7 @@ let tokenizerFrom (definitions: seq<'Definition>) (definitionMap: 'Definition ->
         if Seq.isEmpty definitions then
             generator None chars |> Seq.singleton
         else
-            (Item.fromSeq chars, None)
+            (Item.ofSeq chars, None)
             |> Seq.unfold (fun (item, next: 'Token option) ->
                 let nextVal token nextItem nextToken =
                     Some (token, (nextItem, nextToken))
@@ -125,6 +125,29 @@ let tokenizerFrom (definitions: seq<'Definition>) (definitionMap: 'Definition ->
                 | Some token ->
                     nextVal token item None))
 
+/// Turns a sequence of characters into a sequence of tokens.
 let tokenize (tokenizer: Tokenizer<'Token>) chars =
     let (Tokenizer tokenizeFunc) = tokenizer
     tokenizeFunc chars
+
+let map (mapper: 'Token1 -> 'Token2) tokenizer =
+    Tokenizer (fun chars ->
+        tokenize tokenizer chars
+        |> Seq.map mapper)
+
+let zip (tokenizer1: Tokenizer<'Token1>) (tokenizer2: Tokenizer<'Token2>) =
+    Tokenizer (fun chars ->
+        tokenize tokenizer1 chars
+        |> Seq.zip (tokenize tokenizer2 chars))
+
+let scan folder (state: 'State) (tokenizer: Tokenizer<'Token>) =
+    Tokenizer (fun chars ->
+        tokenize tokenizer chars
+        |> Seq.scan folder state)
+
+let mapScan (mapper: 'State -> 'Token1 -> 'Token2 * 'State) state tokenizer =
+    Tokenizer (fun chars ->
+        let (tokens, _) =
+            tokenize tokenizer chars
+            |> Seq.mapFold mapper state
+        tokens)
