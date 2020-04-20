@@ -57,6 +57,19 @@ namespace Classier.NET.Compiler
             Assert.Equal(expectedLineCount - 1, tokens.Last().LineNum);
         }
 
+        [InlineData("zero based\nindex", 0, 0, 0, 4, 0, 5, 0, 10, 1, 0)]
+        [InlineData("\r\ndo\r\nyou\r\ngit\r\nit", 0, 0, 1, 0, 1, 2, 2, 0, 2, 3, 3, 0, 3, 3, 4, 0)]
+        [InlineData("  \t// sharpness\u0085\uFFFF \uEEEE", 0, 0, 0, 3, 0, 15, 1, 0, 1, 1, 1, 2)]
+        [Theory]
+        public void TokensHaveCorrectLineInfo(string source, params int[] lineInfo)
+        {
+            // Act
+            var tokens = tokenize(Grammar.tokenizer, source);
+
+            // Assert
+            Assert.Equal(tokens.SelectMany(token => new[] { token.LineNum, token.LinePos }), lineInfo);
+        }
+
 #pragma warning restore IDE0002 // Name can be simplified
     }
 }
