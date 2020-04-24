@@ -18,11 +18,12 @@ module rec Classier.NET.Compiler.Grammar
 
 open System
 
+open Classier.NET.Compiler.Item
 open Classier.NET.Compiler.Lexing
 open Classier.NET.Compiler.Matching
 open Classier.NET.Compiler.Parsing
+open Classier.NET.Compiler.Parsing.Node
 
-/// Indicates the type of a token.
 type TokenType =
     | ``a-fA-F0-9`` = -3
     /// Matches any character of the English alphabet, regardless of case.
@@ -114,7 +115,25 @@ type Token =
       Type: TokenType
       /// The zero-based number indicating the line that this token is on.
       LineNum: int
-      LinePos: int}
+      LinePos: int }
+
+type NodeType =
+    /// Indicates that the node contains unexpected tokens.
+    | Skipped
+    | Block
+    | ClassDef
+    | Comment
+    | CtorDef
+    | Expression
+    | FieldDef
+    | Identifier of seq<string>
+    /// Represents an integer literal.
+    | IntLit of int
+    | MethodCall
+    | MethodDef
+    | Statement
+    | UseStatement
+    | Whitespace
 
 let matchTokenType t = lazy (tokenizerDefs.Item t) |> matchLazy
 
@@ -187,4 +206,25 @@ let tokenizer: Tokenizer<Token> =
         nextToken, nextLineInfo)
         (true, -1, 0)
 
-let parser = null
+let parser: Parser<Token, NodeType> =
+    Parser (fun tokens ->
+        let matchToken t =
+            (fun token -> token.Type = t)
+            |> matchPredicate (string t)
+
+        let parseWhitespace item =
+            matchToken TokenType.Whitespace
+            |> matchMany
+            |> nextResult item
+
+        let parseIdentifier item =
+            andMatch (matchToken TokenType.Identifier)
+            <| (matchChainOf [ TokenType.Period; TokenType.Identifier ] matchToken |> matchOptional)
+            |> nextResult item
+
+        tokens
+        |> Item.ofSeq
+        |> Seq.unfold (fun item ->
+            match item with
+            | None -> None)
+        invalidOp "Not implemented")

@@ -19,3 +19,13 @@ open System
 
 open Classier.NET.Compiler.Lexing
 open Classier.NET.Compiler.Matching
+
+module Node =
+    type Node<'Token, 'Value> =
+        { Nodes: seq<Node<'Token, 'Value>>
+          Tokens: seq<'Token>
+          Value: 'Value }
+
+open Node
+
+type Parser<'Token, 'Value> = Parser of (seq<'Token> -> Node<'Token, 'Value>)

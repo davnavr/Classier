@@ -34,13 +34,17 @@ let isSuccess (result: MatchResult<'T>) =
     | Failure _ -> false
 
 /// Returns the result of matching the specified item against the specified matching function.
-let evaluateMatch (f: MatchFunc<'T>) item =
+let evaluateMatch (Match (label, f): MatchFunc<'T>) item =
     match item with
     | Some actualItem ->
-        let (Match (_, matchFunc)) = f
-        matchFunc(actualItem)
+        f actualItem
     | None ->
-        Failure (f.Label, "The end of the sequence was unexpectedly reached.")
+        Failure (label, "The end of the sequence was unexpectedly reached.")
+
+let nextResult item (f: MatchFunc<'T>) =
+    match evaluateMatch f item with
+    | Success (values, nextItem) -> nextItem, Some values
+    | Failure _ -> item, None
 
 /// Changes the label of the specified result.
 let labelResult label (result: MatchResult<'T>) =
@@ -106,8 +110,8 @@ let matchAny (matches: seq<MatchFunc<'T>>) =
         | Some result -> result
         | None -> results |> Seq.last)
 
-let matchAnyOf items (f: 'Match -> MatchFunc<'T>) =
-    items |> Seq.map f |> matchAny
+let matchAnyOf items (mapper: 'Match -> MatchFunc<'T>) =
+    items |> Seq.map mapper |> matchAny
 
 /// Matches one or more of the specified function.
 let matchMany (f: MatchFunc<'T>): MatchFunc<'T> =
@@ -156,6 +160,11 @@ let matchChain (matches: seq<MatchFunc<'T>>) =
         |> Seq.reduce andMatch
         |> labelMatch chainLabel
 
+let matchChainOf items (mapper: 'Match -> MatchFunc<'T>) =
+    items
+    |> Seq.map mapper
+    |> matchChain
+
 let private skippedItems (f: MatchFunc<'T>) startItem =
     Some startItem
     |> Item.toItemSeq
@@ -195,7 +204,7 @@ let matchToEnd: MatchFunc<'T> =
         Success (Some item |> Item.toValSeq, None))
 
 /// Skips items in the sequence until the specified function returns a success, and returns the skipped items.
-let matchUntil (f: MatchFunc<'T>): MatchFunc<'T> =
+let matchUntil (f: MatchFunc<'T>): MatchFunc<'T> = // TODO: matchMany of some inverted function instead?
     let untilLabel = sprintf "until %s" f.Label
     Match (untilLabel, fun startItem ->
         match skippedItems f startItem with

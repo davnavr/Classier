@@ -126,9 +126,8 @@ let ofDefinitions (definitions: seq<'Definition>) (definitionMap: 'Definition ->
                     nextVal token item None))
 
 /// Turns a sequence of characters into a sequence of tokens.
-let tokenize (tokenizer: Tokenizer<'Token>) chars =
-    let (Tokenizer tokenizeFunc) = tokenizer
-    tokenizeFunc chars
+let tokenize (Tokenizer tokenizer: Tokenizer<'Token>) chars =
+    tokenizer chars
 
 let map (mapper: 'Token1 -> 'Token2) tokenizer =
     Tokenizer (fun chars ->
