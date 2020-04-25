@@ -41,11 +41,6 @@ let evaluateMatch (Match (label, f): MatchFunc<'T>) item =
     | None ->
         Failure (label, "The end of the sequence was unexpectedly reached.")
 
-let nextResult item (f: MatchFunc<'T>) =
-    match evaluateMatch f item with
-    | Success (values, nextItem) -> nextItem, Some values
-    | Failure _ -> item, None
-
 /// Changes the label of the specified result.
 let labelResult label (result: MatchResult<'T>) =
     match result with

@@ -19,9 +19,10 @@ namespace Classier.NET.Compiler
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using Microsoft.FSharp.Core;
     using Xunit;
-    using static Classier.NET.Compiler.Lexing;
     using static Classier.NET.Compiler.Matching;
+    using static Classier.NET.Compiler.Tokenizer;
 
     public class MatchingTests
     {
@@ -30,12 +31,11 @@ namespace Classier.NET.Compiler
         [Theory]
         public void MatchAnyOfFailsWithLastResult(string[] matches, string text)
         {
-            // Arrange
-            var func = new InteropFunc<string, MatchFunc<char>>(matchStr);
-
             // Act
             var failure = new FailureResult<char>(
-                    matchAnyOf(matches, func),
+                    matchAnyOf(
+                        matches,
+                        FuncConvert.FromFunc<string, MatchFunc<char>>(matchStr)),
                     Item.ofSeq(text));
 
             // Assert

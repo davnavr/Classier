@@ -21,11 +21,11 @@ namespace Classier.NET.Compiler
     using System.Linq;
     using Xunit;
     using static Classier.NET.Compiler.Grammar;
-    using static Classier.NET.Compiler.Lexing;
     using static Classier.NET.Compiler.Matching;
-    using static Classier.NET.Compiler.Parsing;
+    using static Classier.NET.Compiler.ParserTests;
+    using static Classier.NET.Compiler.Tokenizer;
 
-    public class LexingTests
+    public class TokenizerTests
     {
 #pragma warning disable IDE0002 // Name can be simplified
 

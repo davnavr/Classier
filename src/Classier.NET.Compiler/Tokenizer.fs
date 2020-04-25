@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /// Contains types and functions for turning a sequence of characters into a sequence of tokens.
-module Classier.NET.Compiler.Lexing
+module Classier.NET.Compiler.Tokenizer
 
 open System
 

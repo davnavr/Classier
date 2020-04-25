@@ -17,22 +17,32 @@
 namespace Classier.NET.Compiler
 {
     using System;
+    using System.Linq;
     using Microsoft.FSharp.Core;
+    using Xunit;
+    using static Classier.NET.Compiler.Matching;
+    using static Classier.NET.Compiler.Parser;
+    using static Classier.NET.Compiler.Tokenizer;
 
-    /// <summary>
-    /// Used to convert a <see cref="Func{TResult, T}"/> to a <see cref="FSharpFunc{T, TResult}"/>.
-    /// </summary>
-    /// <typeparam name="T">The type of the argument.</typeparam>
-    /// <typeparam name="TResult">The type of the return value.</typeparam>
-    internal sealed class InteropFunc<T, TResult> : FSharpFunc<T, TResult>
+    public class ParserTests
     {
-        private readonly Func<T, TResult> func;
+        [InlineData(@"
+public class MyClass {
 
-        public InteropFunc(Func<T, TResult> func)
+}
+")]
+        [Theory]
+        public void NodeContentMatchesOriginalInput(string input)
         {
-            this.func = func;
-        }
+            // Act
+            var node = parse(
+                Grammar.parser,
+                tokenize(
+                    Grammar.tokenizer,
+                    input));
 
-        public override TResult Invoke(T func) => this.func.Invoke(func);
+            // Assert
+            Assert.Equal(input, Node.toString(FuncConvert.FromFunc<Grammar.Token, string>(token => token.Content), node));
+        }
     }
 }

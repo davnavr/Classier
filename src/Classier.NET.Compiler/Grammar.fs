@@ -19,10 +19,10 @@ module rec Classier.NET.Compiler.Grammar
 open System
 
 open Classier.NET.Compiler.Item
-open Classier.NET.Compiler.Lexing
+open Classier.NET.Compiler.Tokenizer
 open Classier.NET.Compiler.Matching
-open Classier.NET.Compiler.Parsing
-open Classier.NET.Compiler.Parsing.Node
+open Classier.NET.Compiler.Parser
+open Classier.NET.Compiler.Node
 
 type TokenType =
     | ``a-fA-F0-9`` = -3
@@ -186,7 +186,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
     ] |> Map.ofList
 
 let tokenizer: Tokenizer<Token> =
-    Lexing.ofDefinitions
+    Tokenizer.ofDefinitions
         (tokenizerDefs
         |> Map.toSeq
         |> Seq.filter (fun (t, _) -> t > TokenType.Unknown))
@@ -195,7 +195,7 @@ let tokenizer: Tokenizer<Token> =
             match def with
             | Some (t, _) -> t, chars
             | None -> TokenType.Unknown, chars)
-    |> Lexing.mapScan (fun (newline, line, pos) (tokenType, tokenChars) ->
+    |> Tokenizer.mapScan (fun (newline, line, pos) (tokenType, tokenChars) ->
         let (nextLine, nextPos) =
             if newline
             then line + 1, 0
@@ -212,15 +212,10 @@ let parser: Parser<Token, NodeType> =
             (fun token -> token.Type = t)
             |> matchPredicate (string t)
 
-        let parseWhitespace item =
-            matchToken TokenType.Whitespace
-            |> matchMany
-            |> nextResult item
+        let matchWhitespace item = matchToken TokenType.Whitespace |> matchMany
 
-        let parseIdentifier item =
-            andMatch (matchToken TokenType.Identifier)
-            <| (matchChainOf [ TokenType.Period; TokenType.Identifier ] matchToken |> matchOptional)
-            |> nextResult item
+        let matchIdentifier item =
+            andMatch (matchToken TokenType.Identifier) (matchChainOf [ TokenType.Period; TokenType.Identifier ] matchToken |> matchOptional)
 
         tokens
         |> Item.ofSeq

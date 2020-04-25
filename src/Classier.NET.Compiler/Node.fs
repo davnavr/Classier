@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2020 David Navarro
+﻿// Copyright (c) 2020 NAME HERE
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Turns tokens into a concrete syntax tree.
-module Classier.NET.Compiler.Parsing
+module Classier.NET.Compiler.Node
 
 open System
 
-open Classier.NET.Compiler.Lexing
+open Classier.NET.Compiler.Item
+open Classier.NET.Compiler.Tokenizer
 open Classier.NET.Compiler.Matching
 
-module Node =
-    type Node<'Token, 'Value> =
-        { Nodes: seq<Node<'Token, 'Value>>
-          Tokens: seq<'Token>
-          Value: 'Value }
+type Node<'Token, 'Value> =
+    { Nodes: seq<Node<'Token, 'Value>>
+      Tokens: seq<'Token>
+      Value: 'Value }
 
-open Node
+type NodeParser<'Token> = Item<'Token> option -> Item<'Token> option * seq<'Token> option
 
-type Parser<'Token, 'Value> = Parser of (seq<'Token> -> Node<'Token, 'Value>)
+let toString (contentMap: 'Token -> string) (node: Node<'Token, 'Value>) =
+    node.Tokens
+    |> Seq.map contentMap
+    |> String.Concat
