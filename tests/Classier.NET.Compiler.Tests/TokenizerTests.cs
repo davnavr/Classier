@@ -20,7 +20,7 @@ namespace Classier.NET.Compiler
     using System.Collections.Generic;
     using System.Linq;
     using Xunit;
-    using static Classier.NET.Compiler.Grammar;
+    using static Classier.NET.Compiler.Grammar.Lexical;
     using static Classier.NET.Compiler.Matching;
     using static Classier.NET.Compiler.ParserTests;
     using static Classier.NET.Compiler.Tokenizer;
@@ -49,7 +49,7 @@ namespace Classier.NET.Compiler
         public void TokensFromStringAreValid(string source, int expectedLineCount, params TokenType[] expectedTypes)
         {
             // Act
-            var tokens = tokenize(Grammar.tokenizer, source);
+            var tokens = tokenize(tokenizer, source);
 
             // Assert
             Assert.Equal(source, tokens.SelectMany(token => token.Content));
@@ -64,7 +64,7 @@ namespace Classier.NET.Compiler
         public void TokensHaveCorrectLineInfo(string source, params int[] lineInfo)
         {
             // Act
-            var tokens = tokenize(Grammar.tokenizer, source);
+            var tokens = tokenize(tokenizer, source);
 
             // Assert
             Assert.Equal(tokens.SelectMany(token => new[] { token.LineNum, token.LinePos }), lineInfo);

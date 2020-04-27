@@ -20,6 +20,8 @@ namespace Classier.NET.Compiler
     using System.Linq;
     using Microsoft.FSharp.Core;
     using Xunit;
+    using static Classier.NET.Compiler.Grammar.Lexical;
+    using static Classier.NET.Compiler.Grammar.Syntactic;
     using static Classier.NET.Compiler.Matching;
     using static Classier.NET.Compiler.Parser;
     using static Classier.NET.Compiler.Tokenizer;
@@ -36,13 +38,13 @@ public class MyClass {
         {
             // Act
             var node = parse(
-                Grammar.parser,
+                parser,
                 tokenize(
-                    Grammar.tokenizer,
+                    tokenizer,
                     input));
 
             // Assert
-            Assert.Equal(input, Node.toString(FuncConvert.FromFunc<Grammar.Token, string>(token => token.Content), node));
+            Assert.Equal(input, Node.toString(FuncConvert.FromFunc<Token, string>(token => token.Content), node.Item1, node.Item2));
         }
     }
 }

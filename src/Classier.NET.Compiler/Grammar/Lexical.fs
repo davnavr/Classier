@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module rec Classier.NET.Compiler.Grammar
+/// Contains the lexical grammar and tokenizer for the language.
+module Classier.NET.Compiler.Grammar.Lexical
 
 #nowarn "40"
 
 open System
 
-open Classier.NET.Compiler.Item
+open Classier.NET.Compiler
 open Classier.NET.Compiler.Tokenizer
 open Classier.NET.Compiler.Matching
-open Classier.NET.Compiler.Parser
-open Classier.NET.Compiler.Node
 
 type TokenType =
     | ``a-fA-F0-9`` = -3
@@ -117,29 +116,9 @@ type Token =
       LineNum: int
       LinePos: int }
 
-[<RequireQualifiedAccessAttribute>]
-type NodeType =
-    | CompilationUnit
-    /// Indicates that the node contains unexpected tokens.
-    | Skipped
-    | Block
-    | ClassDef
-    | Comment
-    | CtorDef
-    | Expression
-    | FieldDef
-    | Identifier of seq<string>
-    /// Represents an integer literal.
-    | IntLit of int
-    | MethodCall
-    | MethodDef
-    | Statement
-    | UseStatement
-    | Whitespace
-
-let matchTokenType t = lazy (tokenizerDefs.Item t) |> matchLazy
-
-let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
+let rec tokenizerDefs: Map<TokenType, MatchFunc<char>> =
+    (fun () ->
+    let matchTokenType t = lazy (tokenizerDefs.Item t) |> matchLazy
     [
         TokenType.``a-fA-F0-9``, matchAny [matchTokenType TokenType.``0-9``; matchCharRange ('a', 'f'); matchCharRange ('A', 'F')];
         TokenType.``a-zA-Z``, matchCharRange ('A', 'Z') |> orMatch <| matchCharRange ('a', 'z');
@@ -185,7 +164,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.NewLine, matchAnyOf ["\r\n"; "\r"; "\n"; "\u0085"; "\u2028"; "\u2029"] matchStr;
         
         TokenType.Identifier, matchChain [matchTokenType TokenType.``a-zA-Z``; matchAny [matchTokenType TokenType.``a-zA-Z``; matchTokenType TokenType.``0-9``; matchChar '_'] |> matchMany |> matchOptional];
-    ] |> Map.ofList
+    ] |> Map.ofList)()
 
 let tokenizer: Tokenizer<Token> =
     Tokenizer.ofDefinitions
@@ -207,43 +186,3 @@ let tokenizer: Tokenizer<Token> =
         let nextLineInfo = tokenType = TokenType.NewLine, nextLine, nextPos + content.Length
         nextToken, nextLineInfo)
         (true, -1, 0)
-
-let parser: Parser<Token, NodeType> =
-    Parser (fun tokens ->
-        let matchToken t =
-            (fun token -> token.Type = t)
-            |> matchPredicate (string t)
-
-        let nodeType t _ = t
-
-        let parseWhitespace =
-            matchToken TokenType.Whitespace
-            |> matchMany
-            |> parserOfMatch (nodeType NodeType.Whitespace) None
-
-        let parseMLComment =
-            andMatch (matchToken TokenType.MLCommentStart) (matchToken TokenType.MLCommentEnd |> matchTo)
-            |> parserOfMatch (nodeType NodeType.Comment) None
-
-        let parseIdentifier: NodeParser<Token, NodeType> =
-            let identifier tokens =
-                tokens
-                |> Seq.choose (function
-                    | idtoken when idtoken.Type = TokenType.Identifier ->
-                        Some idtoken.Content
-                    | _ -> None)
-                |> NodeType.Identifier
-
-            andMatch (matchToken TokenType.Identifier) (matchChainOf [ TokenType.Period; TokenType.Identifier ] matchToken |> matchOptional)
-            |> parserOfMatch identifier None
-
-        // TODO: Need to chain them together, so parseWhitespace first, then parseMLComment if the previous failed, and so on.
-
-        let nodes =
-            (Item.ofSeq tokens, None)
-            |> Seq.unfold (fun (item, unknown) ->
-                match item with
-                | Some _ ->
-                    None
-                | None -> None)
-        { Nodes = nodes; Tokens = tokens; Value = NodeType.CompilationUnit })

@@ -28,7 +28,8 @@
     <Compile Include="Tokenizer.fs" />
     <Compile Include="Node.fs" />
     <Compile Include="Parser.fs" />
-    <Compile Include="Grammar.fs" />
+    <Compile Include="Grammar\Lexical.fs" />
+    <Compile Include="Grammar\Syntactic.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

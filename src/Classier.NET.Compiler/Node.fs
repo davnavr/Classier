@@ -20,16 +20,13 @@ open Classier.NET.Compiler.Item
 open Classier.NET.Compiler.Tokenizer
 open Classier.NET.Compiler.Matching
 
-type Node<'Token, 'Value> =
-    { Nodes: seq<Node<'Token, 'Value>>
-      Tokens: seq<'Token>
-      Value: 'Value }
+type Node<'Token, 'Value> = seq<'Token> * 'Value
 
 type NodeParser<'Token, 'Value> =
     NodeParser of (Item<'Token> option -> Item<'Token> option * Node<'Token, 'Value> option)
 
-let toString (contentMap: 'Token -> string) (node: Node<'Token, 'Value>) =
-    node.Tokens
+let toString (contentMap: 'Token -> string) ((tokens, _): Node<'Token, 'Value>) =
+    tokens
     |> Seq.map contentMap
     |> String.Concat
 
@@ -42,7 +39,7 @@ let parserOfMatch (value: seq<'Token> -> 'Value) (childNodes: (Item<'Token> -> s
                 | Some nodeGen -> nodeGen item.Value
                 | None -> Seq.empty
 
-            nextItem, Some ({ Nodes = children; Tokens = tokens; Value = value tokens })
+            nextItem, Some (tokens, value tokens)
         | Failure _ ->
             item, None)
 

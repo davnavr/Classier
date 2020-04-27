@@ -22,6 +22,6 @@ open Classier.NET.Compiler.Tokenizer
 open Classier.NET.Compiler.Matching
 open Classier.NET.Compiler.Node
 
-type Parser<'Token, 'Value> = Parser of (seq<'Token> -> Node<'Token, 'Value>)
+type Parser<'Token, 'Node> = Parser of (seq<'Token> -> Node<'Token, 'Node>)
 
 let parse (Parser parser: Parser<'Token, 'Value>) tokens = parser tokens
