@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2020 NAME HERE
+﻿// Copyright (c) 2020 David Navarro
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,14 +19,15 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Lexical
 open Classier.NET.Compiler.Node
+open Classier.NET.Compiler.Matching
 open Classier.NET.Compiler.Parser
 
 type Node =
     /// Contains the imported namespaces and the nodes in the source file.
-    | CompilationUnit of seq<Identifier> * seq<Node>
+    | CompilationUnit of {| Namespaces: seq<Identifier>; TypeDef: Node<Token, Node> |} * seq<Node<Token, Node>>
     /// Indicates that the node contains unexpected tokens.
     | Skipped
-    | Block of seq<Node>
+    | Block of seq<Node<Token, Node>>
     | ClassDef
     | Comment of string
     | CtorDef
@@ -35,20 +36,48 @@ type Node =
     | Identifier of Identifier
     /// Represents an integer literal of a specified kind (decimal/hexadecimal/binary).
     | IntLit of int * TokenType
-    | Newline
     | MethodCall of Identifier
-    | MethodDef of Identifier
+    | MethodDef of Identifier * seq<Parameter>
+    | Newline
+    | ParamDef of Parameter
     | Statement // of Expression
+    | UseStatement of Identifier
     | Whitespace
+
+    member this.Nodes =
+        match this with
+        | CompilationUnit (_, nodes) -> nodes
+        | Block (nodes) -> nodes
+        | _ -> Seq.empty
+
 and Identifier = seq<string>
+and Parameter = Identifier * Identifier
 
 let parser: Parser<Token, Node> =
-    Parser (fun tokens -> 
+    Parser (fun tokens ->
+        let matchTokenType t =
+            (fun token -> token.Type = t)
+            |> matchPredicate (string t)
+
+        let nodeType t _ = t
+        
+        let parseWhitespace =
+            matchTokenType TokenType.Whitespace
+            |> matchMany
+            |> parserOfMatch (nodeType Node.Whitespace) None
+
+        /// The main parsing function.
+        let entryPoint = null
         let nodes =
-            (Item.ofSeq tokens, None)
-            |> Seq.unfold (fun (item, unknown) -> // TODO: Have parser function be included in state tuple?
+            (Item.ofSeq tokens, None, entryPoint)
+            |> Seq.unfold (fun (item, unknown, pfunc) -> // TODO: Have parser function be included in state tuple?
                 match item with
                 | Some _ ->
                     None
                 | None -> None)
-        invalidOp "Not implemented")
+            |> Seq.cache
+
+        let ns = seq { invalidOp "Not implemented" }
+        let typeDef = Seq.empty, Skipped
+
+        tokens, CompilationUnit ({| Namespaces = ns; TypeDef = typeDef |}, nodes))

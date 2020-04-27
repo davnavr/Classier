@@ -16,13 +16,9 @@
 
 namespace Classier.NET.Compiler
 {
-    using System;
-    using System.Collections.Generic;
     using System.Linq;
     using Xunit;
     using static Classier.NET.Compiler.Grammar.Lexical;
-    using static Classier.NET.Compiler.Matching;
-    using static Classier.NET.Compiler.ParserTests;
     using static Classier.NET.Compiler.Tokenizer;
 
     public class TokenizerTests

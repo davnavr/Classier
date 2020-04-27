@@ -49,12 +49,10 @@ type TokenType =
     | WrdClass = 24
     /// The token is a keyword that indicates the declaration of a field or local variable.
     | WrdLet = 25
-    /// The token is a keyword that indicates the declaration of a namespace.
-    | WrdNamespace = 26
     /// The token is a keyword that allows the use of types without their fully qualified names.
-    | WrdUse = 27
+    | WrdUse = 26
     /// The token is a modifier.
-    | Modifier = 28
+    | Modifier = 27
 
     /// The token is a plus sign.
     | AddOp = 40
@@ -133,7 +131,6 @@ let rec tokenizerDefs: Map<TokenType, MatchFunc<char>> =
         TokenType.AccProtected, matchStr "protected";
         TokenType.WrdClass, matchStr "class";
         TokenType.WrdLet, matchStr "let";
-        TokenType.WrdNamespace, matchStr "namespace";
         TokenType.WrdUse, matchStr "use";
         TokenType.Modifier, matchAnyOf ["extends"; "implements"; "mutable"; "virtual"] matchStr;
 
