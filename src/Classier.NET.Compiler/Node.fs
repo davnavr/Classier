@@ -25,9 +25,35 @@ type Node<'Token, 'Value> =
       Tokens: seq<'Token>
       Value: 'Value }
 
-type NodeParser<'Token> = Item<'Token> option -> Item<'Token> option * seq<'Token> option
+type NodeParser<'Token, 'Value> =
+    NodeParser of (Item<'Token> option -> Item<'Token> option * Node<'Token, 'Value> option)
 
 let toString (contentMap: 'Token -> string) (node: Node<'Token, 'Value>) =
     node.Tokens
     |> Seq.map contentMap
     |> String.Concat
+
+let parserOfMatch (value: seq<'Token> -> 'Value) (childNodes: (Item<'Token> -> seq<Node<'Token, 'Value>>) option) (f: MatchFunc<'Token>) =
+    NodeParser (fun item ->
+        match evaluateMatch f item with
+        | Success (tokens, nextItem) ->
+            let children =
+                match childNodes with
+                | Some nodeGen -> nodeGen item.Value
+                | None -> Seq.empty
+
+            nextItem, Some ({ Nodes = children; Tokens = tokens; Value = value tokens })
+        | Failure _ ->
+            item, None)
+
+let parseNode item (NodeParser parser: NodeParser<'Token, 'Value>) = parser(item)
+
+let parseAny item (parsers: seq<NodeParser<'Token, 'Value>>) =
+    let node =
+        parsers
+        |> Seq.map (parseNode item)
+        |> Seq.tryFind (fun (_, node) -> node.IsSome)
+
+    match node with
+    | Some actualNode -> actualNode
+    | None -> item, None

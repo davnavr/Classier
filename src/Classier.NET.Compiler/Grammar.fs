@@ -44,8 +44,8 @@ type TokenType =
     | AccPublic = 21
     /// The token is an access modifier restricting access to the current library.
     | AccInternal = 22
-    /// The token is an access modifier restricting access to the containing type.
-    | AccPrivate = 23
+    /// The token is an access modifier restricting access to the containing type and its subclasses.
+    | AccProtected = 23
     /// The token is a keyword that indicates the declaration of a class.
     | WrdClass = 24
     /// The token is a keyword that indicates the declaration of a field or local variable.
@@ -117,7 +117,9 @@ type Token =
       LineNum: int
       LinePos: int }
 
+[<RequireQualifiedAccessAttribute>]
 type NodeType =
+    | CompilationUnit
     /// Indicates that the node contains unexpected tokens.
     | Skipped
     | Block
@@ -149,7 +151,7 @@ let tokenizerDefs: Map<TokenType, MatchFunc<char>> =
 
         TokenType.AccPublic, matchStr "public";
         TokenType.AccInternal, matchStr "internal";
-        TokenType.AccPrivate, matchStr "private";
+        TokenType.AccProtected, matchStr "protected";
         TokenType.WrdClass, matchStr "class";
         TokenType.WrdLet, matchStr "let";
         TokenType.WrdNamespace, matchStr "namespace";
@@ -212,14 +214,36 @@ let parser: Parser<Token, NodeType> =
             (fun token -> token.Type = t)
             |> matchPredicate (string t)
 
-        let matchWhitespace item = matchToken TokenType.Whitespace |> matchMany
+        let nodeType t _ = t
 
-        let matchIdentifier item =
+        let parseWhitespace =
+            matchToken TokenType.Whitespace
+            |> matchMany
+            |> parserOfMatch (nodeType NodeType.Whitespace) None
+
+        let parseMLComment =
+            andMatch (matchToken TokenType.MLCommentStart) (matchToken TokenType.MLCommentEnd |> matchTo)
+            |> parserOfMatch (nodeType NodeType.Comment) None
+
+        let parseIdentifier: NodeParser<Token, NodeType> =
+            let identifier tokens =
+                tokens
+                |> Seq.choose (function
+                    | idtoken when idtoken.Type = TokenType.Identifier ->
+                        Some idtoken.Content
+                    | _ -> None)
+                |> NodeType.Identifier
+
             andMatch (matchToken TokenType.Identifier) (matchChainOf [ TokenType.Period; TokenType.Identifier ] matchToken |> matchOptional)
+            |> parserOfMatch identifier None
 
-        tokens
-        |> Item.ofSeq
-        |> Seq.unfold (fun item ->
-            match item with
-            | None -> None)
-        invalidOp "Not implemented")
+        // TODO: Need to chain them together, so parseWhitespace first, then parseMLComment if the previous failed, and so on.
+
+        let nodes =
+            (Item.ofSeq tokens, None)
+            |> Seq.unfold (fun (item, unknown) ->
+                match item with
+                | Some _ ->
+                    None
+                | None -> None)
+        { Nodes = nodes; Tokens = tokens; Value = NodeType.CompilationUnit })

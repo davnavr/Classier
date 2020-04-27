@@ -35,7 +35,7 @@ namespace Classier.NET.Compiler
         [InlineData("/*\u0001*/", 1, TokenType.MLCommentStart, TokenType.Unknown, TokenType.MLCommentEnd)]
         [InlineData("myVariable.myMethod(true)", 1, TokenType.Identifier, TokenType.Period, TokenType.Identifier, TokenType.LeftParen, TokenType.TrueLit, TokenType.RightParen)]
         [InlineData("0B010101-0XFFAB", 1, TokenType.BinLit, TokenType.SubOp, TokenType.HexLit)]
-        [InlineData("private\r\nclass", 2, TokenType.AccPrivate, TokenType.NewLine, TokenType.WrdClass)]
+        [InlineData("protected\r\nclass", 2, TokenType.AccProtected, TokenType.NewLine, TokenType.WrdClass)]
         [InlineData("one\r\n\r\ntwo\n\nthree", 5, TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier, TokenType.NewLine, TokenType.NewLine, TokenType.Identifier)]
         [InlineData("\u0085\u0002\u0003\u0004extends", 2, TokenType.NewLine, TokenType.Unknown, TokenType.Modifier)]
         [InlineData("let myVar=\"string cheese is ok\"", 1, TokenType.WrdLet, TokenType.Whitespace, TokenType.Identifier, TokenType.EqOp, TokenType.StrLit)]
