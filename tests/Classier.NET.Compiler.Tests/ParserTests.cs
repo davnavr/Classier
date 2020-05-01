@@ -67,5 +67,20 @@ public class Test1 { }",
             // Assert
             Assert.Equal(namespaces, compilationUnit.Item1.Namespaces.Select(ns => string.Join('.', ns)));
         }
+
+        [InlineData("  \n  ")]
+        [Theory]
+        public void ParserProducesNodeContainingOtherNodes(string input)
+        {
+            // Act
+            var node = parse(
+                parser,
+                tokenize(
+                    tokenizer,
+                    input)).Item2;
+
+            // Assert
+            Assert.NotEmpty(node.Nodes);
+        }
     }
 }

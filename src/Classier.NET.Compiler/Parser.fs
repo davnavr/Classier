@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /// Turns tokens into a concrete syntax tree.
-module Classier.NET.Compiler.Parser // TODO: Have different modules for abstract and concrete?
+module Classier.NET.Compiler.Parser
 
 open System
 
@@ -22,6 +22,6 @@ open Classier.NET.Compiler.Tokenizer
 open Classier.NET.Compiler.Matching
 open Classier.NET.Compiler.Node
 
-type Parser<'Token, 'Node> = Parser of (seq<'Token> -> Node<'Token, 'Node>)
+type Parser<'Token, 'Value> = Parser of (seq<'Token> -> Node<'Token, 'Value>)
 
 let parse (Parser parser: Parser<'Token, 'Value>) tokens = parser tokens

@@ -23,34 +23,28 @@ open Classier.NET.Compiler.Matching
 type Node<'Token, 'Value> = seq<'Token> * 'Value
 
 type NodeParser<'Token, 'Value> =
-    NodeParser of (Item<'Token> option -> Item<'Token> option * Node<'Token, 'Value> option)
+    NodeParser of (Item<'Token> option -> (Node<'Token, 'Value>) option * Item<'Token> option)
 
-let toString (contentMap: 'Token -> string) ((tokens, _): Node<'Token, 'Value>) =
+let toString contentMap ((tokens, _): Node<'Token, 'Value>) =
     tokens
     |> Seq.map contentMap
     |> String.Concat
 
-let parserOfMatch (value: seq<'Token> -> 'Value) (childNodes: (Item<'Token> -> seq<Node<'Token, 'Value>>) option) (f: MatchFunc<'Token>) =
-    NodeParser (fun item ->
-        match evaluateMatch f item with
+let parseNode item (NodeParser parser: NodeParser<'Token, 'Value>) = parser item
+
+let parserOfMatch (value: seq<'Token> -> 'Value) (tokenParser: MatchFunc<'Token>) =
+    NodeParser (fun startItem ->
+        match evaluateMatch tokenParser startItem with
         | Success (tokens, nextItem) ->
-            let children =
-                match childNodes with
-                | Some nodeGen -> nodeGen item.Value
-                | None -> Seq.empty
+            Some (tokens, value tokens), nextItem
+        | _ -> None, startItem)
 
-            nextItem, Some (tokens, value tokens)
-        | Failure _ ->
-            item, None)
-
-let parseNode item (NodeParser parser: NodeParser<'Token, 'Value>) = parser(item)
-
-let parseAny item (parsers: seq<NodeParser<'Token, 'Value>>) =
-    let node =
-        parsers
-        |> Seq.map (parseNode item)
-        |> Seq.tryFind (fun (_, node) -> node.IsSome)
-
-    match node with
-    | Some actualNode -> actualNode
-    | None -> item, None
+let parseAny (parsers: seq<NodeParser<'Token, 'Value>>) =
+    NodeParser (fun startItem ->
+        let node =
+            parsers
+            |> Seq.map (parseNode startItem)
+            |> Seq.tryFind (fun (node, _) -> node.IsSome)
+        match node with
+        | Some (actualNode, nextItem) -> actualNode, nextItem
+        | None -> None, startItem)

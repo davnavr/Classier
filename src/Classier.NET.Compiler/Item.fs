@@ -92,3 +92,8 @@ let takeVals count (start: Item<'T> option) =
     start
     |> takeElems count
     |> mapVals
+
+let tryNext (item: Item<'T> option) =
+    match item with
+    | Some actualItem -> actualItem.Next.Value
+    | _ -> None
