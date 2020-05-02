@@ -30,8 +30,10 @@ let toString contentMap ((tokens, _): Node<'Token, 'Value>) =
     |> Seq.map contentMap
     |> String.Concat
 
+[<ObsoleteAttribute>]
 let parseNode item (NodeParser parser: NodeParser<'Token, 'Value>) = parser item
 
+[<ObsoleteAttribute>]
 let parserOfMatch (value: seq<'Token> -> 'Value) (tokenParser: MatchFunc<'Token>) =
     NodeParser (fun startItem ->
         match evaluateMatch tokenParser startItem with
@@ -39,6 +41,15 @@ let parserOfMatch (value: seq<'Token> -> 'Value) (tokenParser: MatchFunc<'Token>
             Some (tokens, value tokens), nextItem
         | _ -> None, startItem)
 
+[<ObsoleteAttribute>]
+let orParse parser2 (parser1: NodeParser<'Token, 'Value>) =
+    NodeParser (fun startItem ->
+        let (node, nextItem) = parseNode startItem parser1
+        match node with
+        | Some _ -> node, nextItem
+        | _ -> parseNode startItem parser2)
+
+[<ObsoleteAttribute>]
 let parseAny (parsers: seq<NodeParser<'Token, 'Value>>) =
     NodeParser (fun startItem ->
         let node =

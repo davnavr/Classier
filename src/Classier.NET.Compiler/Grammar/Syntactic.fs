@@ -15,6 +15,9 @@
 /// Contains the parser for the language that transforms tokens into a concrete syntax tree.
 module Classier.NET.Compiler.Grammar.Syntactic
 
+open System
+open System.Collections.Generic
+
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Lexical
@@ -25,11 +28,11 @@ open Classier.NET.Compiler.Parser
 [<RequireQualifiedAccess>]
 type Node =
     /// Contains the imported namespaces and the nodes in the source file.
-    | CompilationUnit of {| Namespaces: seq<Identifier>; TypeDef: CSTNode |} * seq<CSTNode>
+    | CompilationUnit of {| Namespaces: seq<Identifier>; TypeDef: CSTNode |} * seq<CSTNode> // TODO: Is CSTNode necessary?
     /// Indicates that the node contains unexpected tokens.
     | Skipped
     | Block of seq<CSTNode>
-    | ClassDef
+    | ClassDef of seq<CSTNode>
     | Comment of string
     | CtorDef
     | Expression
@@ -39,10 +42,10 @@ type Node =
     | IntLit of int * TokenType
     | MethodCall of Identifier // * seq<Expression>
     | MethodDef of Identifier * seq<Parameter>
-    | Newline
+    | NewLine
     | ParamDef of Parameter
     | Statement // of Expression
-    | UseStatement of Identifier
+    | UseStatement of Identifier * seq<CSTNode>
     | Whitespace
 
     member this.Nodes =
@@ -57,42 +60,30 @@ and Parameter = { Type: Identifier; Name: Identifier }
 
 let parser: Parser<Token, Node> =
     Parser (fun tokens ->
-        let matchTokenType t =
-            (fun (token: Token) -> token.Type = t)
-            |> matchPredicate (string t)
-
-        let nodeType t _ = t
-
-        let parseNewline =
-            matchTokenType TokenType.NewLine
-            |> parserOfMatch (nodeType Node.Newline)
-        
-        let parseWhitespace =
-            matchTokenType TokenType.Whitespace
-            |> matchMany
-            |> parserOfMatch (nodeType Node.Whitespace)
-
-        let parseIdentifier =
-            matchTokenType TokenType.Identifier
-
-        /// The main parsing function.
-        let entryPoint =
-            parseAny [ parseNewline; parseWhitespace ]
+        let takeTokensOfType t start =
+            start
+            |> Item.takeValsWhile (fun (token: Token, _) -> token.Type = t)
 
         let nodes =
-            (Item.ofSeq tokens, None, entryPoint)
-            |> Seq.unfold (fun (item, unknown, parser) ->
-                match item with
-                | Some _ ->
-                    let (node, nextItem) = parseNode item parser
-                    match node with
-                    | Some _ ->
-                        Some (node.Value, (nextItem, None, parser))
-                    | _ -> None // TODO: Add handling for unknowns
-                | None -> None)
-            |> Seq.cache
+            seq {
+                let startItem = Item.ofSeq tokens
+                let mutable currentItem = startItem
 
-        let ns = seq { invalidOp "Not implemented" }
+                while currentItem.IsSome do
+                    let currentToken = currentItem.Value.Value
+                    match currentToken.Type with
+                    | TokenType.Whitespace ->
+                        yield
+                            currentItem
+                            |> takeTokensOfType TokenType.Whitespace,
+                            Node.Whitespace
+                    | TokenType.NewLine ->
+                        yield Seq.singleton currentToken, Node.NewLine
+                    | TokenType.Identifier -> invalidOp "Cannot parse identifiers yet"
+                    | _ -> ()
+            }
+
+        let ns = Seq.empty
         let typeDef = Seq.empty, Node.Skipped
 
         tokens, Node.CompilationUnit ({| Namespaces = ns; TypeDef = typeDef |}, nodes))
