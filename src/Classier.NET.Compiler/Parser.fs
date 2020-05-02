@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2020 David Navarro
+﻿// Copyright (c) 2020 NAME HERE
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Turns tokens into a concrete syntax tree.
 module Classier.NET.Compiler.Parser
 
-open System
+open FParsec
 
-open Classier.NET.Compiler.Item
-open Classier.NET.Compiler.Tokenizer
-open Classier.NET.Compiler.Matching
-open Classier.NET.Compiler.Node
+open Classier.NET.Compiler.Grammar
 
-type Parser<'Token, 'Value> = Parser of (seq<'Token> -> Node<'Token, 'Value>)
+let parseString str name =
+    runParserOnString parser ParseState.Default name str
 
-let parse (Parser parser: Parser<'Token, 'Value>) tokens = parser tokens
+let parseStream stream name encoding =
+    runParserOnStream parser ParseState.Default name stream encoding

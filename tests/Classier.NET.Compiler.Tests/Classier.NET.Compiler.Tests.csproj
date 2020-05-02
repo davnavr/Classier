@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
   Copyright (c) 2020 David Navarro
 
@@ -26,6 +26,11 @@
   <!-- References -->
   <ItemGroup>
     <ProjectReference Include="$(RootDirectory)/src/$(RootNamespace)/$(RootNamespace).fsproj" />
+  </ItemGroup>
+
+  <!-- Test files -->
+  <ItemGroup>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)/source/*.txt" />
   </ItemGroup>
 
 </Project>

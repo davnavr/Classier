@@ -14,48 +14,28 @@
 
 module Classier.NET.Compiler.Node
 
-open System
+/// Contains the zero-based line number and line position.
+type LineInfo =
+    { LineNum: int
+      LinePos: int }
+    with
+        static member Default = { LineNum = 0; LinePos = 0; }
+        static member (+) (info, pos) =
+            { LineNum = info.LineNum
+              LinePos = info.LinePos + pos }
 
-open Classier.NET.Compiler.Item
-open Classier.NET.Compiler.Tokenizer
-open Classier.NET.Compiler.Matching
+        member this.NextLine =
+            { LineNum = this.LineNum + 1
+              LinePos = 0 }
 
-type Node<'Token, 'Value> = seq<'Token> * 'Value
+type Node<'Value> =
+    { Children: seq<Node<'Value>>
+      Content: string
+      Position: LineInfo
+      Value: 'Value }
 
-type NodeParser<'Token, 'Value> =
-    NodeParser of (Item<'Token> option -> (Node<'Token, 'Value>) option * Item<'Token> option)
-
-let toString contentMap ((tokens, _): Node<'Token, 'Value>) =
-    tokens
-    |> Seq.map contentMap
-    |> String.Concat
-
-[<ObsoleteAttribute>]
-let parseNode item (NodeParser parser: NodeParser<'Token, 'Value>) = parser item
-
-[<ObsoleteAttribute>]
-let parserOfMatch (value: seq<'Token> -> 'Value) (tokenParser: MatchFunc<'Token>) =
-    NodeParser (fun startItem ->
-        match evaluateMatch tokenParser startItem with
-        | Success (tokens, nextItem) ->
-            Some (tokens, value tokens), nextItem
-        | _ -> None, startItem)
-
-[<ObsoleteAttribute>]
-let orParse parser2 (parser1: NodeParser<'Token, 'Value>) =
-    NodeParser (fun startItem ->
-        let (node, nextItem) = parseNode startItem parser1
-        match node with
-        | Some _ -> node, nextItem
-        | _ -> parseNode startItem parser2)
-
-[<ObsoleteAttribute>]
-let parseAny (parsers: seq<NodeParser<'Token, 'Value>>) =
-    NodeParser (fun startItem ->
-        let node =
-            parsers
-            |> Seq.map (parseNode startItem)
-            |> Seq.tryFind (fun (node, _) -> node.IsSome)
-        match node with
-        | Some (actualNode, nextItem) -> actualNode, nextItem
-        | None -> None, startItem)
+let terminal content value pos: Node<'Value> =
+    { Children = Seq.empty
+      Content = content
+      Position = pos
+      Value = value }

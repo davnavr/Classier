@@ -18,69 +18,11 @@ namespace Classier.NET.Compiler
 {
     using System;
     using System.Linq;
-    using Classier.NET.Compiler.Grammar;
     using Microsoft.FSharp.Core;
     using Xunit;
-    using static Classier.NET.Compiler.Grammar.Lexical;
-    using static Classier.NET.Compiler.Grammar.Syntactic;
-    using static Classier.NET.Compiler.Matching;
-    using static Classier.NET.Compiler.Parser;
-    using static Classier.NET.Compiler.Tokenizer;
+    using static Classier.NET.Compiler.Grammar;
 
     public class ParserTests
     {
-        [InlineData(@"
-public class MyClass {
-}
-")]
-        [Theory]
-        public void NodeContentMatchesOriginalInput(string input)
-        {
-            // Act
-            var (tokens, _) = parse(
-                parser,
-                tokenize(
-                    tokenizer,
-                    input));
-
-            // Assert
-            Assert.Equal(input, tokens.SelectMany(token => token.Content));
-        }
-
-        [InlineData(
-@"use blah.blah.blah
-use System.Collections.Generic
-
-public class Test1 { }",
-"blah.blah.blah",
-"System.Collections.Generic")]
-        [Theory]
-        public void CompilationUnitIncludesUsedNamespaces(string input, params string[] namespaces)
-        {
-            // Act
-            var compilationUnit = (Syntactic.Node.CompilationUnit)parse(
-                parser,
-                tokenize(
-                    tokenizer,
-                    input)).Item2;
-
-            // Assert
-            Assert.Equal(namespaces, compilationUnit.Item1.Namespaces.Select(ns => string.Join('.', ns)));
-        }
-
-        [InlineData("  \n  ")]
-        [Theory]
-        public void ParserProducesNodeContainingOtherNodes(string input)
-        {
-            // Act
-            var node = parse(
-                parser,
-                tokenize(
-                    tokenizer,
-                    input)).Item2;
-
-            // Assert
-            Assert.NotEmpty(node.Nodes);
-        }
     }
 }

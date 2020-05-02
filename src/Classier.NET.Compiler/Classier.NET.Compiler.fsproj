@@ -22,15 +22,17 @@
     <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
 
+  <!-- Source files -->
   <ItemGroup>
-    <Compile Include="Item.fs" />
-    <Compile Include="Matching.fs" />
-    <Compile Include="Tokenizer.fs" />
     <Compile Include="Node.fs" />
+    <Compile Include="Grammar.fs" />
     <Compile Include="Parser.fs" />
-    <Compile Include="Grammar\Lexical.fs" />
-    <Compile Include="Grammar\Syntactic.fs" />
     <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <!-- References -->
+  <ItemGroup>
+    <PackageReference Include="FParsec" Version="1.1.1" />
   </ItemGroup>
 
 </Project>
