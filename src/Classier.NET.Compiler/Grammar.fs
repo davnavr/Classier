@@ -27,23 +27,12 @@ type NodeValue =
     | Whitespace
 and Identifier = seq<string>
 
-type ParseState = // TODO: Get rid of this? We can track position info using the given CharStream.State object, and can use anyChar when parsing multiline comments.
-    { InComment: bool
-      Position: LineInfo }
-    with
-        static member Default = { InComment = false; Position = LineInfo.Default }
-
-let parser: Parser<Node<NodeValue>, ParseState> =
-    let updatePos oldState (str: string) =
-        { InComment = oldState.InComment
-          Position = oldState.Position + str.Length }
-
-    let parseNode (node: ParseState -> 'Result -> ParseState * Node<NodeValue>) (parser: Parser<'Result, ParseState>) stream =
+let parser: Parser<Node<NodeValue>, unit> =
+    let parseNode (node: LineInfo -> 'Result -> Node<NodeValue>) (parser: Parser<'Result, unit>) stream =
         let reply = parser stream
         match reply.Status with
         | Ok ->
-            let (newState, newNode) = node stream.UserState reply.Result
-            stream.UserState <- newState
+            let newNode = node (LineInfo (stream.Position.Line, stream.Position.Index)) reply.Result
             Reply (Ok, newNode, reply.Error)
         | _ ->
             Reply (reply.Status, reply.Error)
@@ -51,22 +40,19 @@ let parser: Parser<Node<NodeValue>, ParseState> =
     let pwhitespace =
         anyOf [ ' '; '\t' ]
         |> many1Chars
-        |> parseNode (fun oldState str ->
-            let newState = updatePos oldState str
-            newState, Node.terminal str Whitespace newState.Position)
+        |> parseNode (fun pos str ->
+            Node.terminal str Whitespace (pos.Advance str.Length))
 
     let pnewline =
         unicodeNewline
-        |> parseNode (fun oldState c ->
-            let newState = { InComment = oldState.InComment; Position = oldState.Position.NextLine }
-            newState, Node.terminal (string c) Newline newState.Position)
+        |> parseNode (fun pos c ->
+            Node.terminal (string c) Newline (pos.Advance 1))
 
     let pslcomment =
         pstring "//" .>>. restOfLine false
-        |> parseNode (fun oldState (str1, str2) ->
+        |> parseNode (fun pos (str1, str2) ->
             let content = str1 + str2
-            let newState = updatePos oldState content
-            newState, Node.terminal content Comment newState.Position)
+            Node.terminal content Comment (pos.Advance content.Length))
 
     let parseIgnored allowSl =
         choice
@@ -83,10 +69,9 @@ let parser: Parser<Node<NodeValue>, ParseState> =
             List.append [ 'a'..'z' ] [ 'A'..'Z' ]
             |> anyOf
         palphabet .>>. many (palphabet <|> digit)
-        |> parseNode (fun oldState (c, chars) ->
+        |> parseNode (fun pos (c, chars) ->
             let content = System.String(c :: chars |> List.toArray)
-            let newState = updatePos oldState content
-            newState, Node.terminal content (Identifier (content.Split('.'))) newState.Position)
+            Node.terminal content (Identifier (content.Split('.'))) (pos.Advance content.Length))
 
     //let pUseStatement =
     //    pstring "use" .>>. parseIgnored false .>>. pidentifier

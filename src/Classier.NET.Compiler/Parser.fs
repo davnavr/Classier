@@ -19,7 +19,7 @@ open FParsec
 open Classier.NET.Compiler.Grammar
 
 let parseString str name =
-    runParserOnString parser ParseState.Default name str
+    runParserOnString parser () name str
 
 let parseStream stream name encoding =
-    runParserOnStream parser ParseState.Default name stream encoding
+    runParserOnStream parser () name stream encoding

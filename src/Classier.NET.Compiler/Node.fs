@@ -14,19 +14,17 @@
 
 module Classier.NET.Compiler.Node
 
-/// Contains the zero-based line number and line position.
-type LineInfo =
-    { LineNum: int
-      LinePos: int }
-    with
-        static member Default = { LineNum = 0; LinePos = 0; }
-        static member (+) (info, pos) =
-            { LineNum = info.LineNum
-              LinePos = info.LinePos + pos }
-
-        member this.NextLine =
-            { LineNum = this.LineNum + 1
-              LinePos = 0 }
+/// Contains the line number and line position.
+[<System.Runtime.CompilerServices.IsReadOnly; Struct>]
+type LineInfo (lineNum: uint32, linePos: uint32) =
+    struct
+        new (lineNum: int64, linePos: int64) = LineInfo(lineNum, linePos)
+        member _.LineNum: uint32 = lineNum
+        member _.LinePos: uint32 = linePos
+        member this.Advance chars = LineInfo (this.LineNum, this.LinePos + chars)
+        member this.Advance chars = this.Advance(uint32(chars))
+        member this.NextLine = LineInfo (this.LineNum + 1u, 0u)
+    end
 
 type Node<'Value> =
     { Children: seq<Node<'Value>>
