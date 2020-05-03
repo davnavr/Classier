@@ -1,6 +1,7 @@
 ﻿
 use System
 
+// This is a comment
 public class MyClass1 (name: String) {
     public String DoSomething() {
         return "The casing rules have not been decided yet";

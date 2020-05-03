@@ -19,11 +19,15 @@ open FParsec
 open Classier.NET.Compiler.Node
 
 type NodeValue =
-    | CompilationUnit
+    | CompilationUnit of {| Imports: seq<Identifier>; Declaration: Node<NodeValue> option |}
+    | AccessModifier
+    | Identifier of Identifier
     | Newline
+    | Comment
     | Whitespace
+and Identifier = seq<string>
 
-type ParseState =
+type ParseState = // TODO: Get rid of this? We can track position info using the given CharStream.State object, and can use anyChar when parsing multiline comments.
     { InComment: bool
       Position: LineInfo }
     with
@@ -40,7 +44,7 @@ let parser: Parser<Node<NodeValue>, ParseState> =
         | Ok ->
             let (newState, newNode) = node stream.UserState reply.Result
             stream.UserState <- newState
-            Reply(Ok, newNode, reply.Error)
+            Reply (Ok, newNode, reply.Error)
         | _ ->
             Reply (reply.Status, reply.Error)
 
@@ -57,4 +61,36 @@ let parser: Parser<Node<NodeValue>, ParseState> =
             let newState = { InComment = oldState.InComment; Position = oldState.Position.NextLine }
             newState, Node.terminal (string c) Newline newState.Position)
 
-    "test"
+    let pslcomment =
+        pstring "//" .>>. restOfLine false
+        |> parseNode (fun oldState (str1, str2) ->
+            let content = str1 + str2
+            let newState = updatePos oldState content
+            newState, Node.terminal content Comment newState.Position)
+
+    let parseIgnored allowSl =
+        choice
+            [
+                pwhitespace;
+                pnewline;
+                if allowSl then
+                    pslcomment
+            ]
+        |> opt
+
+    let pidentifier =
+        let palphabet =
+            List.append [ 'a'..'z' ] [ 'A'..'Z' ]
+            |> anyOf
+        palphabet .>>. many (palphabet <|> digit)
+        |> parseNode (fun oldState (c, chars) ->
+            let content = System.String(c :: chars |> List.toArray)
+            let newState = updatePos oldState content
+            newState, Node.terminal content (Identifier (content.Split('.'))) newState.Position)
+
+    //let pUseStatement =
+    //    pstring "use" .>>. parseIgnored false .>>. pidentifier
+    //    |> parseNode (fun oldState ((keyword, separator), id) ->
+    //        let newState )
+
+    pwhitespace
