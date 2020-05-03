@@ -14,7 +14,7 @@
 
 module Classier.NET.Compiler.Node
 
-/// Contains the line number and line position.
+/// Contains line number and line position.
 [<System.Runtime.CompilerServices.IsReadOnly; Struct>]
 type LineInfo (lineNum: uint32, linePos: uint32) =
     struct
@@ -32,8 +32,8 @@ type Node<'Value> =
       Position: LineInfo
       Value: 'Value }
 
-let terminal content value pos: Node<'Value> =
+let terminal value content (oldPos: LineInfo): Node<'Value> =
     { Children = Seq.empty
       Content = content
-      Position = pos
+      Position = oldPos.Advance(content.Length)
       Value = value }

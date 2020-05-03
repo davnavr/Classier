@@ -17,12 +17,28 @@
 namespace Classier.NET.Compiler
 {
     using System;
+    using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
+    using System.Text;
     using Microsoft.FSharp.Core;
     using Xunit;
     using static Classier.NET.Compiler.Grammar;
 
     public class ParserTests
     {
+        [InlineData("Classier.NET.Compiler.source.MyClass1.txt")]
+        [Theory]
+        public void ParserCorrectlyParsesTestFiles(string file)
+        {
+            // Arrange
+            Func<Stream> stream = () => typeof(ParserTests).Assembly.GetManifestResourceStream(file);
+
+            // Act
+            var result = new SuccessResult<Node.Node<NodeValue>, Unit>(() => Parser.parseStream(stream(), file, Encoding.UTF8));
+
+            // Assert
+            Assert.Equal(result.Result.Content, new StreamChars(stream));
+        }
     }
 }

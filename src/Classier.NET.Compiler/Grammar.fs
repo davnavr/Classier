@@ -28,11 +28,11 @@ type NodeValue =
 and Identifier = seq<string>
 
 let parser: Parser<Node<NodeValue>, unit> =
-    let parseNode (node: LineInfo -> 'Result -> Node<NodeValue>) (parser: Parser<'Result, unit>) stream =
+    let parseNode (node: 'Result -> LineInfo -> Node<NodeValue>) (parser: Parser<'Result, unit>) stream =
         let reply = parser stream
         match reply.Status with
         | Ok ->
-            let newNode = node (LineInfo (stream.Position.Line, stream.Position.Index)) reply.Result
+            let newNode = node reply.Result (LineInfo (stream.Position.Line, stream.Position.Index))
             Reply (Ok, newNode, reply.Error)
         | _ ->
             Reply (reply.Status, reply.Error)
@@ -40,19 +40,20 @@ let parser: Parser<Node<NodeValue>, unit> =
     let pwhitespace =
         anyOf [ ' '; '\t' ]
         |> many1Chars
-        |> parseNode (fun pos str ->
-            Node.terminal str Whitespace (pos.Advance str.Length))
+        |> parseNode (Node.terminal Whitespace)
 
     let pnewline =
         unicodeNewline
-        |> parseNode (fun pos c ->
-            Node.terminal (string c) Newline (pos.Advance 1))
+        |> parseNode (fun c pos ->
+            { Children = Seq.empty
+              Content = string c
+              Position = pos.NextLine
+              Value = Newline })
 
     let pslcomment =
         pstring "//" .>>. restOfLine false
-        |> parseNode (fun pos (str1, str2) ->
-            let content = str1 + str2
-            Node.terminal content Comment (pos.Advance content.Length))
+        |> parseNode (fun (str1, str2) ->
+            Node.terminal Comment (str1 + str2))
 
     let parseIgnored allowSl =
         choice
@@ -62,16 +63,15 @@ let parser: Parser<Node<NodeValue>, unit> =
                 if allowSl then
                     pslcomment
             ]
-        |> opt
 
     let pidentifier =
         let palphabet =
             List.append [ 'a'..'z' ] [ 'A'..'Z' ]
             |> anyOf
-        palphabet .>>. many (palphabet <|> digit)
-        |> parseNode (fun pos (c, chars) ->
-            let content = System.String(c :: chars |> List.toArray)
-            Node.terminal content (Identifier (content.Split('.'))) (pos.Advance content.Length))
+        let psegment = palphabet .>>. many (palphabet <|> digit)
+        psegment
+        |> parseNode (fun _ _ ->
+            invalidOp "Not implemented")
 
     //let pUseStatement =
     //    pstring "use" .>>. parseIgnored false .>>. pidentifier
