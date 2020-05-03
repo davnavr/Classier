@@ -24,6 +24,7 @@ namespace Classier.NET.Compiler
     using Microsoft.FSharp.Core;
     using Xunit;
     using static Classier.NET.Compiler.Grammar;
+    using SuccessResult = SuccessResult<Node.Node<Grammar.NodeValue>, Microsoft.FSharp.Core.Unit>;
 
     public class ParserTests
     {
@@ -35,7 +36,10 @@ namespace Classier.NET.Compiler
             Func<Stream> stream = () => typeof(ParserTests).Assembly.GetManifestResourceStream(file);
 
             // Act
-            var result = new SuccessResult<Node.Node<NodeValue>, Unit>(() => Parser.parseStream(stream(), file, Encoding.UTF8));
+            var result =
+                new SuccessResult(
+                    () =>
+                        Parser.parseStream(stream(), file, Encoding.UTF8));
 
             // Assert
             Assert.Equal(result.Result.Content, new StreamChars(stream));

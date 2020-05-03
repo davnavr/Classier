@@ -28,12 +28,24 @@ type LineInfo (lineNum: uint32, linePos: uint32) =
 
 type Node<'Value> =
     { Children: seq<Node<'Value>>
-      Content: string
+      Content: string // TODO: Save memory by having TerminalNode that can only have strings and Node that can only have child nodes?
       Position: LineInfo
       Value: 'Value }
 
 let terminal value content (oldPos: LineInfo): Node<'Value> =
     { Children = Seq.empty
       Content = content
+      Position = oldPos.Advance(content.Length)
+      Value = value }
+
+let contentOf (nodes: seq<Node<'Value>>) =
+    nodes
+    |> Seq.map (fun node -> node.Content)
+    |> System.String.Concat
+
+let withChildren (value: 'Value) nodes (oldPos: LineInfo) =
+    let content = contentOf nodes
+    { Children = nodes
+      Content = contentOf nodes
       Position = oldPos.Advance(content.Length)
       Value = value }

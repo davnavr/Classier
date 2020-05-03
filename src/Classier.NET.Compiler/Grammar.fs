@@ -19,16 +19,19 @@ open FParsec
 open Classier.NET.Compiler.Node
 
 type NodeValue =
-    | CompilationUnit of {| Imports: seq<Identifier>; Declaration: Node<NodeValue> option |}
+    | CompilationUnit of {| Imports: seq<Node<NodeValue> * string>; Declaration: Node<NodeValue> |}
     | AccessModifier
-    | Identifier of Identifier
-    | Newline
     | Comment
+    | Identifier
+    | IdentifierChain
+    | Keyword
+    | Newline
+    | Period
+    | UseStatement
     | Whitespace
-and Identifier = seq<string>
 
 let parser: Parser<Node<NodeValue>, unit> =
-    let parseNode (node: 'Result -> LineInfo -> Node<NodeValue>) (parser: Parser<'Result, unit>) stream =
+    let parseNode node (parser: Parser<'Result, unit>) stream =
         let reply = parser stream
         match reply.Status with
         | Ok ->
@@ -37,12 +40,24 @@ let parser: Parser<Node<NodeValue>, unit> =
         | _ ->
             Reply (reply.Status, reply.Error)
 
-    let pwhitespace =
+    let pAccessModifier full =
+        [
+            "public";
+            "internal";
+            if full then
+                "protected";
+                "private";
+        ]
+        |> Seq.map pstring
+        |> choice
+        |> parseNode (Node.terminal AccessModifier)
+
+    let pWhitespace =
         anyOf [ ' '; '\t' ]
         |> many1Chars
         |> parseNode (Node.terminal Whitespace)
 
-    let pnewline =
+    let pNewline =
         unicodeNewline
         |> parseNode (fun c pos ->
             { Children = Seq.empty
@@ -50,32 +65,61 @@ let parser: Parser<Node<NodeValue>, unit> =
               Position = pos.NextLine
               Value = Newline })
 
-    let pslcomment =
+    let pSlComment =
         pstring "//" .>>. restOfLine false
         |> parseNode (fun (str1, str2) ->
             Node.terminal Comment (str1 + str2))
 
-    let parseIgnored allowSl =
+    let pIgnored allowSl =
         choice
             [
-                pwhitespace;
-                pnewline;
+                pWhitespace;
+                pNewline;
                 if allowSl then
-                    pslcomment
+                    pSlComment
             ]
 
-    let pidentifier =
+    let pIdentifier =
         let palphabet =
             List.append [ 'a'..'z' ] [ 'A'..'Z' ]
             |> anyOf
-        let psegment = palphabet .>>. many (palphabet <|> digit)
-        psegment
-        |> parseNode (fun _ _ ->
-            invalidOp "Not implemented")
+        palphabet
+        .>>. many (palphabet <|> digit)
+        |>> fun (c, rest) -> c :: rest |> Array.ofList |> System.String
+        |> parseNode (Node.terminal Identifier)
 
-    //let pUseStatement =
-    //    pstring "use" .>>. parseIgnored false .>>. pidentifier
-    //    |> parseNode (fun oldState ((keyword, separator), id) ->
-    //        let newState )
+    let pIdentifierChain =
+        pIdentifier
+        .>>. many (
+            (pIgnored false |> opt)
+            .>>. (pstring "." |> parseNode (Node.terminal Period))
+            .>>. (pIgnored false |> opt)
+            .>>. pIdentifier)
+        |>> fun (first, rest) ->
+            first :: (rest
+                |> List.map (fun (((sep1, period), sep2), next: Node<NodeValue>) ->
+                    [
+                        if sep1.IsSome then
+                            sep1.Value
+                        period
+                        if sep2.IsSome then
+                            sep2.Value
+                        next
+                    ])
+                |> List.collect id)
+        |> parseNode (Node.withChildren IdentifierChain)
 
-    pwhitespace
+    let pUseStatement =
+        pstring "use"
+        |> parseNode (Node.terminal Keyword)
+        .>>. pIgnored false
+        .>>. pIdentifierChain
+        |>> fun ((useWord, sep), identifier) -> [ useWord; sep; identifier ]
+        |> parseNode (Node.withChildren UseStatement)
+
+    let pClassDef nested =
+        pAccessModifier nested
+        |> opt
+
+
+    pWhitespace
