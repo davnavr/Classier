@@ -17,12 +17,10 @@
 namespace Classier.NET.Compiler
 {
     using System;
-    using System.Collections.Generic;
     using System.IO;
-    using System.Linq;
     using System.Text;
-    using Microsoft.FSharp.Core;
     using Xunit;
+    using static Classier.NET.Compiler.Grammar;
     using static FParsec.CharParsers;
     using SuccessResult = SuccessResult<SyntaxNode.SyntaxNode<Grammar.NodeValue>, Microsoft.FSharp.Core.Unit>;
 

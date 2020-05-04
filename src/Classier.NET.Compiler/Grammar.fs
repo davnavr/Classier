@@ -67,15 +67,16 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |> parseNode (fun (str1, str2) ->
             SyntaxNode.createToken Comment (str1 + str2))
 
-    let pIgnored allowSl =
+    let pIgnored allowMultiline =
         choice
             [
                 // TODO: Move these inside of here?
                 pWhitespace
                 pNewline
-                // pMlComment
-                if allowSl then
+                // pMlCommentOneLine
+                if allowMultiline then
                     pSlComment
+                    // pMlComment
             ]
 
     let pIdentifier =
@@ -95,7 +96,8 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             (pIdentifier
             .>>. (pIgnored false |> opt)
             .>>. (pstring "." |> parseNode (SyntaxNode.createToken Period))
-            .>>. (pIgnored false |> opt))
+            .>>. (pIgnored false |> opt)
+            |> attempt)
         .>>. pIdentifier
         |>> fun (leading, last) ->
             Seq.append
@@ -114,7 +116,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pIdentifierStatement keyword value =
         parseKeyword keyword
-        .>>. pIgnored false // TODO: More than one ignored?
+        .>>. pIgnored false
         .>>. pIdentifierChain
         |>> fun ((word, sep), identifier) -> [ word; sep; identifier ]
         |> parseNode (SyntaxNode.createNode value)
