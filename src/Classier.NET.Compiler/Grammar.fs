@@ -30,10 +30,12 @@ type NodeValue =
     | Identifier
     | IdentifierChain
     | Keyword
+    | LCurlyBracket
     | ModuleDef
     | NamespaceStatement
     | Newline
     | Period
+    | RCurlyBracket
     | UseStatement
     | Whitespace
 
@@ -142,6 +144,12 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |>> List.Cons
         |> opt
 
+    let pBlock (parser: Parser<SyntaxNode<NodeValue> list, unit>) =
+        (pstring "{" |> parseNode (SyntaxNode.createToken LCurlyBracket))
+        .>>. parser
+        .>>. (pstring "}" |> parseNode (SyntaxNode.createToken RCurlyBracket))
+        |>> fun ((lc, middle), rc) -> lc :: middle @ [ rc ]
+
     let pClassDef nested: Parser<SyntaxNode<NodeValue>, unit> =
         pAccessModifier nested
         .>>. opt (parseKeyword "inheritable" |> attempt <|> parseKeyword "abstract")
@@ -171,12 +179,21 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         pAccessModifier nested
         .>>. parseKeyword "module"
         .>>. pIdentifier
-        fail "not implemented"
+        |>> fun ((access, wordm), name) ->
+            [
+                match access with
+                | Some _ -> access.Value
+                | _ -> List.empty
+                wordm
+                [ name ]
+            ]
+            |> List.collect id
+        |> parseNode (SyntaxNode.createNode ModuleDef)
 
     pUseStatements
     .>>. opt (pIdentifierStatement "namespace" NamespaceStatement <?> "namespace declaration")
     .>>. pUseStatements
-    .>>. (pClassDef false <|> pModuleDef false)
+    .>>. (pClassDef false |> attempt <|> pModuleDef false) // NOTE: Use a choice here when another type of def is added.
     .>>. many (pIgnored true)
     |>> fun ((((use1, ns), use2), classOrModule), trailing) ->
         let nodes =

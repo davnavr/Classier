@@ -45,7 +45,10 @@ namespace Classier.NET.Compiler
 
             // Assert
             Assert.IsType<NodeValue.CompilationUnit>(result.Result.Value);
-            Assert.Equal(result.Result.ToString(), new StreamChars(stream));
+            Assert.Equal(
+                normalizeNewlines(
+                    result.Result.ToString()),
+                new StreamChars(stream));
         }
     }
 }
