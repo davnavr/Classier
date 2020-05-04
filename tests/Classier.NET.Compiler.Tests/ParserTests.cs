@@ -24,7 +24,7 @@ namespace Classier.NET.Compiler
     using Microsoft.FSharp.Core;
     using Xunit;
     using static FParsec.CharParsers;
-    using SuccessResult = SuccessResult<Node.Node<Grammar.NodeValue>, Microsoft.FSharp.Core.Unit>;
+    using SuccessResult = SuccessResult<SyntaxNode.SyntaxNode<Grammar.NodeValue>, Microsoft.FSharp.Core.Unit>;
 
     public class ParserTests
     {
@@ -46,8 +46,8 @@ namespace Classier.NET.Compiler
                     });
 
             // Assert
-            ////Assert.IsType<NodeValue.CompilationUnit>(result.Result.Value);
-            Assert.Equal(result.Result.Content, new StreamChars(stream));
+            Assert.IsType<NodeValue.CompilationUnit>(result.Result.Value);
+            Assert.Equal(result.Result.ToString(), new StreamChars(stream));
         }
     }
 }

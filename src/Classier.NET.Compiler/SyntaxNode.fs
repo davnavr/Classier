@@ -14,7 +14,6 @@
 
 module rec Classier.NET.Compiler.SyntaxNode
 
-// TODO: Save memory by having TerminalNode that can only have strings and Node that can only have child nodes?
 type SyntaxNode<'Value> =
     { Content: NodeOrToken<'Value>
       Position: LinePos
@@ -28,6 +27,14 @@ type SyntaxNode<'Value> =
             match this.Content with
             | Node children -> lengthOf children
             | Token content -> content.Length
+        /// Returns the content of the node.
+        override this.ToString() =
+            match this.Content with
+            | Node children ->
+                children
+                |> Seq.map string
+                |> System.String.Concat
+            | Token content -> content
 
 type NodeOrToken<'Value> =
     | Node of seq<SyntaxNode<'Value>>

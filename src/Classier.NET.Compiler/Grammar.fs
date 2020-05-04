@@ -19,12 +19,19 @@ open FParsec
 open Classier.NET.Compiler.SyntaxNode
 
 type NodeValue =
-    | CompilationUnit of {| Imports: seq<SyntaxNode<NodeValue> * string>; Declaration: SyntaxNode<NodeValue> |}
+    | CompilationUnit of
+        {| Definition: SyntaxNode<NodeValue>
+           Imports: seq<SyntaxNode<NodeValue>>
+           Namespace: SyntaxNode<NodeValue> option |}
     | AccessModifier
+    | Block
+    | ClassDef
     | Comment
     | Identifier
     | IdentifierChain
     | Keyword
+    | ModuleDef
+    | NamespaceStatement
     | Newline
     | Period
     | UseStatement
@@ -39,17 +46,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 |> Reply)
             node
 
-    let pAccessModifier full =
-        [
-            "public";
-            "internal";
-            if full then
-                "protected";
-                "private";
-        ]
-        |> Seq.map pstring
-        |> choice
-        |> parseNode (SyntaxNode.createToken AccessModifier)
+    let parseKeyword keyword =
+        pstring keyword
+        |> parseNode (SyntaxNode.createToken Keyword)
 
     let pWhitespace =
         anyOf [ ' '; '\t' ]
@@ -71,8 +70,10 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
     let pIgnored allowSl =
         choice
             [
-                pWhitespace;
-                pNewline;
+                // TODO: Move these inside of here?
+                pWhitespace
+                pNewline
+                // pMlComment
                 if allowSl then
                     pSlComment
             ]
@@ -89,7 +90,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |> System.String
         |> parseNode (SyntaxNode.createToken Identifier)
 
-    let pIdentifierChain = // TODO: Need to reverse the order, it things another identifier is next since it parses a newline at the end of "use my.identifier"
+    let pIdentifierChain =
         many
             (pIdentifier
             .>>. (pIgnored false |> opt)
@@ -111,16 +112,70 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 [ last ]
         |> parseNode (SyntaxNode.createNode IdentifierChain)
 
-    let pUseStatement =
-        pstring "use"
-        |> parseNode (SyntaxNode.createToken Keyword)
-        .>>. pIgnored false
+    let pIdentifierStatement keyword value =
+        parseKeyword keyword
+        .>>. pIgnored false // TODO: More than one ignored?
         .>>. pIdentifierChain
-        |>> fun ((useWord, sep), identifier) -> [ useWord; sep; identifier ]
-        |> parseNode (SyntaxNode.createNode UseStatement)
+        |>> fun ((word, sep), identifier) -> [ word; sep; identifier ]
+        |> parseNode (SyntaxNode.createNode value)
 
-    let pClassDef nested =
-        pAccessModifier nested
+    let pUseStatements =
+        choice
+            [
+                pIgnored true
+                pIdentifierStatement "use" UseStatement
+            ]
+        |> many
+
+    // Includes trailing whitespace
+    let pAccessModifier full =
+        [
+            "public";
+            "internal";
+            if full then
+                "protected";
+                "private";
+        ]
+        |> Seq.map pstring
+        |> choice
+        |> parseNode (SyntaxNode.createToken AccessModifier)
+        .>>. many (pIgnored false)
+        |>> List.Cons
         |> opt
 
-    pUseStatement
+    let pClassDef nested: Parser<SyntaxNode<NodeValue>, unit> =
+        pAccessModifier nested
+        .>>. parseKeyword "class"
+        fail "not implemented"
+
+    let pModuleDef nested: Parser<SyntaxNode<NodeValue>, unit> =
+        pAccessModifier nested
+        .>>. parseKeyword "module"
+        fail "not implemented"
+
+    pUseStatements
+    .>>. opt (pIdentifierStatement "namespace" NamespaceStatement)
+    .>>. pUseStatements
+    .>>. (pClassDef false <|> pModuleDef false)
+    .>>. many (pIgnored true)
+    |>> fun ((((use1, ns), use2), classOrModule), trailing) ->
+        let nodes =
+            trailing
+            |> List.append [ classOrModule ]
+            |> List.append use2
+            |> List.append (List.choose id [ ns ])
+            |> List.append use1
+        let imports =
+            Seq.append use1 use2
+            |> Seq.choose (fun node ->
+                match node.Value with
+                | UseStatement -> Some node
+                | _ -> None)
+        classOrModule, imports, ns, nodes
+    |> parseNode (fun (def, imports, ns, nodes) ->
+        let compilationUnit =
+            CompilationUnit
+                {| Definition = def
+                   Imports = imports
+                   Namespace = ns |}
+        SyntaxNode.createNode compilationUnit nodes)
