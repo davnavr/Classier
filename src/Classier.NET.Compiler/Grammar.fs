@@ -31,11 +31,8 @@ type NodeValue =
     | Whitespace
 
 let parser: Parser<Node<NodeValue>, unit> =
-    let parseNode (node: 'Result -> LineInfo -> Node<NodeValue>) (parser: Parser<'Result, unit>) = // TODO: Fix, This causes a stack overflow or access violation exception!
-        parser
-        //.>>. (fun stream -> LineInfo (stream.Position.Line, stream.Position.Index) |> Reply)
-        //|>> (fun (result, pos) -> node result pos)
-        |>> (fun (result) -> node result (LineInfo (0u, 0u)))
+    let parseNode (node: 'Result -> LineInfo -> Node<NodeValue>) (parser: Parser<'Result, unit>) =
+        pipe2 parser (fun stream -> LineInfo (stream.Position.Line, stream.Position.Index) |> Reply) node
 
     let pAccessModifier full =
         [
@@ -118,5 +115,4 @@ let parser: Parser<Node<NodeValue>, unit> =
         pAccessModifier nested
         |> opt
 
-    pstring "use"
-    |> parseNode (Node.terminal UseStatement)
+    pUseStatement

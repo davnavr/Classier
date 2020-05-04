@@ -18,7 +18,7 @@ module Classier.NET.Compiler.Node
 [<System.Runtime.CompilerServices.IsReadOnly; Struct>]
 type LineInfo (lineNum: uint32, linePos: uint32) =
     struct
-        new (lineNum: int64, linePos: int64) = LineInfo(lineNum, linePos)
+        new (lineNum: int64, linePos: int64) = LineInfo(uint32(lineNum), uint32(linePos))
         member _.LineNum: uint32 = lineNum
         member _.LinePos: uint32 = linePos
         member this.Advance chars = LineInfo (this.LineNum, this.LinePos + chars)

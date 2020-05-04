@@ -42,12 +42,12 @@ namespace Classier.NET.Compiler
                     () =>
                     {
                         using Stream fileStream = stream();
-                        return runParserOnStream(Parser.temp, null, file, fileStream, Encoding.UTF8);
+                        return runParserOnStream(Grammar.parser, null, file, fileStream, Encoding.UTF8);
                     });
 
             // Assert
             ////Assert.IsType<NodeValue.CompilationUnit>(result.Result.Value);
-            ////Assert.Equal(result.Result.Content, new StreamChars(stream));
+            Assert.Equal(result.Result.Content, new StreamChars(stream));
         }
     }
 }
