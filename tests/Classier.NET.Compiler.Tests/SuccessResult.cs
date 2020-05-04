@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2020 NAME HERE
+ * Copyright (c) 2020 David Navarro
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,9 @@ namespace Classier.NET.Compiler
 {
     using System;
     using System.IO;
+    using System.Linq;
+    using FParsec;
+    using Microsoft.FSharp.Collections;
     using static FParsec.CharParsers;
     using static FParsec.Primitives;
 
@@ -28,7 +31,7 @@ namespace Classier.NET.Compiler
     /// <typeparam name="TUserState">The state.</typeparam>
     public sealed class SuccessResult<TResult, TUserState>
     {
-        private ParserResult<TResult, TUserState> result;
+        private readonly ParserResult<TResult, TUserState> result;
 
         public SuccessResult(Func<ParserResult<TResult, TUserState>> resultEvaluator)
         {
@@ -39,15 +42,12 @@ namespace Classier.NET.Compiler
 
         private ParserResult<TResult, TUserState>.Success CastResult()
         {
-            switch (this.result)
+            return this.result switch
             {
-                case ParserResult<TResult, TUserState>.Success success:
-                    return success;
-                case ParserResult<TResult, TUserState>.Failure failiure:
-                    throw new InvalidCastException(failiure.Item2.ToString());
-                default:
-                    throw new InvalidOperationException($"Unknown result type {this.result.GetType()}.");
-            }
+                ParserResult<TResult, TUserState>.Success success => success,
+                ParserResult<TResult, TUserState>.Failure failure => throw new InvalidCastException(failure.Item2.ToString()),
+                _ => throw new InvalidOperationException($"Unknown result type {this.result.GetType()}."),
+            };
         }
     }
 }
