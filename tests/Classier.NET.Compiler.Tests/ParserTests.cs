@@ -32,23 +32,16 @@ namespace Classier.NET.Compiler
         public void ParserCorrectlyParsesTestFiles(string file)
         {
             // Arrange
-            Func<Stream> stream = () => typeof(ParserTests).Assembly.GetManifestResourceStream(file);
+            using var stream = typeof(ParserTests).Assembly.GetManifestResourceStream(file);
+            using var reader = new StreamReader(stream);
+            string content = reader.ReadToEnd();
 
             // Act
-            var result =
-                new SuccessResult(
-                    () =>
-                    {
-                        using Stream fileStream = stream();
-                        return runParserOnStream(Grammar.parser, null, file, fileStream, Encoding.UTF8);
-                    });
+            var result = new SuccessResult(() => runParserOnString(Grammar.parser, null, file, content));
 
             // Assert
             Assert.IsType<NodeValue.CompilationUnit>(result.Result.Value);
-            Assert.Equal(
-                normalizeNewlines(
-                    result.Result.ToString()),
-                new StreamChars(stream));
+            Assert.Equal(normalizeNewlines(content), result.Result.ToString());
         }
     }
 }

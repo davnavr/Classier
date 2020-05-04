@@ -32,7 +32,7 @@ type NodeValue =
     | Keyword
     | LCurlyBracket
     | ModuleDef
-    | NamespaceStatement
+    | NamespaceDef
     | Newline
     | Period
     | RCurlyBracket
@@ -184,6 +184,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 |> many)
         |>> fun (header, body) -> header @ body
         |> parseNode (SyntaxNode.createNode ClassDef)
+        <?> "class definition"
 
     let pModuleDef nested: Parser<SyntaxNode<NodeValue>, unit> =
         pAccessModifier nested
@@ -207,9 +208,10 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 |> many)
         |>> fun (header, body) -> header @ body
         |> parseNode (SyntaxNode.createNode ModuleDef)
+        <?> "module definition"
 
     pUseStatements
-    .>>. opt (pIdentifierStatement "namespace" NamespaceStatement <?> "namespace declaration")
+    .>>. opt (pIdentifierStatement "namespace" NamespaceDef <?> "namespace definition")
     .>>. pUseStatements
     .>>. (pClassDef false |> attempt <|> pModuleDef false) // NOTE: Use a choice here when another type of def is added.
     .>>. many (pIgnored true)
