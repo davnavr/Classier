@@ -16,10 +16,10 @@ module Classier.NET.Compiler.Grammar
 
 open FParsec
 
-open Classier.NET.Compiler.Node
+open Classier.NET.Compiler.SyntaxNode
 
 type NodeValue =
-    | CompilationUnit of {| Imports: seq<Node<NodeValue> * string>; Declaration: Node<NodeValue> |}
+    | CompilationUnit of {| Imports: seq<SyntaxNode<NodeValue> * string>; Declaration: SyntaxNode<NodeValue> |}
     | AccessModifier
     | Comment
     | Identifier
@@ -30,12 +30,12 @@ type NodeValue =
     | UseStatement
     | Whitespace
 
-let parser: Parser<Node<NodeValue>, unit> =
-    let parseNode (node: 'Result -> LineInfo -> Node<NodeValue>) (parser: Parser<'Result, unit>) =
+let parser: Parser<SyntaxNode<NodeValue>, unit> =
+    let parseNode (node: 'Result -> LinePos -> SyntaxNode<NodeValue>) (parser: Parser<'Result, unit>) =
         pipe2
             parser
             (fun stream ->
-                LineInfo (stream.Position.Line, stream.Position.Index)
+                LinePos (stream.Position.Line, stream.Position.Index)
                 |> Reply)
             node
 
@@ -49,25 +49,24 @@ let parser: Parser<Node<NodeValue>, unit> =
         ]
         |> Seq.map pstring
         |> choice
-        |> parseNode (Node.terminal AccessModifier)
+        |> parseNode (SyntaxNode.createToken AccessModifier)
 
     let pWhitespace =
         anyOf [ ' '; '\t' ]
         |> many1Chars
-        |> parseNode (Node.terminal Whitespace)
+        |> parseNode (SyntaxNode.createToken Whitespace)
 
     let pNewline =
         unicodeNewline
         |> parseNode (fun c pos ->
-            { Children = Seq.empty
-              Content = string c
+            { Content = Token (string c)
               Position = pos.NextLine
               Value = Newline })
 
     let pSlComment =
         pstring "//" .>>. restOfLine false
         |> parseNode (fun (str1, str2) ->
-            Node.terminal Comment (str1 + str2))
+            SyntaxNode.createToken Comment (str1 + str2))
 
     let pIgnored allowSl =
         choice
@@ -88,13 +87,13 @@ let parser: Parser<Node<NodeValue>, unit> =
             c :: rest
             |> Array.ofList
             |> System.String
-        |> parseNode (Node.terminal Identifier)
+        |> parseNode (SyntaxNode.createToken Identifier)
 
     let pIdentifierChain = // TODO: Need to reverse the order, it things another identifier is next since it parses a newline at the end of "use my.identifier"
         many
             (pIdentifier
             .>>. (pIgnored false |> opt)
-            .>>. (pstring "." |> parseNode (Node.terminal Period))
+            .>>. (pstring "." |> parseNode (SyntaxNode.createToken Period))
             .>>. (pIgnored false |> opt))
         .>>. pIdentifier
         |>> fun (leading, last) ->
@@ -110,15 +109,15 @@ let parser: Parser<Node<NodeValue>, unit> =
                             sep2.Value
                     ]))
                 [ last ]
-        |> parseNode (Node.withChildren IdentifierChain)
+        |> parseNode (SyntaxNode.createNode IdentifierChain)
 
     let pUseStatement =
         pstring "use"
-        |> parseNode (Node.terminal Keyword)
+        |> parseNode (SyntaxNode.createToken Keyword)
         .>>. pIgnored false
         .>>. pIdentifierChain
         |>> fun ((useWord, sep), identifier) -> [ useWord; sep; identifier ]
-        |> parseNode (Node.withChildren UseStatement)
+        |> parseNode (SyntaxNode.createNode UseStatement)
 
     let pClassDef nested =
         pAccessModifier nested
