@@ -145,10 +145,12 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |> opt
 
     let pBlock (parser: Parser<SyntaxNode<NodeValue> list, unit>) =
-        (pstring "{" |> parseNode (SyntaxNode.createToken LCurlyBracket))
+        many (pIgnored true)
+        .>>. (pstring "{" |> parseNode (SyntaxNode.createToken LCurlyBracket))
         .>>. parser
         .>>. (pstring "}" |> parseNode (SyntaxNode.createToken RCurlyBracket))
-        |>> fun ((lc, middle), rc) -> lc :: middle @ [ rc ]
+        |>> fun (((leading, lc), middle), rc) ->
+            leading @ (lc :: middle @ [ rc ])
 
     let pClassDef nested: Parser<SyntaxNode<NodeValue>, unit> =
         pAccessModifier nested
@@ -162,7 +164,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         // NOTE: Implement primary constructors some other time.
         .>>. pIdentifier
         .>>. opt (parseKeyword "extends" .>>. pIdentifierChain)
-        |>> fun (((modifiers, wordc), name), extend) ->
+        |>> (fun (((modifiers, wordc), name), extend) ->
             [
                 modifiers
                 wordc
@@ -172,14 +174,22 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     List.append wordex [ supername ]
                 | _ -> List.empty
             ]
-            |> List.collect id
+            |> List.collect id)
+        .>>. pBlock (
+                choice
+                    [
+                        pIgnored true
+                    ]
+                |> attempt
+                |> many)
+        |>> fun (header, body) -> header @ body
         |> parseNode (SyntaxNode.createNode ClassDef)
 
     let pModuleDef nested: Parser<SyntaxNode<NodeValue>, unit> =
         pAccessModifier nested
         .>>. parseKeyword "module"
         .>>. pIdentifier
-        |>> fun ((access, wordm), name) ->
+        |>> (fun ((access, wordm), name) ->
             [
                 match access with
                 | Some _ -> access.Value
@@ -187,7 +197,15 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 wordm
                 [ name ]
             ]
-            |> List.collect id
+            |> List.collect id)
+        .>>. pBlock (
+                choice
+                    [
+                        pIgnored true
+                    ]
+                |> attempt
+                |> many)
+        |>> fun (header, body) -> header @ body
         |> parseNode (SyntaxNode.createNode ModuleDef)
 
     pUseStatements

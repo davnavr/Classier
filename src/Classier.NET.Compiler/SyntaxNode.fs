@@ -42,8 +42,7 @@ type NodeOrToken<'Value> =
 
 let lengthOf (nodes: seq<SyntaxNode<'Value>>) =
     nodes
-    |> Seq.map (fun node -> node.Length)
-    |> Seq.sum
+    |> Seq.sumBy (fun node -> node.Length)
 
 let createToken value content (oldPos: LinePos): SyntaxNode<'Value> =
     { Content = Token content
