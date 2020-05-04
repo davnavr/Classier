@@ -46,38 +46,36 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 |> Reply)
             node
 
-    let parseKeyword keyword =
-        pstring keyword
-        |> parseNode (SyntaxNode.createToken Keyword)
-
-    let pWhitespace =
-        anyOf [ ' '; '\t' ]
-        |> many1Chars
-        |> parseNode (SyntaxNode.createToken Whitespace)
-
-    let pNewline =
-        unicodeNewline
-        |> parseNode (fun c pos ->
-            { Content = Token (string c)
-              Position = pos.NextLine
-              Value = Newline })
-
-    let pSlComment =
-        pstring "//" .>>. restOfLine false
-        |> parseNode (fun (str1, str2) ->
-            SyntaxNode.createToken Comment (str1 + str2))
-
     let pIgnored allowMultiline =
         choice
             [
                 // TODO: Move these inside of here?
-                pWhitespace
-                pNewline
+                anyOf [ ' '; '\t' ]
+                |> many1Chars
+                |> parseNode (SyntaxNode.createToken Whitespace)
+                <?> "whitespace";
+
                 // pMlCommentOneLine
+
                 if allowMultiline then
-                    pSlComment
+                    unicodeNewline
+                    |> parseNode (fun c pos ->
+                        { Content = Token (string c)
+                          Position = pos.NextLine
+                          Value = Newline });
+
+                    pstring "//" .>>. restOfLine false
+                    |> parseNode (fun (str1, str2) ->
+                        SyntaxNode.createToken Comment (str1 + str2));
+
                     // pMlComment
             ]
+
+    let parseKeyword keyword =
+        pstring keyword
+        |> parseNode (SyntaxNode.createToken Keyword)
+        .>>. pIgnored false
+        |>> fun (word, sep) -> [ word; sep ]
 
     let pIdentifier =
         let palphabet =
@@ -116,9 +114,8 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pIdentifierStatement keyword value =
         parseKeyword keyword
-        .>>. pIgnored false
         .>>. pIdentifierChain
-        |>> fun ((word, sep), identifier) -> [ word; sep; identifier ]
+        |>> fun (word, identifier) -> List.append word [identifier]
         |> parseNode (SyntaxNode.createNode value)
 
     let pUseStatements =
@@ -147,16 +144,37 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pClassDef nested: Parser<SyntaxNode<NodeValue>, unit> =
         pAccessModifier nested
+        .>>. opt (parseKeyword "inheritable" |> attempt <|> parseKeyword "abstract")
+        .>>. opt (parseKeyword "mutable")
+        |>> (fun ((access, worde), wordm) ->
+            [ access; worde; wordm ]
+            |> List.choose id
+            |> List.collect id)
         .>>. parseKeyword "class"
-        fail "not implemented"
+        // NOTE: Implement primary constructors some other time.
+        .>>. pIdentifier
+        .>>. opt (parseKeyword "extends" .>>. pIdentifierChain)
+        |>> fun (((modifiers, wordc), name), extend) ->
+            [
+                modifiers
+                wordc
+                [ name ]
+                match extend with
+                | Some (wordex, supername) ->
+                    List.append wordex [ supername ]
+                | _ -> List.empty
+            ]
+            |> List.collect id
+        |> parseNode (SyntaxNode.createNode ClassDef)
 
     let pModuleDef nested: Parser<SyntaxNode<NodeValue>, unit> =
         pAccessModifier nested
         .>>. parseKeyword "module"
+        .>>. pIdentifier
         fail "not implemented"
 
     pUseStatements
-    .>>. opt (pIdentifierStatement "namespace" NamespaceStatement)
+    .>>. opt (pIdentifierStatement "namespace" NamespaceStatement <?> "namespace declaration")
     .>>. pUseStatements
     .>>. (pClassDef false <|> pModuleDef false)
     .>>. many (pIgnored true)
