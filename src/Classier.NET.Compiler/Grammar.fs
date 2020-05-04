@@ -32,7 +32,12 @@ type NodeValue =
 
 let parser: Parser<Node<NodeValue>, unit> =
     let parseNode (node: 'Result -> LineInfo -> Node<NodeValue>) (parser: Parser<'Result, unit>) =
-        pipe2 parser (fun stream -> LineInfo (stream.Position.Line, stream.Position.Index) |> Reply) node
+        pipe2
+            parser
+            (fun stream ->
+                LineInfo (stream.Position.Line, stream.Position.Index)
+                |> Reply)
+            node
 
     let pAccessModifier full =
         [
@@ -79,28 +84,32 @@ let parser: Parser<Node<NodeValue>, unit> =
             |> anyOf
         palphabet
         .>>. many (palphabet <|> digit)
-        |>> fun (c, rest) -> c :: rest |> Array.ofList |> System.String
+        |>> fun (c, rest) ->
+            c :: rest
+            |> Array.ofList
+            |> System.String
         |> parseNode (Node.terminal Identifier)
 
-    let pIdentifierChain =
-        pIdentifier
-        .>>. many (
-            (pIgnored false |> opt)
-            .>>. (pstring "." |> parseNode (Node.terminal Period))
+    let pIdentifierChain = // TODO: Need to reverse the order, it things another identifier is next since it parses a newline at the end of "use my.identifier"
+        many
+            (pIdentifier
             .>>. (pIgnored false |> opt)
-            .>>. pIdentifier)
-        |>> fun (first, rest) ->
-            first :: (rest
-                |> List.map (fun (((sep1, period), sep2), next: Node<NodeValue>) ->
+            .>>. (pstring "." |> parseNode (Node.terminal Period))
+            .>>. (pIgnored false |> opt))
+        .>>. pIdentifier
+        |>> fun (leading, last) ->
+            Seq.append
+                (leading
+                |> Seq.collect (fun (((id, sep1), per), sep2) ->
                     [
+                        id
                         if sep1.IsSome then
                             sep1.Value
-                        period
+                        per
                         if sep2.IsSome then
                             sep2.Value
-                        next
-                    ])
-                |> List.collect id)
+                    ]))
+                [ last ]
         |> parseNode (Node.withChildren IdentifierChain)
 
     let pUseStatement =
