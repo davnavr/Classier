@@ -6,7 +6,7 @@ use System.IO
 public class MyClass1 {
     let myField: int = 42
 
-    public def this.TheTest
+    public def this.TheTest (myParam: FileInfo)
     //public String this.DoSomething () {
     //    return "The casing rules have not been decided yet";
     //}

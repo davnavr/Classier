@@ -26,21 +26,28 @@ type NodeValue =
            Namespace: SyntaxNode<NodeValue> option |}
     | AccessModifier
     | Block
-    | ClassDef
+    | ClassDef // TODO: Add anonymous records to some to store information.
     | Colon
+    | Comma
     | Comment
     | FieldDef
     | Identifier
     | IdentifierChain
     | Keyword
     | LCurlyBracket
+    | LParen
+    | MethodDef
     | MethodHeader
     | ModuleDef
     | NamespaceDef
     | Newline
     | OpAssign
+    | Param
+    | ParamTuple
+    | ParamSet
     | Period
     | RCurlyBracket
+    | RParen
     | UseStatement
     | Whitespace
 
@@ -48,7 +55,6 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
     let pIgnored allowMultiline =
         choice
             [
-                // TODO: Move these inside of here?
                 anyOf [ ' '; '\t' ]
                 |> many1Chars
                 |> pnode (SyntaxNode.createToken Whitespace)
@@ -204,9 +210,64 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |>> fun (acc, def) ->
             List.collect id [ acc; def ]
 
-    let pFuncParamTuple = null
+    let pFuncParamTuple =
+        let pParam =
+            pNameAndType
+            |> pnode (createNode Param)
 
-    let pFuncParams = null
+        pcharToken '(' LParen
+        .>>. opt (pIgnored false)
+        .>>. pnodesOpt (
+            many (
+                pParam
+                .>>. opt (pIgnored false)
+                .>>. pcharToken ',' Comma
+                .>>. opt (pIgnored false)
+                |> attempt
+                |>> (fun (((param, sep1), comma), sep2) ->
+                    [
+                        param
+                        if sep1.IsSome then
+                            sep1.Value
+                        comma
+                        if sep2.IsSome then
+                            sep2.Value
+                    ]))
+            |>> List.collect id
+            .>>. pParam
+            |>> fun (rest, last) -> rest @ [ last ])
+        .>>. opt (pIgnored false)
+        .>>. pcharToken ')' RParen
+        |>> (fun ((((lparen, sep1), parameters), sep2), rparen) ->
+            let left =
+                [
+                    lparen
+                    if sep1.IsSome then
+                        sep1.Value
+                ]
+            let right =
+                [
+                    rparen
+                    if sep2.IsSome then
+                        sep2.Value
+                ]
+            left @ parameters @ right)
+        |> pnode (createNode ParamTuple)
+
+    let pFuncParamSet =
+        many (
+            pFuncParamTuple
+            .>>. opt (pIgnored false)
+            |>> fun (tuple, sep) ->
+                [
+                    tuple
+                    if sep.IsSome then
+                        sep.Value
+                ])
+        |>> List.collect id
+        .>>. pFuncParamTuple
+        |>> (fun (rest, last) -> rest @ [ last ])
+        |> pnode (createNode ParamSet)
 
     let pFuncBody =
         pBlock (choice [ pIgnored true ] |> attempt |> many) // Temporary
@@ -224,7 +285,8 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                         .>>. pcharToken '.' Period
                         .>>. opt (pIgnored false)
                         .>>. pIdentifier
-                        |>> (fun (((((words, self), sep1), per), sep2), name) ->
+                        .>>. pIgnored false
+                        |>> (fun ((((((words, self), sep1), per), sep2), name), sep3) ->
                             let header = 
                                 [
                                     self
@@ -234,10 +296,13 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                                     if sep2.IsSome then
                                         sep2.Value
                                     name
+                                    sep3
                                 ]
                             words @ header)
-                        // .>>. pFuncParams
                         |> pnode (createNode MethodHeader)
+                        .>>. pFuncParamSet
+                        |> pnodePair // TODO: Replace this line, add method body
+                        |> pnode (createNode MethodDef)
                         <?> "method definition";
                 ]
             |> attempt
