@@ -211,7 +211,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |>> fun (acc, def) ->
             List.collect id [ acc; def ]
 
-    let pFuncParamTuple = // TODO: Allow omitting of parenthesis for one parameter in tuple, like F#.
+    let pFuncParamTuple =
         let pParam =
             pNameAndType
             |> pnode (createNode Param)
@@ -256,20 +256,20 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |> pnode (createNode ParamTuple)
         <?> "Parameter tuple"
 
-    let pFuncParamList = // TODO: Fix, parses one too many parameter tuples
-        many (
-            pFuncParamTuple
-            .>>. opt (pIgnored false)
-            |>> fun (tuple, sep) ->
+    let pFuncParamList = // TODO: Allow omitting of parenthesis for one parameter in tuple, like F#.
+        pFuncParamTuple
+        .>>. many (
+            opt (pIgnored true)
+            .>>. pFuncParamTuple
+            |> attempt
+            |>> fun (sep, tup) ->
                 [
-                    tuple
                     if sep.IsSome then
                         sep.Value
-                ]
-            |> attempt)
-        |>> List.collect id
-        .>>. pFuncParamTuple
-        |>> (fun (rest, last) -> rest @ [ last ])
+                    tup
+                ])
+        |>> (fun (first, rest) ->
+            first :: List.collect id rest)
         |> pnode (createNode ParamSet)
         <??> "Parameter list"
 
