@@ -16,6 +16,7 @@ module Classier.NET.Compiler.Grammar
 
 open FParsec
 
+open Classier.NET.Compiler.NodeParsers
 open Classier.NET.Compiler.SyntaxNode
 
 type NodeValue =
@@ -26,7 +27,9 @@ type NodeValue =
     | AccessModifier
     | Block
     | ClassDef
+    | Colon
     | Comment
+    | FieldDef
     | Identifier
     | IdentifierChain
     | Keyword
@@ -34,50 +37,43 @@ type NodeValue =
     | ModuleDef
     | NamespaceDef
     | Newline
+    | OpAssign
     | Period
     | RCurlyBracket
     | UseStatement
     | Whitespace
 
 let parser: Parser<SyntaxNode<NodeValue>, unit> =
-    let parseNode (node: 'Result -> LinePos -> SyntaxNode<NodeValue>) (parser: Parser<'Result, unit>) =
-        pipe2
-            parser
-            (fun stream ->
-                LinePos (stream.Position.Line, stream.Position.Index)
-                |> Reply)
-            node
-
     let pIgnored allowMultiline =
         choice
             [
                 // TODO: Move these inside of here?
                 anyOf [ ' '; '\t' ]
                 |> many1Chars
-                |> parseNode (SyntaxNode.createToken Whitespace)
+                |> pnode (SyntaxNode.createToken Whitespace)
                 <?> "whitespace";
 
                 // pMlCommentOneLine
 
                 if allowMultiline then
                     unicodeNewline
-                    |> parseNode (fun c pos ->
+                    |> pnode (fun c pos ->
                         { Content = Token (string c)
                           Position = pos.NextLine
                           Value = Newline });
 
                     pstring "//" .>>. restOfLine false
-                    |> parseNode (fun (str1, str2) ->
+                    |> pnode (fun (str1, str2) ->
                         SyntaxNode.createToken Comment (str1 + str2));
 
                     // pMlComment
             ]
 
-    let parseKeyword keyword =
+    let pKeyword keyword =
         pstring keyword
-        |> parseNode (SyntaxNode.createToken Keyword)
+        |> pnode (SyntaxNode.createToken Keyword)
         .>>. pIgnored false
-        |>> fun (word, sep) -> [ word; sep ]
+        |> pnodePair
 
     let pIdentifier =
         let palphabet =
@@ -89,13 +85,13 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             c :: rest
             |> Array.ofList
             |> System.String
-        |> parseNode (SyntaxNode.createToken Identifier)
+        |> pnode (SyntaxNode.createToken Identifier)
 
     let pIdentifierChain =
         many
             (pIdentifier
             .>>. (pIgnored false |> opt)
-            .>>. (pstring "." |> parseNode (SyntaxNode.createToken Period))
+            .>>. (pstring "." |> pnode (SyntaxNode.createToken Period))
             .>>. (pIgnored false |> opt)
             |> attempt)
         .>>. pIdentifier
@@ -112,13 +108,13 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                             sep2.Value
                     ]))
                 [ last ]
-        |> parseNode (SyntaxNode.createNode IdentifierChain)
+        |> pnode (SyntaxNode.createNode IdentifierChain)
 
     let pIdentifierStatement keyword value =
-        parseKeyword keyword
+        pKeyword keyword
         .>>. pIdentifierChain
         |>> fun (word, identifier) -> List.append word [identifier]
-        |> parseNode (SyntaxNode.createNode value)
+        |> pnode (SyntaxNode.createNode value)
 
     let pUseStatements =
         choice
@@ -139,31 +135,83 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         ]
         |> Seq.map pstring
         |> choice
-        |> parseNode (SyntaxNode.createToken AccessModifier)
-        .>>. many (pIgnored false)
-        |>> List.Cons
+        |> pnode (SyntaxNode.createToken AccessModifier)
+        .>>. pIgnored false
+        |> pnodePair
         |> opt
 
-    let pBlock (parser: Parser<SyntaxNode<NodeValue> list, unit>) =
+    let pBlock (p: NodeListParser<NodeValue>) =
         many (pIgnored true)
-        .>>. (pstring "{" |> parseNode (SyntaxNode.createToken LCurlyBracket))
-        .>>. parser
-        .>>. (pstring "}" |> parseNode (SyntaxNode.createToken RCurlyBracket))
+        .>>. (pstring "{" |> pnode (SyntaxNode.createToken LCurlyBracket))
+        .>>. p
+        .>>. (pstring "}" |> pnode (SyntaxNode.createToken RCurlyBracket))
         |>> fun (((leading, lc), middle), rc) ->
             leading @ (lc :: middle @ [ rc ])
 
-    let pClassDef nested: Parser<SyntaxNode<NodeValue>, unit> =
+    let pexpression: Parser<SyntaxNode<NodeValue>, unit> =
+        pstring "42"
+        |> pnode (createToken Keyword) // Temporary
+
+    let pFieldOrVar =
+        pKeyword "let"
+        .>>. pnodesOpt (pKeyword "mutable")
+        .>>. pIdentifierChain
+        .>>. opt (pIgnored false)
+        .>>. (pcharNode ':' Colon)
+        .>>. opt (pIgnored false)
+        |>> (fun (((((wordl, wordm), name), sep1), colon), sep2) ->
+            let trailing =
+                [
+                    name
+                    if sep1.IsSome then
+                        sep1.Value
+                    colon
+                    if sep2.IsSome then
+                        sep2.Value
+                ]
+            wordl @ wordm @ trailing)
+        .>>. pIdentifierChain
+        .>>. opt (pIgnored false)
+        .>>. (pcharNode '=' OpAssign)
+        .>>. opt (pIgnored false)
+        .>>. pexpression
+        |>> (fun (((((def, valueType), sep1), eq), sep2), expr) ->
+            let value =
+                [
+                    valueType
+                    if sep1.IsSome then
+                        sep1.Value
+                    eq
+                    if sep2.IsSome then
+                        sep2.Value
+                    expr
+                ]
+            List.append def value)
+        |> pnode (createNode FieldDef)
+        <?> "variable definition"
+
+    let pMemberBlock instance =
+        pBlock (
+            choice
+                [
+                    pIgnored true;
+                    pFieldOrVar;
+                ]
+            |> attempt
+            |> many)
+
+    let pClassDef nested =
         pAccessModifier nested
-        .>>. opt (parseKeyword "inheritable" |> attempt <|> parseKeyword "abstract")
-        .>>. opt (parseKeyword "mutable")
+        .>>. opt (pKeyword "inheritable" |> attempt <|> pKeyword "abstract")
+        .>>. opt (pKeyword "mutable")
         |>> (fun ((access, worde), wordm) ->
             [ access; worde; wordm ]
             |> List.choose id
             |> List.collect id)
-        .>>. parseKeyword "class"
+        .>>. pKeyword "class"
         // NOTE: Implement primary constructors some other time.
         .>>. pIdentifier
-        .>>. opt (parseKeyword "extends" .>>. pIdentifierChain)
+        .>>. opt (pKeyword "extends" .>>. pIdentifierChain)
         |>> (fun (((modifiers, wordc), name), extend) ->
             [
                 modifiers
@@ -175,20 +223,14 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 | _ -> List.empty
             ]
             |> List.collect id)
-        .>>. pBlock (
-                choice
-                    [
-                        pIgnored true
-                    ]
-                |> attempt
-                |> many)
+        .>>. pMemberBlock true
         |>> fun (header, body) -> header @ body
-        |> parseNode (SyntaxNode.createNode ClassDef)
+        |> pnode (SyntaxNode.createNode ClassDef)
         <?> "class definition"
 
-    let pModuleDef nested: Parser<SyntaxNode<NodeValue>, unit> =
+    let pModuleDef nested =
         pAccessModifier nested
-        .>>. parseKeyword "module"
+        .>>. pKeyword "module"
         .>>. pIdentifier
         |>> (fun ((access, wordm), name) ->
             [
@@ -199,15 +241,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 [ name ]
             ]
             |> List.collect id)
-        .>>. pBlock (
-                choice
-                    [
-                        pIgnored true
-                    ]
-                |> attempt
-                |> many)
+        .>>. pMemberBlock false
         |>> fun (header, body) -> header @ body
-        |> parseNode (SyntaxNode.createNode ModuleDef)
+        |> pnode (SyntaxNode.createNode ModuleDef)
         <?> "module definition"
 
     pUseStatements
@@ -229,7 +265,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 | UseStatement -> Some node
                 | _ -> None)
         classOrModule, imports, ns, nodes
-    |> parseNode (fun (def, imports, ns, nodes) ->
+    |> pnode (fun (def, imports, ns, nodes) ->
         let compilationUnit =
             CompilationUnit
                 {| Definition = def

@@ -26,6 +26,7 @@
   <ItemGroup>
     <Compile Include="LinePos.fs" />
     <Compile Include="SyntaxNode.fs" />
+    <Compile Include="NodeParsers.fs" />
     <Compile Include="Grammar.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

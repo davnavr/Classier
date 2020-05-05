@@ -1,9 +1,11 @@
 ﻿
 use System
+use System.IO
 
 // This is a comment
 public class MyClass1 {
-    public String DoSomething() {
-        return "The casing rules have not been decided yet";
-    }
+    let myField: int = 42
+    //public String DoSomething() {
+    //    return "The casing rules have not been decided yet";
+    //}
 }
