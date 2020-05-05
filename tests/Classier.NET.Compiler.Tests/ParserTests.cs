@@ -26,6 +26,7 @@ namespace Classier.NET.Compiler
 
     public class ParserTests
     {
+        [InlineData("Classier.NET.Compiler.source.MyAbstractClass1.txt")]
         [InlineData("Classier.NET.Compiler.source.MyClass1.txt")]
         [InlineData("Classier.NET.Compiler.source.MyModule1.txt")]
         [Theory]

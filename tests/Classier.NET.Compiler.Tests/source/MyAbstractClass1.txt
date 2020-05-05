@@ -1,0 +1,9 @@
+
+use java.lang
+use java.util
+
+namespace this.is.my.space
+
+internal class MyAbstractClass1 {
+    let tester: java.lang.String = someUndefinedGlobal
+}

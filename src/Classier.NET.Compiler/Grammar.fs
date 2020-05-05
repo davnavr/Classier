@@ -19,6 +19,7 @@ open FParsec
 open Classier.NET.Compiler.NodeParsers
 open Classier.NET.Compiler.SyntaxNode
 
+
 type NodeValue =
     | CompilationUnit of
         {| Definition: SyntaxNode<NodeValue>
@@ -32,6 +33,7 @@ type NodeValue =
     | Comma
     | Comment
     | Expression
+    | ExprAdd
     | FieldDef
     | HexLit
     | Identifier
@@ -45,7 +47,8 @@ type NodeValue =
     | ModuleDef
     | NamespaceDef
     | Newline
-    | OpAssign
+    | OpAdd
+    | OpEqual
     | Param // of {| Name: string |}
     | ParamTuple // of seq<SyntaxNode<NodeValue>>
     | ParamSet
@@ -57,7 +60,7 @@ type NodeValue =
     | Whitespace
 
 let parser: Parser<SyntaxNode<NodeValue>, unit> =
-    let pIgnored allowMultiline =
+    let pIgnored multiline =
         choice
             [
                 anyOf [ ' '; '\t' ]
@@ -67,7 +70,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
                 // pMlCommentOneLine
 
-                if allowMultiline then
+                if multiline then
                     unicodeNewline
                     |> pnode (fun c pos ->
                         { Content = Token (string c)
@@ -81,6 +84,8 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
                     // pMlComment
             ]
+
+    let pIgnoredOpt multiline = opt (pIgnored multiline)
 
     let pKeyword keyword =
         pstring keyword
@@ -174,43 +179,88 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |> choice
             |> opt
             |>> Option.defaultValue ""
+            <?> "numeric literal suffix"
 
-        choice
-            [
-                digit
-                .>>. manyChars (digit <|> pchar '_')
-                .>>. numSuffixes
-                |>> (fun ((first, rest), suffix) ->
-                    sprintf "%c%s%s" first rest suffix)
-                |> pnode (createToken IntLit)
-                <??> "integer literal";
+        let expr, exprRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
 
-                pstringCI "0x"
-                .>>. hex
-                .>>. manyChars (hex <|> pchar '_')
-                .>>. numSuffixes
-                |>> (fun (((prefix, first), rest), suffix) ->
-                    sprintf "%s%c%s%s" prefix first rest suffix)
-                |> pnode (createToken HexLit)
-                <??> "hexadecimal literal";
+        let binaryOperator op value = // TODO: Fix, throws a StackOverflowException when parsing addition expression. Need to check something first before parsing expr
+            expr
+            .>>. pIgnoredOpt true
+            .>>. (pstring op |> pnode (createToken value))
+            .>>. pIgnoredOpt true
+            .>>. expr
+            |>> fun ((((exp1, sep1), opstr), sep2), exp2) ->
+                [
+                    exp1
+                    if sep1.IsSome then
+                        sep1.Value
+                    opstr
+                    if sep2.IsSome then
+                        sep2.Value
+                    exp2
+                ]
 
-                pstringCI "0b"
-                .>>. anyOf [ '0'; '1' ]
-                .>>. manyChars (anyOf [ '0'; '1'; '_' ])
-                .>>. numSuffixes
-                |>> (fun (((prefix, first), rest), suffix) ->
-                    sprintf "%s%c%s%s" prefix first rest suffix)
-                |> pnode (createToken BinLit)
-                <??> "binary literal";
-            ]
-        <?> "expression"
+        exprRef :=
+            choice
+                [
+                    pIdentifier
+
+                    digit // TODO: Allow negative
+                    .>>. manyChars (digit <|> pchar '_')
+                    .>>. numSuffixes
+                    |>> (fun ((first, rest), suffix) ->
+                        sprintf "%c%s%s" first rest suffix)
+                    |> pnode (createToken IntLit)
+                    <??> "integer literal";
+
+                    pstringCI "0x"
+                    .>>. hex
+                    .>>. manyChars (hex <|> pchar '_')
+                    .>>. numSuffixes
+                    |>> (fun (((prefix, first), rest), suffix) ->
+                        sprintf "%s%c%s%s" prefix first rest suffix)
+                    |> pnode (createToken HexLit)
+                    <??> "hexadecimal literal";
+
+                    pstringCI "0b"
+                    .>>. anyOf [ '0'; '1' ]
+                    .>>. manyChars (anyOf [ '0'; '1'; '_' ])
+                    .>>. numSuffixes
+                    |>> (fun (((prefix, first), rest), suffix) ->
+                        sprintf "%s%c%s%s" prefix first rest suffix)
+                    |> pnode (createToken BinLit)
+                    <??> "binary literal";
+
+                    pcharToken '(' LParen
+                    .>>. pIgnoredOpt true
+                    .>>. expr // TODO: Make expr optional to allow something like F# unit?
+                    .>>. pIgnoredOpt true
+                    .>>. pcharToken ')' RParen
+                    |>> (fun ((((lparen, sep1), exp), sep2), rparen) ->
+                        [
+                            lparen
+                            if sep1.IsSome then
+                                sep1.Value
+                            exp
+                            if sep2.IsSome then
+                                sep2.Value
+                            rparen
+                        ])
+                    |> pnode (createNode Expression);
+
+                    //binaryOperator "+" OpAdd
+                    //|> pnode (createNode ExprAdd);
+                ]
+            <??> "expression"
+
+        expr
 
     let pTypeAnnotation =
         pIgnored true
         |> attempt
         |> many
         .>>. pcharToken ':' Colon
-        .>>. opt (pIgnored false)
+        .>>. pIgnoredOpt false
         .>>. pIdentifierChain
         |>> (fun (((sep1, col), sep2), typeName) ->
             let trailing =
@@ -234,9 +284,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         // TODO: Add modifiers "mutable"
         .>>. pNameAndType
         |>> (fun (wordl, names) -> wordl @ names)
-        .>>. opt (pIgnored false)
-        .>>. pcharToken '=' OpAssign
-        .>>. opt (pIgnored false)
+        .>>. pIgnoredOpt false
+        .>>. pcharToken '=' OpEqual
+        .>>. pIgnoredOpt false
         .>>. pExpression
         |>> (fun (((((def), sep1), eq), sep2), expr) ->
             let value =
@@ -264,13 +314,13 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |> pnode (createNode Param)
 
         pcharToken '(' LParen
-        .>>. opt (pIgnored false)
+        .>>. pIgnoredOpt false
         .>>. pnodesOpt (
             many (
                 pParam
-                .>>. opt (pIgnored false)
+                .>>. pIgnoredOpt false
                 .>>. pcharToken ',' Comma
-                .>>. opt (pIgnored false)
+                .>>. pIgnoredOpt false
                 |>> (fun (((param, sep1), comma), sep2) ->
                     [
                         param
@@ -284,7 +334,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |>> List.collect id
             .>>. pParam
             |>> fun (rest, last) -> rest @ [ last ])
-        .>>. opt (pIgnored false)
+        .>>. pIgnoredOpt false
         .>>. pcharToken ')' RParen
         |>> (fun ((((lparen, sep1), parameters), sep2), rparen) ->
             let left =
@@ -341,9 +391,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 if instance then
                     pFuncKeywords
                     .>>. (pIdentifier <?> "self identifier")
-                    .>>. opt (pIgnored false)
+                    .>>. pIgnoredOpt false
                     .>>. pcharToken '.' Period
-                    .>>. opt (pIgnored false)
+                    .>>. pIgnoredOpt false
                     .>>. (pIdentifier <?> "method name")
                     .>>. pIgnored false
                     |>> (fun ((((((words, self), sep1), per), sep2), name), sep3) ->
@@ -365,7 +415,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     .>>. pFuncBody
                     |>> (fun (((header, mparams), returnType), body) -> [ header; mparams; returnType; body ])
                     |> pnode (createNode MethodDef)
-                    <??> "method definition";
+                    <?> "method definition";
             ]
         |> attempt
         |> many
