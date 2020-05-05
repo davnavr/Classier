@@ -6,8 +6,16 @@ use System.IO
 public class MyClass1 {
     let myField: int = 42
 
+    // Optional type annotation for return type
     public def this.TheTest (myParam: FileInfo)
-    //public String this.DoSomething () {
-    //    return "The casing rules have not been decided yet";
-    //}
+    {
+    }
+
+    public def this.Explicit (p1: int) (p2: int): int
+    {
+    }
+
+    public def self.implicit (p1, p2)
+    {
+    }
 }

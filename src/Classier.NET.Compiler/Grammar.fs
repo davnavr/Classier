@@ -48,6 +48,7 @@ type NodeValue =
     | Period
     | RCurlyBracket
     | RParen
+    | TypeAnnotation
     | UseStatement
     | Whitespace
 
@@ -150,7 +151,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pIgnored false
         |> pnodePair
         |> pnodesOpt
-        <?> "Access modifier"
+        <?> "access modifier"
 
     let pBlock (p: NodeListParser<NodeValue>) =
         many (pIgnored true)
@@ -165,22 +166,29 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         pstring "42"
         |> pnode (createToken Keyword) // Temporary
 
-    let pNameAndType =
-        pIdentifier
-        .>>. opt (pIgnored false)
+    let pTypeAnnotation =
+        pIgnored true
+        |> attempt
+        |> many
         .>>. pcharToken ':' Colon
         .>>. opt (pIgnored false)
         .>>. pIdentifierChain
-        |>> (fun ((((name, sep1), col), sep2), varType) ->
-            [
-                name
-                if sep1.IsSome then
-                    sep1.Value
-                col
-                if sep2.IsSome then
-                    sep2.Value
-                varType
-            ])
+        |>> (fun (((sep1, col), sep2), typeName) ->
+            let trailing =
+                [
+                    col
+                    if sep2.IsSome then
+                        sep2.Value
+                    typeName
+                ]
+            sep1 @ trailing)
+        |> attempt
+        |> pnodesOpt
+        |> pnode (createNode TypeAnnotation)
+        <?> "type annotation"
+
+    let pNameAndType =
+        pIdentifier .>>. pTypeAnnotation |> pnodePair
 
     let pFieldOrVar =
         pKeyword "let"
@@ -254,69 +262,75 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 ]
             left @ parameters @ right)
         |> pnode (createNode ParamTuple)
-        <?> "Parameter tuple"
+        <?> "parameter tuple"
 
     let pFuncParamList = // TODO: Allow omitting of parenthesis for one parameter in tuple, like F#.
         pFuncParamTuple
         .>>. many (
-            opt (pIgnored true)
+            pIgnored true
+            |> attempt
+            |> many
             .>>. pFuncParamTuple
             |> attempt
-            |>> fun (sep, tup) ->
-                [
-                    if sep.IsSome then
-                        sep.Value
-                    tup
-                ])
+            |>> fun (sep, tup) -> sep @ [ tup ])
         |>> (fun (first, rest) ->
             first :: List.collect id rest)
         |> pnode (createNode ParamSet)
-        <??> "Parameter list"
+        <??> "parameter list"
 
-    let pFuncBody =
-        pBlock (choice [ pIgnored true ] |> attempt |> many) // Temporary
+    let pFuncBody: Parser<SyntaxNode<NodeValue>, unit> =
+        choice
+            [
+                pIgnored true
+                pexpression
+            ]
+        |> attempt
+        |> many
+        |> pBlock
+        <??> "function body"
 
-    let pMemberBlock instance: Parser<SyntaxNode<NodeValue>, unit> =
-        pBlock (
-            choice
-                [
-                    pIgnored true
+    let pMemberBlock instance =
+        choice
+            [
+                pIgnored true
 
-                    pFieldOrVar <?>
-                        (if instance
-                        then "Field definition"
-                        else "Global variable definition");
+                pFieldOrVar <?>
+                    (if instance
+                    then "field definition"
+                    else "value definition");
 
-                    if instance then
-
-                        pFuncKeywords
-                        .>>. (pIdentifier <?> "Self identifier")
-                        .>>. opt (pIgnored false)
-                        .>>. pcharToken '.' Period
-                        .>>. opt (pIgnored false)
-                        .>>. pIdentifier
-                        .>>. pIgnored false
-                        |>> (fun ((((((words, self), sep1), per), sep2), name), sep3) ->
-                            let header = 
-                                [
-                                    self
-                                    if sep1.IsSome then
-                                        sep1.Value
-                                    per
-                                    if sep2.IsSome then
-                                        sep2.Value
-                                    name
-                                    sep3
-                                ]
-                            words @ header)
-                        |> pnode (createNode MethodHeader)
-                        .>>. pFuncParamList
-                        |> pnodePair // TODO: Replace this line, add method body
-                        |> pnode (createNode MethodDef)
-                        <??> "Method definition";
-                ]
-            |> attempt
-            |> many)
+                if instance then
+                    pFuncKeywords
+                    .>>. (pIdentifier <?> "self identifier")
+                    .>>. opt (pIgnored false)
+                    .>>. pcharToken '.' Period
+                    .>>. opt (pIgnored false)
+                    .>>. (pIdentifier <?> "method name")
+                    .>>. pIgnored false
+                    |>> (fun ((((((words, self), sep1), per), sep2), name), sep3) ->
+                        let header = 
+                            [
+                                self
+                                if sep1.IsSome then
+                                    sep1.Value
+                                per
+                                if sep2.IsSome then
+                                    sep2.Value
+                                name
+                                sep3
+                            ]
+                        words @ header)
+                    |> pnode (createNode MethodHeader)
+                    .>>. pFuncParamList
+                    .>>. pTypeAnnotation
+                    .>>. pFuncBody
+                    |>> (fun (((header, mparams), returnType), body) -> [ header; mparams; returnType; body ])
+                    |> pnode (createNode MethodDef)
+                    <??> "method definition";
+            ]
+        |> attempt
+        |> many
+        |> pBlock
 
     let pClassDef nested =
         pAccessModifier nested
@@ -350,7 +364,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pMemberBlock true
         |>> fun (header, body) -> header @ [ body ]
         |> pnode (SyntaxNode.createNode ClassDef)
-        <?> "Class definition"
+        <?> "class definition"
 
     let pModuleDef nested =
         pAccessModifier nested
@@ -361,10 +375,10 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pMemberBlock false
         |>> fun (header, body) -> header @ [ body ]
         |> pnode (SyntaxNode.createNode ModuleDef)
-        <?> "Module definition"
+        <?> "module definition"
 
     pUseStatements
-    .>>. opt (pIdentifierStatement "namespace" NamespaceDef <?> "Namespace definition")
+    .>>. opt (pIdentifierStatement "namespace" NamespaceDef <?> "namespace definition")
     .>>. pUseStatements
     .>>. (pClassDef false <|> pModuleDef false) // NOTE: Use a choice here when another type of def is added.
     .>>. many (pIgnored true)
