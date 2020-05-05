@@ -42,8 +42,8 @@ type NodeValue =
     | NamespaceDef
     | Newline
     | OpAssign
-    | Param
-    | ParamTuple
+    | Param // of {| Name: string |}
+    | ParamTuple // of seq<SyntaxNode<NodeValue>>
     | ParamSet
     | Period
     | RCurlyBracket
@@ -223,7 +223,6 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 .>>. opt (pIgnored false)
                 .>>. pcharToken ',' Comma
                 .>>. opt (pIgnored false)
-                |> attempt
                 |>> (fun (((param, sep1), comma), sep2) ->
                     [
                         param
@@ -232,7 +231,8 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                         comma
                         if sep2.IsSome then
                             sep2.Value
-                    ]))
+                    ])
+                |> attempt)
             |>> List.collect id
             .>>. pParam
             |>> fun (rest, last) -> rest @ [ last ])
@@ -253,8 +253,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 ]
             left @ parameters @ right)
         |> pnode (createNode ParamTuple)
+        <?> "parameters"
 
-    let pFuncParamSet =
+    let pFuncParamList = // TODO: Fix, parses one too many parameter tuples
         many (
             pFuncParamTuple
             .>>. opt (pIgnored false)
@@ -263,11 +264,13 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     tuple
                     if sep.IsSome then
                         sep.Value
-                ])
+                ]
+            |> attempt)
         |>> List.collect id
         .>>. pFuncParamTuple
         |>> (fun (rest, last) -> rest @ [ last ])
         |> pnode (createNode ParamSet)
+        <?> "parameter list"
 
     let pFuncBody =
         pBlock (choice [ pIgnored true ] |> attempt |> many) // Temporary
@@ -300,7 +303,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                                 ]
                             words @ header)
                         |> pnode (createNode MethodHeader)
-                        .>>. pFuncParamSet
+                        .>>. pFuncParamList
                         |> pnodePair // TODO: Replace this line, add method body
                         |> pnode (createNode MethodDef)
                         <?> "method definition";
@@ -355,7 +358,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
     pUseStatements
     .>>. opt (pIdentifierStatement "namespace" NamespaceDef <?> "namespace definition")
     .>>. pUseStatements
-    .>>. (pClassDef false |> attempt <|> pModuleDef false) // NOTE: Use a choice here when another type of def is added.
+    .>>. (pClassDef false) // |> attempt <|> pModuleDef false) // NOTE: Use a choice here when another type of def is added.
     .>>. many (pIgnored true)
     |>> fun ((((use1, ns), use2), classOrModule), trailing) ->
         let nodes =
