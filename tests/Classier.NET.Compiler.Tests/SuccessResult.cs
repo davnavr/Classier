@@ -17,12 +17,7 @@
 namespace Classier.NET.Compiler
 {
     using System;
-    using System.IO;
-    using System.Linq;
-    using FParsec;
-    using Microsoft.FSharp.Collections;
     using static FParsec.CharParsers;
-    using static FParsec.Primitives;
 
     /// <summary>
     /// Wraps a <see cref="ParserResult{Result, UserState}"/>, and assumes it is a <see cref="ParserResult{Result, UserState}.Success"/>.

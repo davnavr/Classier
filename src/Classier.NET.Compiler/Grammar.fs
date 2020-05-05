@@ -95,6 +95,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |> Array.ofList
             |> System.String
         |> pnode (SyntaxNode.createToken Identifier)
+        <??> "Identifier"
 
     let pIdentifierChain =
         many
@@ -118,6 +119,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     ]))
                 [ last ]
         |> pnode (SyntaxNode.createNode IdentifierChain)
+        <?> "Fully qualified name"
 
     let pIdentifierStatement keyword value =
         pKeyword keyword
@@ -148,12 +150,12 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pIgnored false
         |> pnodePair
         |> pnodesOpt
-        <?> "access modifier"
+        <?> "Access modifier"
 
     let pBlock (p: NodeListParser<NodeValue>) =
         many (pIgnored true)
         .>>. pcharToken '{' LCurlyBracket
-        .>>. p
+        .>>. attempt p
         .>>. pcharToken '}' RCurlyBracket
         |>> fun (((leading, lc), middle), rc) ->
             leading @ (lc :: middle @ [ rc ])
@@ -201,7 +203,6 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 ]
             List.append def value)
         |> pnode (createNode FieldDef)
-        <?> "variable definition"
 
     let pFuncKeywords =
         pAccessModifier true
@@ -210,7 +211,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |>> fun (acc, def) ->
             List.collect id [ acc; def ]
 
-    let pFuncParamTuple =
+    let pFuncParamTuple = // TODO: Allow omitting of parenthesis for one parameter in tuple, like F#.
         let pParam =
             pNameAndType
             |> pnode (createNode Param)
@@ -253,7 +254,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 ]
             left @ parameters @ right)
         |> pnode (createNode ParamTuple)
-        <?> "parameters"
+        <?> "Parameter tuple"
 
     let pFuncParamList = // TODO: Fix, parses one too many parameter tuples
         many (
@@ -270,7 +271,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pFuncParamTuple
         |>> (fun (rest, last) -> rest @ [ last ])
         |> pnode (createNode ParamSet)
-        <?> "parameter list"
+        <??> "Parameter list"
 
     let pFuncBody =
         pBlock (choice [ pIgnored true ] |> attempt |> many) // Temporary
@@ -280,10 +281,16 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             choice
                 [
                     pIgnored true
-                    pFieldOrVar
+
+                    pFieldOrVar <?>
+                        (if instance
+                        then "Field definition"
+                        else "Global variable definition");
+
                     if instance then
+
                         pFuncKeywords
-                        .>>. (pIdentifier <?> "self identifier")
+                        .>>. (pIdentifier <?> "Self identifier")
                         .>>. opt (pIgnored false)
                         .>>. pcharToken '.' Period
                         .>>. opt (pIgnored false)
@@ -306,7 +313,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                         .>>. pFuncParamList
                         |> pnodePair // TODO: Replace this line, add method body
                         |> pnode (createNode MethodDef)
-                        <?> "method definition";
+                        <??> "Method definition";
                 ]
             |> attempt
             |> many)
@@ -339,10 +346,11 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 | _ -> List.empty
             ]
             |> List.collect id)
+        |> attempt // Important, allows a module to be parsed if a class couldn't be parsed.
         .>>. pMemberBlock true
         |>> fun (header, body) -> header @ [ body ]
         |> pnode (SyntaxNode.createNode ClassDef)
-        <?> "class definition"
+        <?> "Class definition"
 
     let pModuleDef nested =
         pAccessModifier nested
@@ -353,12 +361,12 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pMemberBlock false
         |>> fun (header, body) -> header @ [ body ]
         |> pnode (SyntaxNode.createNode ModuleDef)
-        <?> "module definition"
+        <?> "Module definition"
 
     pUseStatements
-    .>>. opt (pIdentifierStatement "namespace" NamespaceDef <?> "namespace definition")
+    .>>. opt (pIdentifierStatement "namespace" NamespaceDef <?> "Namespace definition")
     .>>. pUseStatements
-    .>>. (pClassDef false) // |> attempt <|> pModuleDef false) // NOTE: Use a choice here when another type of def is added.
+    .>>. (pClassDef false <|> pModuleDef false) // NOTE: Use a choice here when another type of def is added.
     .>>. many (pIgnored true)
     |>> fun ((((use1, ns), use2), classOrModule), trailing) ->
         let nodes =

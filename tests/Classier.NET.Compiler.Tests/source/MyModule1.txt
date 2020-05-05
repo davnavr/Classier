@@ -3,4 +3,5 @@
 namespace blah.blah.blah
 
 public module Math {
+    let myGlobal: long = 42
 }
