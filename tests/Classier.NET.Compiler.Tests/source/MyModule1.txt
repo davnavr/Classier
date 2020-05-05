@@ -3,5 +3,7 @@
 namespace blah.blah.blah
 
 public module Math {
-    let myGlobal: long = 42
+    let myGlobal: long = 42L
+    let aHexadecimalLiteral: int = 42L
+    let aBinaryLiteral: int = 42L
 }

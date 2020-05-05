@@ -25,14 +25,18 @@ type NodeValue =
            Imports: seq<SyntaxNode<NodeValue>>
            Namespace: SyntaxNode<NodeValue> option |}
     | AccessModifier
+    | BinLit
     | Block
     | ClassDef // TODO: Add anonymous records to some to store information.
     | Colon
     | Comma
     | Comment
+    | Expression
     | FieldDef
+    | HexLit
     | Identifier
     | IdentifierChain
+    | IntLit
     | Keyword
     | LCurlyBracket
     | LParen
@@ -57,9 +61,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         choice
             [
                 anyOf [ ' '; '\t' ]
+                <?> "whitespace"
                 |> many1Chars
-                |> pnode (SyntaxNode.createToken Whitespace)
-                <?> "whitespace";
+                |> pnode (SyntaxNode.createToken Whitespace);
 
                 // pMlCommentOneLine
 
@@ -68,7 +72,8 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     |> pnode (fun c pos ->
                         { Content = Token (string c)
                           Position = pos.NextLine
-                          Value = Newline });
+                          Value = Newline })
+                    <?> "newline";
 
                     pstring "//" .>>. restOfLine false
                     |> pnode (fun (str1, str2) ->
@@ -162,9 +167,43 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             leading @ (lc :: middle @ [ rc ])
         |> pnode (createNode Block)
 
-    let pexpression: Parser<SyntaxNode<NodeValue>, unit> =
-        pstring "42"
-        |> pnode (createToken Keyword) // Temporary
+    let pExpression: Parser<SyntaxNode<NodeValue>, unit> =
+        let numSuffixes =
+            [ "l"; "u"; "ul"; "lu" ]
+            |> List.map pstringCI
+            |> choice
+            |> opt
+            |>> Option.defaultValue ""
+
+        choice
+            [
+                digit
+                .>>. manyChars (digit <|> pchar '_')
+                .>>. numSuffixes
+                |>> (fun ((first, rest), suffix) ->
+                    sprintf "%c%s%s" first rest suffix)
+                |> pnode (createToken IntLit)
+                <??> "integer literal";
+
+                pstringCI "0x"
+                .>>. hex
+                .>>. manyChars (hex <|> pchar '_')
+                .>>. numSuffixes
+                |>> (fun (((prefix, first), rest), suffix) ->
+                    sprintf "%s%c%s%s" prefix first rest suffix)
+                |> pnode (createToken HexLit)
+                <??> "hexadecimal literal";
+
+                pstringCI "0b"
+                .>>. anyOf [ '0'; '1' ]
+                .>>. manyChars (anyOf [ '0'; '1'; '_' ])
+                .>>. numSuffixes
+                |>> (fun (((prefix, first), rest), suffix) ->
+                    sprintf "%s%c%s%s" prefix first rest suffix)
+                |> pnode (createToken BinLit)
+                <??> "binary literal";
+            ]
+        <?> "expression"
 
     let pTypeAnnotation =
         pIgnored true
@@ -198,7 +237,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. opt (pIgnored false)
         .>>. pcharToken '=' OpAssign
         .>>. opt (pIgnored false)
-        .>>. pexpression
+        .>>. pExpression
         |>> (fun (((((def), sep1), eq), sep2), expr) ->
             let value =
                 [
@@ -282,7 +321,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         choice
             [
                 pIgnored true
-                pexpression
+                pExpression
             ]
         |> attempt
         |> many
