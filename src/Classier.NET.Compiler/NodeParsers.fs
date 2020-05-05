@@ -31,7 +31,7 @@ let pnode (node: 'Result -> LinePos -> SyntaxNode<'Value>) (parser: Parser<'Resu
 let pnodePair p: NodeListParser<'Value> =
     p |>> fun (r1, r2) -> [ r1; r2 ]
 
-let pcharNode (c: char) (value: 'Value) =
+let pcharToken (c: char) (value: 'Value) =
     pstring (string c)
     |> pnode (createToken value)
 

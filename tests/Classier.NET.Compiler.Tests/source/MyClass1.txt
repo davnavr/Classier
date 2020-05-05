@@ -5,7 +5,9 @@ use System.IO
 // This is a comment
 public class MyClass1 {
     let myField: int = 42
-    //public String DoSomething() {
+
+    public def this.TheTest
+    //public String this.DoSomething () {
     //    return "The casing rules have not been decided yet";
     //}
 }

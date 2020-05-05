@@ -29,7 +29,7 @@ namespace Classier.NET.Compiler
         [InlineData("Classier.NET.Compiler.source.MyClass1.txt")]
         [InlineData("Classier.NET.Compiler.source.MyModule1.txt")]
         [Theory]
-        public void ParserCorrectlyParsesTestFiles(string file)
+        public void ParserCorrectlyParsesTestFiles(string file) ////, string[] imports)
         {
             // Arrange
             using var stream = typeof(ParserTests).Assembly.GetManifestResourceStream(file);
@@ -37,11 +37,12 @@ namespace Classier.NET.Compiler
             string content = reader.ReadToEnd();
 
             // Act
-            var result = new SuccessResult(() => runParserOnString(Grammar.parser, null, file, content));
+            var result = new SuccessResult(() => runParserOnString(Grammar.parser, null, file, content)).Result;
 
             // Assert
-            Assert.IsType<NodeValue.CompilationUnit>(result.Result.Value);
-            Assert.Equal(normalizeNewlines(content), result.Result.ToString());
+            var cunode = Assert.IsType<NodeValue.CompilationUnit>(result.Value);
+            ////Assert.Equal(imports, cunode.Item.Imports);
+            Assert.Equal(normalizeNewlines(content), result.ToString());
         }
     }
 }

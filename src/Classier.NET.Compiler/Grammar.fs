@@ -34,6 +34,7 @@ type NodeValue =
     | IdentifierChain
     | Keyword
     | LCurlyBracket
+    | MethodHeader
     | ModuleDef
     | NamespaceDef
     | Newline
@@ -75,6 +76,8 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pIgnored false
         |> pnodePair
 
+    let pKeywordOpt keyword = pnodesOpt (pKeyword keyword)
+
     let pIdentifier =
         let palphabet =
             List.append [ 'a'..'z' ] [ 'A'..'Z' ]
@@ -91,7 +94,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         many
             (pIdentifier
             .>>. (pIgnored false |> opt)
-            .>>. (pstring "." |> pnode (SyntaxNode.createToken Period))
+            .>>. pcharToken '.' Period
             .>>. (pIgnored false |> opt)
             |> attempt)
         .>>. pIdentifier
@@ -124,7 +127,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             ]
         |> many
 
-    // Includes trailing whitespace
+    // Optional, and includes trailing whitespace
     let pAccessModifier full =
         [
             "public";
@@ -138,47 +141,51 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |> pnode (SyntaxNode.createToken AccessModifier)
         .>>. pIgnored false
         |> pnodePair
-        |> opt
+        |> pnodesOpt
+        <?> "access modifier"
 
     let pBlock (p: NodeListParser<NodeValue>) =
         many (pIgnored true)
-        .>>. (pstring "{" |> pnode (SyntaxNode.createToken LCurlyBracket))
+        .>>. pcharToken '{' LCurlyBracket
         .>>. p
-        .>>. (pstring "}" |> pnode (SyntaxNode.createToken RCurlyBracket))
+        .>>. pcharToken '}' RCurlyBracket
         |>> fun (((leading, lc), middle), rc) ->
             leading @ (lc :: middle @ [ rc ])
+        |> pnode (createNode Block)
 
     let pexpression: Parser<SyntaxNode<NodeValue>, unit> =
         pstring "42"
         |> pnode (createToken Keyword) // Temporary
 
+    let pNameAndType =
+        pIdentifier
+        .>>. opt (pIgnored false)
+        .>>. pcharToken ':' Colon
+        .>>. opt (pIgnored false)
+        .>>. pIdentifierChain
+        |>> (fun ((((name, sep1), col), sep2), varType) ->
+            [
+                name
+                if sep1.IsSome then
+                    sep1.Value
+                col
+                if sep2.IsSome then
+                    sep2.Value
+                varType
+            ])
+
     let pFieldOrVar =
         pKeyword "let"
-        .>>. pnodesOpt (pKeyword "mutable")
-        .>>. pIdentifierChain
+        // TODO: Add modifiers "mutable"
+        .>>. pNameAndType
+        |>> (fun (wordl, names) -> wordl @ names)
         .>>. opt (pIgnored false)
-        .>>. (pcharNode ':' Colon)
-        .>>. opt (pIgnored false)
-        |>> (fun (((((wordl, wordm), name), sep1), colon), sep2) ->
-            let trailing =
-                [
-                    name
-                    if sep1.IsSome then
-                        sep1.Value
-                    colon
-                    if sep2.IsSome then
-                        sep2.Value
-                ]
-            wordl @ wordm @ trailing)
-        .>>. pIdentifierChain
-        .>>. opt (pIgnored false)
-        .>>. (pcharNode '=' OpAssign)
+        .>>. pcharToken '=' OpAssign
         .>>. opt (pIgnored false)
         .>>. pexpression
-        |>> (fun (((((def, valueType), sep1), eq), sep2), expr) ->
+        |>> (fun (((((def), sep1), eq), sep2), expr) ->
             let value =
                 [
-                    valueType
                     if sep1.IsSome then
                         sep1.Value
                     eq
@@ -190,24 +197,65 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |> pnode (createNode FieldDef)
         <?> "variable definition"
 
-    let pMemberBlock instance =
+    let pFuncKeywords =
+        pAccessModifier true
+        .>>. pKeyword "def"
+        // TODO: Add modifiers "mutator", "abstract", and "inline"
+        |>> fun (acc, def) ->
+            List.collect id [ acc; def ]
+
+    let pFuncParamTuple = null
+
+    let pFuncParams = null
+
+    let pFuncBody =
+        pBlock (choice [ pIgnored true ] |> attempt |> many) // Temporary
+
+    let pMemberBlock instance: Parser<SyntaxNode<NodeValue>, unit> =
         pBlock (
             choice
                 [
-                    pIgnored true;
-                    pFieldOrVar;
+                    pIgnored true
+                    pFieldOrVar
+                    if instance then
+                        pFuncKeywords
+                        .>>. (pIdentifier <?> "self identifier")
+                        .>>. opt (pIgnored false)
+                        .>>. pcharToken '.' Period
+                        .>>. opt (pIgnored false)
+                        .>>. pIdentifier
+                        |>> (fun (((((words, self), sep1), per), sep2), name) ->
+                            let header = 
+                                [
+                                    self
+                                    if sep1.IsSome then
+                                        sep1.Value
+                                    per
+                                    if sep2.IsSome then
+                                        sep2.Value
+                                    name
+                                ]
+                            words @ header)
+                        // .>>. pFuncParams
+                        |> pnode (createNode MethodHeader)
+                        <?> "method definition";
                 ]
             |> attempt
             |> many)
 
     let pClassDef nested =
         pAccessModifier nested
-        .>>. opt (pKeyword "inheritable" |> attempt <|> pKeyword "abstract")
-        .>>. opt (pKeyword "mutable")
-        |>> (fun ((access, worde), wordm) ->
-            [ access; worde; wordm ]
-            |> List.choose id
-            |> List.collect id)
+        .>>. pnodesOpt (
+            pnodesOpt (
+                (pKeyword "inheritable" |> attempt <|> pKeyword "abstract")
+                .>>. pIgnored false
+                |>> fun (impl, sep) -> impl @ [ sep ] )
+            .>>. pnodesOpt (
+                pKeywordOpt "mutable"
+                .>>. pIgnored false
+                |>> fun (mut, sep) -> mut @ [ sep ])
+            |>> (fun (impl, mut) -> impl @ mut))
+        |>> (fun (access, modifiers) -> access @ modifiers)
         .>>. pKeyword "class"
         // NOTE: Implement primary constructors some other time.
         .>>. pIdentifier
@@ -224,7 +272,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             ]
             |> List.collect id)
         .>>. pMemberBlock true
-        |>> fun (header, body) -> header @ body
+        |>> fun (header, body) -> header @ [ body ]
         |> pnode (SyntaxNode.createNode ClassDef)
         <?> "class definition"
 
@@ -233,16 +281,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pKeyword "module"
         .>>. pIdentifier
         |>> (fun ((access, wordm), name) ->
-            [
-                match access with
-                | Some _ -> access.Value
-                | _ -> List.empty
-                wordm
-                [ name ]
-            ]
-            |> List.collect id)
+            List.collect id [ access; wordm; [ name ] ])
         .>>. pMemberBlock false
-        |>> fun (header, body) -> header @ body
+        |>> fun (header, body) -> header @ [ body ]
         |> pnode (SyntaxNode.createNode ModuleDef)
         <?> "module definition"
 
