@@ -209,6 +209,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pFuncBody, pFuncBodyRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
 
+    // TODO: Implemented expressions using http://www.quanttec.com/fparsec/reference/operatorprecedenceparser.html#members.OperatorPrecedenceParser
     let pExpression: Parser<SyntaxNode<NodeValue>, unit> =
         let numSuffixes suffixes =
             suffixes
@@ -224,65 +225,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |>> fun (leading, trailing) ->
                 sprintf "%c%s" leading trailing
 
-        let expr, exprRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
+        let expr = new OperatorPrecedenceParser<SyntaxNode<NodeValue>, SyntaxNode<NodeValue> list, unit>()
 
-        let pOperator =
-            let opParser = new OperatorPrecedenceParser<SyntaxNode<NodeValue>, string, unit>()
-            opParser.TermParser <- expr
-            let infixOp symbol prec assoc =
-                let agdaosmgdahd = fail "not implemented"
-                let mapping expr1 expr2 =
-                    expr1
-                InfixOperator (symbol, agdaosmgdahd, prec, assoc, mapping)
-                |> opParser.AddOperator
-
-
-            opParser.ExpressionParser
-
-        let parenExpr = // TODO: Move this into the operator parser
-            pLParen
-            .>>. pIgnoredOpt true
-            .>>. expr // TODO: Make expr optional to allow something like F# unit?
-            .>>. pIgnoredOpt true
-            .>>. pRParen
-            |>> (fun ((((lparen, sep1), exp), sep2), rparen) ->
-                [
-                    lparen
-                    if sep1.IsSome then
-                        sep1.Value
-                    exp
-                    if sep2.IsSome then
-                        sep2.Value
-                    rparen
-                ])
-            |> pnode (createNode Expression);
-
-        let ifExpression =
-            pKeywordNS "if"
-            .>>. many (pIgnored true)
-            .>>. parenExpr
-            .>>. many (pIgnored true)
-            .>>. pKeywordNS "then"
-            // TODO: Should only require whitespace when the expression is not in parenthesis
-
-        let binaryOperator op value = // TODO: Fix, throws a StackOverflowException when parsing addition expression. Need to check something first before parsing expr
-            expr
-            .>>. pIgnoredOpt true
-            .>>. (pstring op |> pnode (createToken value))
-            .>>. pIgnoredOpt true
-            .>>. expr
-            |>> fun ((((exp1, sep1), opstr), sep2), exp2) ->
-                [
-                    exp1
-                    if sep1.IsSome then
-                        sep1.Value
-                    opstr
-                    if sep2.IsSome then
-                        sep2.Value
-                    exp2
-                ]
-
-        exprRef :=
+        expr.TermParser <-
             choice
                 [
                     pIdentifier
@@ -325,18 +270,46 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                             <??> "integer literal";
                         ]
                     |>> (fun (sign, (node, numType)) -> sign + node, numType)
-                    |> pnode (fun (content, numType) -> createToken numType content)
+                    |> pnode (fun (content, numType) -> createToken numType content);
 
-                    parenExpr
-
-                    // NOTE: Might be able to use backtracking to get first operand instead.
-                    // TODO: Use this: http://www.quanttec.com/fparsec/users-guide/tips-and-tricks.html#parsing-f-infix-operators
-                    //binaryOperator "+" OpAdd
-                    //|> pnode (createNode ExprAdd);
+                    pLParen
+                    .>>. pIgnoredOpt true
+                    .>>. expr.ExpressionParser
+                    .>>. pIgnoredOpt true
+                    .>>. pRParen
+                    |>> (fun ((((lparen, sep1), exp), sep2), rparen) ->
+                        [
+                            lparen
+                            if sep1.IsSome then
+                                sep1.Value
+                            exp
+                            if sep2.IsSome then
+                                sep2.Value
+                            rparen
+                        ])
+                    |> pnode (createNode Expression);
                 ]
-            <??> "expression"
+            .>>. (pIgnored true |> many)
+            |> pnode (fun (e, ignored) pos ->
+                if List.isEmpty ignored
+                then e
+                else createNode Expression (e :: ignored) pos)
 
-        expr
+        let infixOp exprType operandType symbol prec assoc =
+            let mapping op (expr1: SyntaxNode<NodeValue>) expr2 =
+                let opNode = createToken operandType symbol expr1.Position
+                createNode exprType (expr1 :: opNode :: op @ [ expr2 ]) expr1.Position
+            InfixOperator (symbol, pIgnored true |> many, prec, assoc, (), mapping)
+
+        [
+            infixOp ExprAdd OpAdd "+" 1 Associativity.Left
+            infixOp ExprAdd OpAdd "-" 1 Associativity.Left
+            infixOp ExprAdd OpAdd "*" 5 Associativity.Left
+            infixOp ExprAdd OpAdd "/" 5 Associativity.Left
+        ]
+        |> List.iter expr.AddOperator
+
+        expr.ExpressionParser <?> "expression"
 
     let pFieldOrVar =
         pKeyword "let"

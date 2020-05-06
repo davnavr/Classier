@@ -4,8 +4,8 @@ namespace blah.blah.blah
 
 public module Math {
     let myGlobal: long = 42L
-    let aHexadecimalLiteral: int = 0x2A
-    let aBinaryLiteral: int = 0b00101010
+    let aHexadecimalLiteral: int = 0x2A + 0x1F
+    let aBinaryLiteral: int = 0b00101010 * 0B1100_0011
 
     let three: uint = 03
     let myNegative: uint = -7_135_601
