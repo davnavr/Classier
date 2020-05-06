@@ -14,11 +14,13 @@ public class MyClass1 {
 
     public this.Explicit (p1: int) (p2: int): int
     {
-        (myField)
+        (myField) / 42
     }
 
     public self.implicit (p1, p2)
     {
+        /* This is a comment on one line */
         1+2
+        3 +      4
     }
 }

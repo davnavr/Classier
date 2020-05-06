@@ -14,6 +14,8 @@
 
 module Classier.NET.Compiler.Grammar
 
+open System
+
 open FParsec
 
 open Classier.NET.Compiler.NodeParsers
@@ -35,6 +37,9 @@ type NodeValue =
     | DecLit
     | Expression
     | ExprAdd
+    | ExprDiv
+    | ExprSub
+    | ExprMul
     | FieldDef
     | HexLit
     | Identifier
@@ -49,8 +54,10 @@ type NodeValue =
     | NamespaceDef
     | Newline
     | OpAdd
+    | OpDiv
     | OpEqual
-    | OpMinus
+    | OpSub
+    | OpMul
     | Param // of {| Name: string |}
     | ParamTuple // of seq<SyntaxNode<NodeValue>>
     | ParamSet
@@ -68,7 +75,26 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
     let pRParen = pcharToken ')' RParen
     let pPeriod = pcharToken '.' Period
 
+    let pword word value =
+        pstring word |> pnode (createToken value)
+
     let pIgnored multiline = // TODO: When ML comments are introduced, make it parse many1
+        let pMLCommentStart = pword "/*" Comment <?> "start of multi-line comment"
+        let pMLCommentEnd = pword "*/" Comment <?> "end of multi-line comment"
+        let pCommentContent =
+            // TODO: Fix, fails when it reaches a */
+            // many (notFollowedBy (pchar '\n') >>. (notFollowedBy pMLCommentEnd) >>. anyChar)
+            manyCharsTill anyChar (followedBy (pMLCommentEnd |>> ignore) <|> followedBy (pchar '\n' |>> ignore))
+            |>> String.Concat
+            |> pnode (createToken Comment)
+        let pNewline =
+            newline
+            |> pnode (fun c pos ->
+                { Content = Token (string c)
+                  Position = pos.NextLine
+                  Value = Newline })
+            <?> "newline";
+
         choice
             [
                 anyOf [ ' '; '\t' ]
@@ -76,28 +102,38 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 |> many1Chars
                 |> pnode (SyntaxNode.createToken Whitespace);
 
-                // pMlCommentOneLine
-
                 if multiline then
-                    unicodeNewline
-                    |> pnode (fun c pos ->
-                        { Content = Token (string c)
-                          Position = pos.NextLine
-                          Value = Newline })
-                    <?> "newline";
+                    pNewline;
 
                     pstring "//" .>>. restOfLine false
                     |> pnode (fun (str1, str2) ->
-                        SyntaxNode.createToken Comment (str1 + str2));
+                        SyntaxNode.createToken Comment (str1 + str2))
+                    <?> "comment";
 
-                    // pMlComment
+                    pMLCommentStart
+                    .>>. many (pCommentContent <|> pNewline)
+                    .>>. pMLCommentEnd
+                    |>> (fun ((start, content), cend) ->
+                        start :: content @ [ cend ])
+                    |> pnode (createNode Comment)
+                    |> attempt
+                else
+                    pMLCommentStart
+                    .>>. opt pCommentContent
+                    .>>. pMLCommentEnd
+                    |>> (fun ((cstart, content), cend) ->
+                        [
+                            cstart
+                            if content.IsSome then
+                                content.Value
+                            cend
+                        ])
+                    |> pnode (createNode Comment);
             ]
 
     let pIgnoredOpt multiline = opt (pIgnored multiline)
 
-    let pKeywordNS keyword =
-        pstring keyword
-        |> pnode (SyntaxNode.createToken Keyword)
+    let pKeywordNS keyword = pword keyword Keyword
 
     let pKeyword keyword =
         pKeywordNS keyword
@@ -115,9 +151,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |>> fun (c, rest) ->
             c :: rest
             |> Array.ofList
-            |> System.String
+            |> String
         |> pnode (SyntaxNode.createToken Identifier)
-        <??> "Identifier"
+        <??> "identifier"
 
     let pIdentifierChain =
         many
@@ -141,7 +177,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     ]))
                 [ last ]
         |> pnode (SyntaxNode.createNode IdentifierChain)
-        <?> "Fully qualified name"
+        <?> "fully qualified name"
 
     let pIdentifierStatement keyword value =
         pKeyword keyword
@@ -209,7 +245,6 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pFuncBody, pFuncBodyRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
 
-    // TODO: Implemented expressions using http://www.quanttec.com/fparsec/reference/operatorprecedenceparser.html#members.OperatorPrecedenceParser
     let pExpression: Parser<SyntaxNode<NodeValue>, unit> =
         let numSuffixes suffixes =
             suffixes
@@ -225,7 +260,20 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |>> fun (leading, trailing) ->
                 sprintf "%c%s" leading trailing
 
-        let expr = new OperatorPrecedenceParser<SyntaxNode<NodeValue>, SyntaxNode<NodeValue> list, unit>()
+        let expr = OperatorPrecedenceParser<SyntaxNode<NodeValue>, SyntaxNode<NodeValue> list, unit>()
+
+        [
+            ExprAdd, OpAdd, "+", 1, Associativity.Left;
+            ExprSub, OpSub, "-", 1, Associativity.Left;
+            ExprMul, OpMul, "*", 5, Associativity.Left;
+            ExprDiv, OpDiv, "/", 5, Associativity.Left;
+        ]
+        |> List.map (fun (exprType, operandType, symbol, prec, assoc) ->
+            let mapping op (expr1: SyntaxNode<NodeValue>) expr2 =
+                let opNode = createToken operandType symbol expr1.Position
+                createNode exprType (expr1 :: opNode :: op @ [ expr2 ]) expr1.Position
+            InfixOperator (symbol, pIgnored true |> many, prec, assoc, (), mapping))
+        |> List.iter expr.AddOperator
 
         expr.TermParser <-
             choice
@@ -294,20 +342,6 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 if List.isEmpty ignored
                 then e
                 else createNode Expression (e :: ignored) pos)
-
-        let infixOp exprType operandType symbol prec assoc =
-            let mapping op (expr1: SyntaxNode<NodeValue>) expr2 =
-                let opNode = createToken operandType symbol expr1.Position
-                createNode exprType (expr1 :: opNode :: op @ [ expr2 ]) expr1.Position
-            InfixOperator (symbol, pIgnored true |> many, prec, assoc, (), mapping)
-
-        [
-            infixOp ExprAdd OpAdd "+" 1 Associativity.Left
-            infixOp ExprAdd OpAdd "-" 1 Associativity.Left
-            infixOp ExprAdd OpAdd "*" 5 Associativity.Left
-            infixOp ExprAdd OpAdd "/" 5 Associativity.Left
-        ]
-        |> List.iter expr.AddOperator
 
         expr.ExpressionParser <?> "expression"
 

@@ -2,7 +2,7 @@
 
 namespace blah.blah.blah
 
-public module Math {
+public/* A comment */module Math {
     let myGlobal: long = 42L
     let aHexadecimalLiteral: int = 0x2A + 0x1F
     let aBinaryLiteral: int = 0b00101010 * 0B1100_0011
