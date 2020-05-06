@@ -32,6 +32,7 @@ type NodeValue =
     | Colon
     | Comma
     | Comment
+    | DecLit
     | Expression
     | ExprAdd
     | FieldDef
@@ -49,6 +50,7 @@ type NodeValue =
     | Newline
     | OpAdd
     | OpEqual
+    | OpMinus
     | Param // of {| Name: string |}
     | ParamTuple // of seq<SyntaxNode<NodeValue>>
     | ParamSet
@@ -60,6 +62,12 @@ type NodeValue =
     | Whitespace
 
 let parser: Parser<SyntaxNode<NodeValue>, unit> =
+    let optString p = opt p |>> Option.defaultValue ""
+
+    let pLParen = pcharToken '(' LParen
+    let pRParen = pcharToken ')' RParen
+    let pPeriod = pcharToken '.' Period
+
     let pIgnored multiline =
         choice
             [
@@ -111,9 +119,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
     let pIdentifierChain =
         many
             (pIdentifier
-            .>>. (pIgnored false |> opt)
-            .>>. pcharToken '.' Period
-            .>>. (pIgnored false |> opt)
+            .>>. pIgnoredOpt false
+            .>>. pPeriod
+            .>>. pIgnoredOpt false
             |> attempt)
         .>>. pIdentifier
         |>> fun (leading, last) ->
@@ -173,13 +181,19 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |> pnode (createNode Block)
 
     let pExpression: Parser<SyntaxNode<NodeValue>, unit> =
-        let numSuffixes =
-            [ "l"; "u"; "ul"; "lu" ]
+        let numSuffixes suffixes =
+            suffixes
             |> List.map pstringCI
             |> choice
-            |> opt
-            |>> Option.defaultValue ""
-            <?> "numeric literal suffix"
+            |> optString
+            <?> "numeric suffix"
+        let decSuffixes = numSuffixes [ "d"; "f"; "m"; ]
+        let intSuffixes = numSuffixes [ "l"; "u"; "ul"; "lu" ]
+        let intDigits =
+            digit
+            .>>. manyChars (digit <|> pchar '_')
+            |>> fun (leading, trailing) ->
+                sprintf "%c%s" leading trailing
 
         let expr, exprRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
 
@@ -205,37 +219,51 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 [
                     pIdentifier
 
-                    digit // TODO: Allow negative
-                    .>>. manyChars (digit <|> pchar '_')
-                    .>>. numSuffixes
-                    |>> (fun ((first, rest), suffix) ->
-                        sprintf "%c%s%s" first rest suffix)
-                    |> pnode (createToken IntLit)
-                    <??> "integer literal";
+                    pstring "-"
+                    |> optString
+                    .>>. choice
+                        [
+                            pstringCI "0x"
+                            .>>. hex
+                            .>>. manyChars (hex <|> pchar '_')
+                            .>>. intSuffixes
+                            |>> (fun (((prefix, first), rest), suffix) ->
+                                sprintf "%s%c%s%s" prefix first rest suffix)
+                            .>>. preturn HexLit
+                            <??> "hexadecimal literal";
 
-                    pstringCI "0x"
-                    .>>. hex
-                    .>>. manyChars (hex <|> pchar '_')
-                    .>>. numSuffixes
-                    |>> (fun (((prefix, first), rest), suffix) ->
-                        sprintf "%s%c%s%s" prefix first rest suffix)
-                    |> pnode (createToken HexLit)
-                    <??> "hexadecimal literal";
+                            pstringCI "0b"
+                            .>>. anyOf [ '0'; '1' ]
+                            .>>. manyChars (anyOf [ '0'; '1'; '_' ])
+                            .>>. intSuffixes
+                            |>> (fun (((prefix, first), rest), suffix) ->
+                                sprintf "%s%c%s%s" prefix first rest suffix)
+                            .>>. preturn BinLit
+                            <??> "binary literal";
 
-                    pstringCI "0b"
-                    .>>. anyOf [ '0'; '1' ]
-                    .>>. manyChars (anyOf [ '0'; '1'; '_' ])
-                    .>>. numSuffixes
-                    |>> (fun (((prefix, first), rest), suffix) ->
-                        sprintf "%s%c%s%s" prefix first rest suffix)
-                    |> pnode (createToken BinLit)
-                    <??> "binary literal";
+                            intDigits
+                            .>>. pstring "."
+                            .>>. intDigits
+                            .>>. decSuffixes
+                            |>> (fun (((intp, per), decp), suffix) -> intp + per + decp + suffix)
+                            .>>. preturn DecLit
+                            |> attempt
+                            <??> "numeric literal"
 
-                    pcharToken '(' LParen
+                            intDigits
+                            .>>. intSuffixes
+                            |>> (fun (digits, suffix) -> digits + suffix)
+                            .>>. preturn IntLit
+                            <??> "integer literal";
+                        ]
+                    |>> (fun (sign, (node, numType)) -> sign + node, numType)
+                    |> pnode (fun (content, numType) -> createToken numType content)
+
+                    pLParen
                     .>>. pIgnoredOpt true
                     .>>. expr // TODO: Make expr optional to allow something like F# unit?
                     .>>. pIgnoredOpt true
-                    .>>. pcharToken ')' RParen
+                    .>>. pRParen
                     |>> (fun ((((lparen, sep1), exp), sep2), rparen) ->
                         [
                             lparen
@@ -248,6 +276,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                         ])
                     |> pnode (createNode Expression);
 
+                    // NOTE: Might be able to use backtracking to get first operand instead.
                     //binaryOperator "+" OpAdd
                     //|> pnode (createNode ExprAdd);
                 ]
@@ -303,7 +332,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pFuncKeywords =
         pAccessModifier true
-        .>>. pKeyword "def"
+        .>>. pKeyword "def" // TODO: Remove "def"
         // TODO: Add modifiers "mutator", "abstract", and "inline"
         |>> fun (acc, def) ->
             List.collect id [ acc; def ]
@@ -313,7 +342,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             pNameAndType
             |> pnode (createNode Param)
 
-        pcharToken '(' LParen
+        pLParen
         .>>. pIgnoredOpt false
         .>>. pnodesOpt (
             many (
@@ -335,7 +364,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             .>>. pParam
             |>> fun (rest, last) -> rest @ [ last ])
         .>>. pIgnoredOpt false
-        .>>. pcharToken ')' RParen
+        .>>. pRParen
         |>> (fun ((((lparen, sep1), parameters), sep2), rparen) ->
             let left =
                 [
@@ -371,7 +400,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         choice
             [
                 pIgnored true
-                pExpression
+                pExpression // TODO: Check if statement is followed by a NewLine
             ]
         |> attempt
         |> many
@@ -392,7 +421,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     pFuncKeywords
                     .>>. (pIdentifier <?> "self identifier")
                     .>>. pIgnoredOpt false
-                    .>>. pcharToken '.' Period
+                    .>>. pPeriod
                     .>>. pIgnoredOpt false
                     .>>. (pIdentifier <?> "method name")
                     .>>. pIgnored false

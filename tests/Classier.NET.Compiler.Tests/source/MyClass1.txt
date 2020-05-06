@@ -19,6 +19,6 @@ public class MyClass1 {
 
     public def self.implicit (p1, p2)
     {
-        1 + 2
+        //1 + 2
     }
 }
