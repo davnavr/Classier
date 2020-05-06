@@ -68,7 +68,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
     let pRParen = pcharToken ')' RParen
     let pPeriod = pcharToken '.' Period
 
-    let pIgnored multiline =
+    let pIgnored multiline = // TODO: When ML comments are introduced, make it parse many1
         choice
             [
                 anyOf [ ' '; '\t' ]
@@ -226,7 +226,20 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
         let expr, exprRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
 
-        let parenExpr =
+        let pOperator =
+            let opParser = new OperatorPrecedenceParser<SyntaxNode<NodeValue>, string, unit>()
+            opParser.TermParser <- expr
+            let infixOp symbol prec assoc =
+                let agdaosmgdahd = fail "not implemented"
+                let mapping expr1 expr2 =
+                    expr1
+                InfixOperator (symbol, agdaosmgdahd, prec, assoc, mapping)
+                |> opParser.AddOperator
+
+
+            opParser.ExpressionParser
+
+        let parenExpr = // TODO: Move this into the operator parser
             pLParen
             .>>. pIgnoredOpt true
             .>>. expr // TODO: Make expr optional to allow something like F# unit?
@@ -317,6 +330,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     parenExpr
 
                     // NOTE: Might be able to use backtracking to get first operand instead.
+                    // TODO: Use this: http://www.quanttec.com/fparsec/users-guide/tips-and-tricks.html#parsing-f-infix-operators
                     //binaryOperator "+" OpAdd
                     //|> pnode (createNode ExprAdd);
                 ]
