@@ -95,9 +95,12 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pIgnoredOpt multiline = opt (pIgnored multiline)
 
-    let pKeyword keyword =
+    let pKeywordNS keyword =
         pstring keyword
         |> pnode (SyntaxNode.createToken Keyword)
+
+    let pKeyword keyword =
+        pKeywordNS keyword
         .>>. pIgnored false
         |> pnodePair
 
@@ -180,6 +183,32 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             leading @ (lc :: middle @ [ rc ])
         |> pnode (createNode Block)
 
+    let pTypeAnnotation =
+        pIgnored true
+        |> attempt
+        |> many
+        .>>. pcharToken ':' Colon
+        .>>. pIgnoredOpt false
+        .>>. pIdentifierChain
+        |>> (fun (((sep1, col), sep2), typeName) ->
+            let trailing =
+                [
+                    col
+                    if sep2.IsSome then
+                        sep2.Value
+                    typeName
+                ]
+            sep1 @ trailing)
+        |> attempt
+        |> pnodesOpt
+        |> pnode (createNode TypeAnnotation)
+        <?> "type annotation"
+
+    let pNameAndType =
+        pIdentifier .>>. pTypeAnnotation |> pnodePair
+
+    let pFuncBody, pFuncBodyRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
+
     let pExpression: Parser<SyntaxNode<NodeValue>, unit> =
         let numSuffixes suffixes =
             suffixes
@@ -196,6 +225,32 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 sprintf "%c%s" leading trailing
 
         let expr, exprRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
+
+        let parenExpr =
+            pLParen
+            .>>. pIgnoredOpt true
+            .>>. expr // TODO: Make expr optional to allow something like F# unit?
+            .>>. pIgnoredOpt true
+            .>>. pRParen
+            |>> (fun ((((lparen, sep1), exp), sep2), rparen) ->
+                [
+                    lparen
+                    if sep1.IsSome then
+                        sep1.Value
+                    exp
+                    if sep2.IsSome then
+                        sep2.Value
+                    rparen
+                ])
+            |> pnode (createNode Expression);
+
+        let ifExpression =
+            pKeywordNS "if"
+            .>>. many (pIgnored true)
+            .>>. parenExpr
+            .>>. many (pIgnored true)
+            .>>. pKeywordNS "then"
+            // TODO: Should only require whitespace when the expression is not in parenthesis
 
         let binaryOperator op value = // TODO: Fix, throws a StackOverflowException when parsing addition expression. Need to check something first before parsing expr
             expr
@@ -259,22 +314,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     |>> (fun (sign, (node, numType)) -> sign + node, numType)
                     |> pnode (fun (content, numType) -> createToken numType content)
 
-                    pLParen
-                    .>>. pIgnoredOpt true
-                    .>>. expr // TODO: Make expr optional to allow something like F# unit?
-                    .>>. pIgnoredOpt true
-                    .>>. pRParen
-                    |>> (fun ((((lparen, sep1), exp), sep2), rparen) ->
-                        [
-                            lparen
-                            if sep1.IsSome then
-                                sep1.Value
-                            exp
-                            if sep2.IsSome then
-                                sep2.Value
-                            rparen
-                        ])
-                    |> pnode (createNode Expression);
+                    parenExpr
 
                     // NOTE: Might be able to use backtracking to get first operand instead.
                     //binaryOperator "+" OpAdd
@@ -283,30 +323,6 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             <??> "expression"
 
         expr
-
-    let pTypeAnnotation =
-        pIgnored true
-        |> attempt
-        |> many
-        .>>. pcharToken ':' Colon
-        .>>. pIgnoredOpt false
-        .>>. pIdentifierChain
-        |>> (fun (((sep1, col), sep2), typeName) ->
-            let trailing =
-                [
-                    col
-                    if sep2.IsSome then
-                        sep2.Value
-                    typeName
-                ]
-            sep1 @ trailing)
-        |> attempt
-        |> pnodesOpt
-        |> pnode (createNode TypeAnnotation)
-        <?> "type annotation"
-
-    let pNameAndType =
-        pIdentifier .>>. pTypeAnnotation |> pnodePair
 
     let pFieldOrVar =
         pKeyword "let"
@@ -332,10 +348,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pFuncKeywords =
         pAccessModifier true
-        .>>. pKeyword "def" // TODO: Remove "def"
         // TODO: Add modifiers "mutator", "abstract", and "inline"
-        |>> fun (acc, def) ->
-            List.collect id [ acc; def ]
 
     let pFuncParamTuple =
         let pParam =
@@ -396,11 +409,11 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |> pnode (createNode ParamSet)
         <??> "parameter list"
 
-    let pFuncBody: Parser<SyntaxNode<NodeValue>, unit> =
+    pFuncBodyRef :=
         choice
             [
                 pIgnored true
-                pExpression // TODO: Check if statement is followed by a NewLine
+                pExpression // TODO: Check if the statement is followed by a NewLine
             ]
         |> attempt
         |> many
