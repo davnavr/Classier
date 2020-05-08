@@ -1,9 +1,9 @@
 
-use java.lang
-use java.util
+use java.lang;
+use java.util;
 
-namespace this.is.my.space
+namespace this.is.my.space;
 
 internal class MyAbstractClass1 {
-    let tester: java.lang.String = someUndefinedGlobal
+  let tester: java.lang.String = someUndefinedGlobal;
 }

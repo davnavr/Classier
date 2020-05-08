@@ -40,7 +40,7 @@ type NodeOrToken<'Value> =
     | Node of seq<SyntaxNode<'Value>>
     | Token of string
 
-let lengthOf (nodes: seq<SyntaxNode<'Value>>) =
+let private lengthOf (nodes: seq<SyntaxNode<'Value>>) =
     nodes
     |> Seq.sumBy (fun node -> node.Length)
 

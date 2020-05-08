@@ -21,16 +21,47 @@ open FParsec
 open Classier.NET.Compiler.NodeParsers
 open Classier.NET.Compiler.SyntaxNode
 
+// TODO: Switch to using Seq.append instead of List as it is much faster for larger collections.
+
+type Visibility =
+    | Public
+    | Internal
+    | Protected
+    | Private
+
+type MemberDef<'Flags> =
+    { Name: string
+      Visibility: Visibility
+      Flags: 'Flags }
+
+[<Flags>]
+type ClassFlags =
+    | None = 0
+    | Abstract = 1
+    | Inheritable = 2
+    | Mutable = 4
+
+[<Flags>]
+type MethodFlags =
+    | None = 0
+    | Abstract = 1
+    | Inline = 2
+    | Mutator = 4
+
+[<Flags>]
+type FuncFlags =
+    | None = 0
+    | Inline = 1
 
 type NodeValue =
     | CompilationUnit of
         {| Definition: SyntaxNode<NodeValue>
-           Imports: seq<SyntaxNode<NodeValue>>
-           Namespace: SyntaxNode<NodeValue> option |}
-    | AccessModifier
+           Imports: seq<seq<string>>
+           Namespace: seq<string> option |}
+    | AccessModifier of Visibility
     | BinLit
     | Block
-    | ClassDef // TODO: Add anonymous records to some to store information.
+    | ClassDef of MemberDef<ClassFlags>
     | Colon
     | Comma
     | Comment
@@ -40,56 +71,58 @@ type NodeValue =
     | ExprDiv
     | ExprSub
     | ExprMul
-    | FieldDef
+    | FieldDef of MemberDef<unit>
+    | FuncDef of MemberDef<unit>
     | HexLit
-    | Identifier
-    | IdentifierChain
+    | Identifier of string
+    | IdentifierChain of seq<string>
     | IntLit
     | Keyword
     | LCurlyBracket
     | LParen
-    | MethodDef
+    | MethodDef of MemberDef<MethodFlags> * seq<seq<Param>>
     | MethodHeader
-    | ModuleDef
-    | NamespaceDef
+    | ModuleDef of MemberDef<unit>
+    | NamespaceDef of seq<string>
     | Newline
     | OpAdd
     | OpDiv
     | OpEqual
     | OpSub
     | OpMul
-    | Param // of {| Name: string |}
-    | ParamTuple // of seq<SyntaxNode<NodeValue>>
-    | ParamSet
+    | Param of Param
+    | ParamTuple of seq<Param>
+    | ParamSet of seq<seq<Param>>
     | Period
     | RCurlyBracket
     | RParen
-    | TypeAnnotation
+    | Semicolon
+    | TypeAnnotation of seq<string>
     | UseStatement
     | Whitespace
+and Param = { Name: string; ParamType: seq<string> }
 
-let parser: Parser<SyntaxNode<NodeValue>, unit> =
+let parser: Parser<SyntaxNode<NodeValue>, unit> = // TODO: Add semicolons to end statements;
     let optString p = opt p |>> Option.defaultValue ""
 
-    let pLParen = pcharToken '(' LParen
-    let pRParen = pcharToken ')' RParen
-    let pPeriod = pcharToken '.' Period
+    let lparen = charToken '(' LParen
+    let period = charToken '.' Period
+    let rparen = charToken ')' RParen
+    let semicolon = charToken ';' Semicolon
 
-    let pword word value =
-        pstring word |> pnode (createToken value)
+    let pword word value = // TODO: Use pstrToken instead
+        pstring word |> node (createToken value)
 
-    let pIgnored multiline = // TODO: When ML comments are introduced, make it parse many1
+    let pIgnored multiline = // TODO: Make it parse many1?
         let pMLCommentStart = pword "/*" Comment <?> "start of multi-line comment"
         let pMLCommentEnd = pword "*/" Comment <?> "end of multi-line comment"
         let pCommentContent =
-            // TODO: Fix, fails when it reaches a */
-            // many (notFollowedBy (pchar '\n') >>. (notFollowedBy pMLCommentEnd) >>. anyChar)
-            manyCharsTill anyChar (followedBy (pMLCommentEnd |>> ignore) <|> followedBy (pchar '\n' |>> ignore))
-            |>> String.Concat
-            |> pnode (createToken Comment)
+            // TODO: Fix, */ might be skipped over, don't know why it parses successfully without changing state
+            manyCharsTill anyChar (followedBy (pMLCommentEnd |>> ignore) <|> followedBy (pchar '\n' |>> ignore)) // TODO: Maybe use restOfLine?
+            |> node (createToken Comment)
         let pNewline =
             newline
-            |> pnode (fun c pos ->
+            |> node (fun c pos ->
                 { Content = Token (string c)
                   Position = pos.NextLine
                   Value = Newline })
@@ -100,13 +133,13 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 anyOf [ ' '; '\t' ]
                 <?> "whitespace"
                 |> many1Chars
-                |> pnode (SyntaxNode.createToken Whitespace);
+                |> node (SyntaxNode.createToken Whitespace);
 
                 if multiline then
                     pNewline;
 
                     pstring "//" .>>. restOfLine false
-                    |> pnode (fun (str1, str2) ->
+                    |> node (fun (str1, str2) ->
                         SyntaxNode.createToken Comment (str1 + str2))
                     <?> "comment";
 
@@ -115,7 +148,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     .>>. pMLCommentEnd
                     |>> (fun ((start, content), cend) ->
                         start :: content @ [ cend ])
-                    |> pnode (createNode Comment)
+                    |> node (createNode Comment)
                     |> attempt
                 else
                     pMLCommentStart
@@ -128,7 +161,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                                 content.Value
                             cend
                         ])
-                    |> pnode (createNode Comment);
+                    |> node (createNode Comment);
             ]
 
     let pIgnoredOpt multiline = opt (pIgnored multiline)
@@ -138,9 +171,9 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
     let pKeyword keyword =
         pKeywordNS keyword
         .>>. pIgnored false
-        |> pnodePair
+        |> nodePair
 
-    let pKeywordOpt keyword = pnodesOpt (pKeyword keyword)
+    let pKeywordOpt keyword = nodesOpt (pKeyword keyword)
 
     let pIdentifier =
         let palphabet =
@@ -152,14 +185,14 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             c :: rest
             |> Array.ofList
             |> String
-        |> pnode (SyntaxNode.createToken Identifier)
-        <??> "identifier"
+        |> node (SyntaxNode.createToken Identifier)
+        <?> "identifier"
 
     let pIdentifierChain =
         many
             (pIdentifier
             .>>. pIgnoredOpt false
-            .>>. pPeriod
+            .>>. period
             .>>. pIgnoredOpt false
             |> attempt)
         .>>. pIdentifier
@@ -176,16 +209,16 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                             sep2.Value
                     ]))
                 [ last ]
-        |> pnode (SyntaxNode.createNode IdentifierChain)
+        |> node (SyntaxNode.createNode IdentifierChain)
         <?> "fully qualified name"
 
     let pIdentifierStatement keyword value =
         pKeyword keyword
         .>>. pIdentifierChain
         |>> fun (word, identifier) -> List.append word [identifier]
-        |> pnode (SyntaxNode.createNode value)
+        |> node (SyntaxNode.createNode value)
 
-    let pUseStatements =
+    let useStatements =
         choice
             [
                 pIgnored true
@@ -204,26 +237,26 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         ]
         |> Seq.map pstring
         |> choice
-        |> pnode (SyntaxNode.createToken AccessModifier)
+        |> node (SyntaxNode.createToken AccessModifier)
         .>>. pIgnored false
-        |> pnodePair
-        |> pnodesOpt
+        |> nodePair
+        |> nodesOpt
         <?> "access modifier"
 
     let pBlock (p: NodeListParser<NodeValue>) =
         many (pIgnored true)
-        .>>. pcharToken '{' LCurlyBracket
+        .>>. charToken '{' LCurlyBracket
         .>>. attempt p
-        .>>. pcharToken '}' RCurlyBracket
+        .>>. charToken '}' RCurlyBracket
         |>> fun (((leading, lc), middle), rc) ->
             leading @ (lc :: middle @ [ rc ])
-        |> pnode (createNode Block)
+        |> node (createNode Block)
 
     let pTypeAnnotation =
         pIgnored true
         |> attempt
         |> many
-        .>>. pcharToken ':' Colon
+        .>>. charToken ':' Colon
         .>>. pIgnoredOpt false
         .>>. pIdentifierChain
         |>> (fun (((sep1, col), sep2), typeName) ->
@@ -236,12 +269,12 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                 ]
             sep1 @ trailing)
         |> attempt
-        |> pnodesOpt
-        |> pnode (createNode TypeAnnotation)
+        |> nodesOpt
+        |> node (createNode TypeAnnotation)
         <?> "type annotation"
 
     let pNameAndType =
-        pIdentifier .>>. pTypeAnnotation |> pnodePair
+        pIdentifier .>>. pTypeAnnotation |> nodePair
 
     let pFuncBody, pFuncBodyRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
 
@@ -260,7 +293,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |>> fun (leading, trailing) ->
                 sprintf "%c%s" leading trailing
 
-        let expr = OperatorPrecedenceParser<SyntaxNode<NodeValue>, SyntaxNode<NodeValue> list, unit>()
+        let expr = OperatorPrecedenceParser<_, _, _>()
 
         [
             ExprAdd, OpAdd, "+", 1, Associativity.Left;
@@ -291,7 +324,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                             |>> (fun (((prefix, first), rest), suffix) ->
                                 sprintf "%s%c%s%s" prefix first rest suffix)
                             .>>. preturn HexLit
-                            <??> "hexadecimal literal";
+                            <?> "hexadecimal literal";
 
                             pstringCI "0b"
                             .>>. anyOf [ '0'; '1' ]
@@ -300,7 +333,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                             |>> (fun (((prefix, first), rest), suffix) ->
                                 sprintf "%s%c%s%s" prefix first rest suffix)
                             .>>. preturn BinLit
-                            <??> "binary literal";
+                            <?> "binary literal";
 
                             intDigits
                             .>>. pstring "."
@@ -309,22 +342,25 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                             |>> (fun (((intp, per), decp), suffix) -> intp + per + decp + suffix)
                             .>>. preturn DecLit
                             |> attempt
-                            <??> "numeric literal"
+                            <?> "numeric literal"
 
                             intDigits
                             .>>. intSuffixes
                             |>> (fun (digits, suffix) -> digits + suffix)
                             .>>. preturn IntLit
-                            <??> "integer literal";
+                            <?> "integer literal";
                         ]
                     |>> (fun (sign, (node, numType)) -> sign + node, numType)
-                    |> pnode (fun (content, numType) -> createToken numType content);
+                    |> node (fun (content, numType) -> createToken numType content);
 
-                    pLParen
+                    //pIdentifierChain
+                    //.>>. pIgnoredOpt false // Method or function call
+
+                    lparen
                     .>>. pIgnoredOpt true
                     .>>. expr.ExpressionParser
                     .>>. pIgnoredOpt true
-                    .>>. pRParen
+                    .>>. rparen
                     |>> (fun ((((lparen, sep1), exp), sep2), rparen) ->
                         [
                             lparen
@@ -335,10 +371,10 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                                 sep2.Value
                             rparen
                         ])
-                    |> pnode (createNode Expression);
+                    |> node (createNode Expression);
                 ]
             .>>. (pIgnored true |> many)
-            |> pnode (fun (e, ignored) pos ->
+            |> node (fun (e, ignored) pos ->
                 if List.isEmpty ignored
                 then e
                 else createNode Expression (e :: ignored) pos)
@@ -351,7 +387,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         .>>. pNameAndType
         |>> (fun (wordl, names) -> wordl @ names)
         .>>. pIgnoredOpt false
-        .>>. pcharToken '=' OpEqual
+        .>>. charToken '=' OpEqual
         .>>. pIgnoredOpt false
         .>>. pExpression
         |>> (fun (((((def), sep1), eq), sep2), expr) ->
@@ -365,7 +401,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     expr
                 ]
             List.append def value)
-        |> pnode (createNode FieldDef)
+        |> node (createNode FieldDef) // TODO: Differentiate between fields and local variables
 
     let pFuncKeywords =
         pAccessModifier true
@@ -374,15 +410,15 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
     let pFuncParamTuple =
         let pParam =
             pNameAndType
-            |> pnode (createNode Param)
+            |> node (createNode Param)
 
-        pLParen
+        lparen
         .>>. pIgnoredOpt false
-        .>>. pnodesOpt (
+        .>>. nodesOpt (
             many (
                 pParam
                 .>>. pIgnoredOpt false
-                .>>. pcharToken ',' Comma
+                .>>. charToken ',' Comma
                 .>>. pIgnoredOpt false
                 |>> (fun (((param, sep1), comma), sep2) ->
                     [
@@ -398,7 +434,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             .>>. pParam
             |>> fun (rest, last) -> rest @ [ last ])
         .>>. pIgnoredOpt false
-        .>>. pRParen
+        .>>. rparen
         |>> (fun ((((lparen, sep1), parameters), sep2), rparen) ->
             let left =
                 [
@@ -413,10 +449,10 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                         sep2.Value
                 ]
             left @ parameters @ right)
-        |> pnode (createNode ParamTuple)
+        |> node (createNode ParamTuple)
         <?> "parameter tuple"
 
-    let pFuncParamList = // TODO: Allow omitting of parenthesis for one parameter in tuple, like F#.
+    let pFuncParamList =
         pFuncParamTuple
         .>>. many (
             pIgnored true
@@ -427,19 +463,19 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             |>> fun (sep, tup) -> sep @ [ tup ])
         |>> (fun (first, rest) ->
             first :: List.collect id rest)
-        |> pnode (createNode ParamSet)
-        <??> "parameter list"
+        |> node (createNode ParamSet)
+        <?> "parameter list"
 
     pFuncBodyRef :=
         choice
             [
                 pIgnored true
-                pExpression // TODO: Check if the statement is followed by a NewLine
+                pExpression
             ]
         |> attempt
         |> many
         |> pBlock
-        <??> "function body"
+        <?> "function body"
 
     let pMemberBlock instance =
         choice
@@ -455,7 +491,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                     pFuncKeywords
                     .>>. (pIdentifier <?> "self identifier")
                     .>>. pIgnoredOpt false
-                    .>>. pPeriod
+                    .>>. period
                     .>>. pIgnoredOpt false
                     .>>. (pIdentifier <?> "method name")
                     .>>. pIgnored false
@@ -472,12 +508,12 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
                                 sep3
                             ]
                         words @ header)
-                    |> pnode (createNode MethodHeader)
+                    |> node (createNode MethodHeader)
                     .>>. pFuncParamList
                     .>>. pTypeAnnotation
                     .>>. pFuncBody
                     |>> (fun (((header, mparams), returnType), body) -> [ header; mparams; returnType; body ])
-                    |> pnode (createNode MethodDef)
+                    |> node (createNode MethodDef)
                     <?> "method definition";
             ]
         |> attempt
@@ -486,12 +522,12 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
 
     let pClassDef nested =
         pAccessModifier nested
-        .>>. pnodesOpt (
-            pnodesOpt (
+        .>>. nodesOpt (
+            nodesOpt (
                 (pKeyword "inheritable" |> attempt <|> pKeyword "abstract")
                 .>>. pIgnored false
                 |>> fun (impl, sep) -> impl @ [ sep ] )
-            .>>. pnodesOpt (
+            .>>. nodesOpt (
                 pKeywordOpt "mutable"
                 .>>. pIgnored false
                 |>> fun (mut, sep) -> mut @ [ sep ])
@@ -515,7 +551,7 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
         |> attempt // Important, allows a module to be parsed if a class couldn't be parsed.
         .>>. pMemberBlock true
         |>> fun (header, body) -> header @ [ body ]
-        |> pnode (SyntaxNode.createNode ClassDef)
+        |> node (SyntaxNode.createNode ClassDef)
         <?> "class definition"
 
     let pModuleDef nested =
@@ -526,32 +562,10 @@ let parser: Parser<SyntaxNode<NodeValue>, unit> =
             List.collect id [ access; wordm; [ name ] ])
         .>>. pMemberBlock false
         |>> fun (header, body) -> header @ [ body ]
-        |> pnode (SyntaxNode.createNode ModuleDef)
+        |> node (SyntaxNode.createNode ModuleDef)
         <?> "module definition"
 
-    pUseStatements
+    useStatements
     .>>. opt (pIdentifierStatement "namespace" NamespaceDef <?> "namespace definition")
-    .>>. pUseStatements
-    .>>. (pClassDef false <|> pModuleDef false) // NOTE: Use a choice here when another type of def is added.
-    .>>. many (pIgnored true)
-    |>> fun ((((use1, ns), use2), classOrModule), trailing) ->
-        let nodes =
-            trailing
-            |> List.append [ classOrModule ]
-            |> List.append use2
-            |> List.append (List.choose id [ ns ])
-            |> List.append use1
-        let imports =
-            Seq.append use1 use2
-            |> Seq.choose (fun node ->
-                match node.Value with
-                | UseStatement -> Some node
-                | _ -> None)
-        classOrModule, imports, ns, nodes
-    |> pnode (fun (def, imports, ns, nodes) ->
-        let compilationUnit =
-            CompilationUnit
-                {| Definition = def
-                   Imports = imports
-                   Namespace = ns |}
-        SyntaxNode.createNode compilationUnit nodes)
+    .>>. useStatements
+    

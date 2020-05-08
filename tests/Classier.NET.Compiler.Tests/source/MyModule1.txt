@@ -1,15 +1,15 @@
-﻿use system.reflection
+﻿use system.reflection;
 
-namespace blah.blah.blah
+namespace blah.blah.blah;
 
-public/* A comment */module Math {
-    let myGlobal: long = 42L
-    let aHexadecimalLiteral: int = 0x2A + 0x1F
-    let aBinaryLiteral: int = 0b00101010 * 0B1100_0011
+public module Math {
+    let myGlobal: long = 42L;
+    let aHexadecimalLiteral: int = 0x2A + 0x1F;
+    let aBinaryLiteral: int = 0b00101010 * 0B1100_0011;
 
-    let three: uint = 03
-    let myNegative: uint = -7_135_601
-    let errorCode: short = -0X00ab_1234
+    let three: uint = 03;
+    let myNegative: uint = -7_135_601;
+    let errorCode: short = -0X00ab_1234;
 
-    let PI: decimal = 3.14159265m
+    let PI: decimal = 3.14159265m;
 }

@@ -18,24 +18,24 @@ open FParsec
 
 open Classier.NET.Compiler.SyntaxNode
 
-type NodeListParser<'Value> = Parser<SyntaxNode<'Value> list, unit>
+type NodeListParser<'Value> = Parser<SyntaxNode<'Value> list, unit> // TODO: Use seq instead of list.
 
-let pnode (node: 'Result -> LinePos -> SyntaxNode<'Value>) (parser: Parser<'Result, unit>) =
-    pipe2
-        parser
-        (fun stream ->
-            LinePos (stream.Position.Line, stream.Position.Index)
-            |> Reply)
-        node
+let node (node: 'Result -> LinePos -> SyntaxNode<'Value>) (parser: Parser<'Result, unit>) =
+    getPosition
+    .>>. parser
+    |>> fun (pos, result) ->
+        node result (LinePos pos)
 
-let pnodePair p: NodeListParser<'Value> =
+let nodePair p: NodeListParser<'Value> =
     p |>> fun (r1, r2) -> [ r1; r2 ]
 
-let pcharToken (c: char) (value: 'Value) =
-    pstring (string c)
-    |> pnode (createToken value)
+let strToken (str: string) (value: 'Value) =
+    pstring str |> node (createToken value)
 
-let pnodesOpt p: NodeListParser<'Value> =
+let charToken (c: char) (value: 'Value) =
+    strToken (string c) value
+
+let nodesOpt p: NodeListParser<'Value> =
     opt p
     |>> fun r ->
         match r with

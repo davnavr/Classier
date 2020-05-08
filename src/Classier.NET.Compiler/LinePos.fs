@@ -18,7 +18,7 @@ namespace Classier.NET.Compiler
 [<System.Runtime.CompilerServices.IsReadOnly; Struct>]
 type LinePos (lineNum: uint32, linePos: uint32) =
     struct
-        new (lineNum: int64, linePos: int64) = LinePos(uint32(lineNum), uint32(linePos))
+        new (pos: FParsec.Position) = LinePos(uint32(pos.Line), uint32(pos.Column))
         member _.LineNum: uint32 = lineNum
         member _.LineCol: uint32 = linePos
         member this.Advance chars = LinePos (this.LineNum, this.LineCol + chars)
