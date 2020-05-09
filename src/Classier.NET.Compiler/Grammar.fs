@@ -62,6 +62,10 @@ type NodeValue =
     | DecLit
     | Expression
     | ExprAdd
+    /// A method or function call
+    | ExprCall of
+        {| Arguments: SyntaxNode<NodeValue>
+           Target: SyntaxNode<NodeValue> |}
     | ExprDiv
     | ExprSub
     | ExprMul
@@ -387,6 +391,43 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
             InfixOperator (symbol, ignored, prec, assoc, (), mapping))
         |> List.iter expr.AddOperator
 
+        let argumentTuple =
+            lparen
+            .>>. ignored
+            .>>. expr.ExpressionParser
+            .>>. (ignored
+                 .>>. comma
+                 |> attempt
+                 .>>. ignored
+                 .>>. expr.ExpressionParser
+                 |>> (fun (((sep1, c), sep2), ex) ->
+                    seq {
+                        yield! sep1
+                        c
+                        yield! sep2
+                        ex
+                    })
+                 |> many
+                 |>> Seq.collect id)
+            .>>. ignored
+            .>>. rparen
+            |>> (fun (((((lp, sep1), first), rest), sep2), rp) ->
+                seq { first; yield! rest }
+                |> Seq.where (fun node ->
+                    match node.Value with
+                    | Expression _ -> true
+                    | _ -> false),
+                seq {
+                    lp
+                    yield! sep1
+                    first
+                    yield! rest
+                    yield! sep2
+                    rp
+                })
+            |> node (fun (args, nodes) ->
+                createNode (ArgumentTuple args) nodes)
+
         expr.TermParser <-
             choice
                 [
@@ -448,12 +489,33 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                         })
                     |> node (createNode Expression)
                 ]
-            // .>>. argumentList
             .>>. ignored
-            |> node (fun (expr, sep) pos ->
-                if Seq.isEmpty sep
-                then expr
-                else createNode Expression (seq { expr; yield! sep }) pos)
+            .>>. opt
+                (argumentTuple
+                .>>. (ignored
+                     .>>. argumentTuple
+                     |> attempt
+                     |>> (fun (sep, arg) -> seq { yield! sep; arg })
+                     |> many
+                     |>> Seq.collect id)
+                |>> (fun (first, rest) -> seq { first; yield! rest })
+                |> node (fun nodes ->
+                    let argList =
+                        nodes
+                        |> Seq.choose (fun node ->
+                            match node.Value with
+                            | ArgumentTuple args -> Some args
+                            | _ -> None)
+                    createNode (ArgumentList argList) nodes))
+            |>> (fun ((ex, sep), args) ->
+                match args with
+                | Some argsNode ->
+                    { Content = Node (seq { ex; yield! sep; argsNode })
+                      Position = ex.Position
+                      Value = ExprCall {| Arguments = argsNode; Target = ex |} }
+                    |> Seq.singleton
+                | None -> seq { ex; yield! sep })
+            |> node (createNode Expression)
 
         expr.ExpressionParser <?> "expression"
 
@@ -476,18 +538,20 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                         yield! sep2
                         expr
                     })
+        .>>. ignored
         .>>. semicolon
-        |>> (fun (((((wordl, sep), wordm), (name, valueType)), value), smcolon) ->
+        |>> (fun ((((((wordl, sep1), wordm), (name, valueType)), value), sep2), smcolon) ->
             valueType,
             name,
             seq {
                 wordl
-                yield! sep
+                yield! sep1
                 yield! wordm
                 name
                 if valueType.IsSome then
                     valueType.Value
                 yield! value
+                yield! sep2
                 smcolon
             })
         .>>. getUserState

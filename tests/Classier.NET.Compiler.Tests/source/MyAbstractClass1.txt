@@ -10,6 +10,7 @@ internal abstract class MyAbstractClass1 {
   public abstract noBody (iUsedToKnow);
 
   private inline doesSomething () {
-    this;
+    let myCurriedResult = this.noBody (45.6) (blah);
+    tester.doThingsWith(this);
   }
 }
