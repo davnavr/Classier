@@ -42,20 +42,20 @@ type ClassFlags =
     | Mutable = 4
 
 [<Flags>]
-type MethodFlags =
-    | None = 0
-    | Abstract = 1
-    | Inline = 2
-    | Mutator = 4
-
-[<Flags>]
 type FuncFlags =
     | None = 0
     | Inline = 1
 
+[<Flags>]
+type MethodFlags =
+    | None = 0
+    | Inline = 1
+    | Abstract = 2
+    | Mutator = 4
+
 type NodeValue =
     | CompilationUnit of
-        {| Definition: SyntaxNode<NodeValue>
+        {| Definitions: seq<SyntaxNode<NodeValue>>
            Imports: seq<seq<string>>
            Namespace: seq<string> option |}
     | AccessModifier of Visibility
@@ -71,14 +71,16 @@ type NodeValue =
     | ExprDiv
     | ExprSub
     | ExprMul
-    | FieldDef of MemberDef<unit>
-    | FuncDef of MemberDef<unit>
+    | FieldDef of MemberDef<unit> * seq<string>
+    | FuncDef of MemberDef<FuncFlags>
     | HexLit
     | Identifier of string
-    | IdentifierChain of seq<string>
+    | IdentifierFull of seq<string>
+    | InterfaceDef of MemberDef<unit>
     | IntLit
     | Keyword
     | LCurlyBracket
+    | LocalVarDef of string * seq<string>
     | LParen
     | MethodDef of MemberDef<MethodFlags> * seq<seq<Param>>
     | MethodHeader
@@ -98,474 +100,300 @@ type NodeValue =
     | RParen
     | Semicolon
     | TypeAnnotation of seq<string>
-    | UseStatement
+    | UseStatement of seq<string>
     | Whitespace
 and Param = { Name: string; ParamType: seq<string> }
 
-let parser: Parser<SyntaxNode<NodeValue>, unit> = // TODO: Add semicolons to end statements;
-    let optString p = opt p |>> Option.defaultValue ""
-
+let parser: Parser<SyntaxNode<NodeValue>, unit> =
+    let comma = charToken ',' Comma
+    let keyword word = strToken word Keyword
+    let lcurlybracket = charToken '{' LCurlyBracket
     let lparen = charToken '(' LParen
     let period = charToken '.' Period
+    let rcurlybracket = charToken '}' RCurlyBracket
     let rparen = charToken ')' RParen
     let semicolon = charToken ';' Semicolon
 
-    let pword word value = // TODO: Use pstrToken instead
-        pstring word |> node (createToken value)
+    let accessModifier full =
+        let modifiers =
+            [
+                "public", Visibility.Public
+                "internal", Visibility.Internal
+                if full then
+                    "protected", Visibility.Protected
+                    "private", Visibility.Private
+            ]
+        modifiers
+        |> Seq.map (fun (str, vis) -> pstring str .>>. preturn vis)
+        |> choice
+        |> node (fun (str, vis) -> createToken (AccessModifier vis) str)
+        <?> "access modifier"
 
-    let pIgnored multiline = // TODO: Make it parse many1?
-        let pMLCommentStart = pword "/*" Comment <?> "start of multi-line comment"
-        let pMLCommentEnd = pword "*/" Comment <?> "end of multi-line comment"
-        let pCommentContent =
-            // TODO: Fix, */ might be skipped over, don't know why it parses successfully without changing state
-            manyCharsTill anyChar (followedBy (pMLCommentEnd |>> ignore) <|> followedBy (pchar '\n' |>> ignore)) // TODO: Maybe use restOfLine?
-            |> node (createToken Comment)
-        let pNewline =
-            newline
-            |> node (fun c pos ->
-                { Content = Token (string c)
-                  Position = pos.NextLine
-                  Value = Newline })
-            <?> "newline";
+    let block parser =
+        lcurlybracket
+        .>>. attempt parser
+        .>>. rcurlybracket
+        |>> (fun ((lc, content), rc) -> seq { lc; yield! content; rc })
+        |> node (createNode Block)
 
+    let ignored =
         choice
             [
                 anyOf [ ' '; '\t' ]
                 <?> "whitespace"
                 |> many1Chars
-                |> node (SyntaxNode.createToken Whitespace);
+                |> token Whitespace
 
-                if multiline then
-                    pNewline;
+                newline
+                |> node (fun c pos ->
+                    { Content = Token (string c)
+                      Position = pos.NextLine
+                      Value = Newline })
 
-                    pstring "//" .>>. restOfLine false
-                    |> node (fun (str1, str2) ->
-                        SyntaxNode.createToken Comment (str1 + str2))
-                    <?> "comment";
-
-                    pMLCommentStart
-                    .>>. many (pCommentContent <|> pNewline)
-                    .>>. pMLCommentEnd
-                    |>> (fun ((start, content), cend) ->
-                        start :: content @ [ cend ])
-                    |> node (createNode Comment)
-                    |> attempt
-                else
-                    pMLCommentStart
-                    .>>. opt pCommentContent
-                    .>>. pMLCommentEnd
-                    |>> (fun ((cstart, content), cend) ->
-                        [
-                            cstart
-                            if content.IsSome then
-                                content.Value
-                            cend
-                        ])
-                    |> node (createNode Comment);
+                pstring "//" .>>. restOfLine false
+                |>> String.Concat
+                |> token Comment
             ]
+        |> many
 
-    let pIgnoredOpt multiline = opt (pIgnored multiline)
+    let ignored1 = notEmpty ignored
 
-    let pKeywordNS keyword = pword keyword Keyword
+    let parserSeq (parsers: seq<Parser<_, _>>) =
+        fun stream ->
+            let (nodes, (status, errors)) =
+                parsers
+                |> Seq.mapFold
+                    (fun prev p ->
+                        let (status, _) = prev
+                        let result = p stream
+                        match status with
+                        | Ok ->
+                            match result.Status with
+                            | Ok -> Some result.Result, prev
+                            | _ -> None, (result.Status, result.Error)
+                        | _ -> None, prev)
+                    (Ok, null)
+            match status with
+            | Ok -> Reply (Seq.choose id nodes)
+            | _ -> Reply (status, errors)
 
-    let pKeyword keyword =
-        pKeywordNS keyword
-        .>>. pIgnored false
-        |> nodePair
-
-    let pKeywordOpt keyword = nodesOpt (pKeyword keyword)
-
-    let pIdentifier =
-        let palphabet =
-            List.append [ 'a'..'z' ] [ 'A'..'Z' ]
-            |> anyOf
-        palphabet
-        .>>. many (palphabet <|> digit)
-        |>> fun (c, rest) ->
-            c :: rest
-            |> Array.ofList
-            |> String
-        |> node (SyntaxNode.createToken Identifier)
+    let identifier =
+        asciiLetter
+        .>>. many1Chars (asciiLetter <|> digit)
+        |>> String.Concat
+        |> node (fun name -> createToken (Identifier name) name)
         <?> "identifier"
 
-    let pIdentifierChain =
+    let identifierFull =
         many
-            (pIdentifier
-            .>>. pIgnoredOpt false
-            .>>. period
-            .>>. pIgnoredOpt false
-            |> attempt)
-        .>>. pIdentifier
-        |>> fun (leading, last) ->
-            Seq.append
-                (leading
-                |> Seq.collect (fun (((id, sep1), per), sep2) ->
-                    [
-                        id
-                        if sep1.IsSome then
-                            sep1.Value
-                        per
-                        if sep2.IsSome then
-                            sep2.Value
-                    ]))
-                [ last ]
-        |> node (SyntaxNode.createNode IdentifierChain)
-        <?> "fully qualified name"
+            (identifier .>>. ignored .>>. period .>>. ignored
+            |> attempt
+            |>> fun (((name, sep1), per), sep2) ->
+                seq {
+                    name
+                    yield! sep1
+                    per
+                    yield! sep2
+                })
+        |>> Seq.collect id
+        .>>. identifier
+        |>> fun (leading, last) -> seq { yield! leading; last }
+        |> node (fun nodes ->
+            let names =
+                nodes
+                |> Seq.choose (fun node ->
+                    match node.Value with
+                    | Identifier name -> Some name
+                    | _ -> None)
+            createNode (IdentifierFull names) nodes)
 
-    let pIdentifierStatement keyword value =
-        pKeyword keyword
-        .>>. pIdentifierChain
-        |>> fun (word, identifier) -> List.append word [identifier]
-        |> node (SyntaxNode.createNode value)
+    let identifierStatement word value =
+        keyword word
+        .>>. ignored1
+        .>>. identifierFull
+        |>> (fun ((wrd, sep), id) -> seq { wrd; yield! sep; id })
+        |> node (fun nodes ->
+            let id =
+                nodes
+                |> Seq.choose (fun node ->
+                    match node.Value with
+                    | IdentifierFull names -> Some names
+                    | _ -> None)
+                |> Seq.collect id
+            createNode (value id) nodes)
 
     let useStatements =
-        choice
-            [
-                pIgnored true
-                pIdentifierStatement "use" UseStatement
-            ]
+        ignored
+        .>>. (identifierStatement "use" UseStatement <?> "use statement")
+        .>>. ignored1
+        |> attempt
+        |>> (fun ((sep1, st), sep2) -> seq { yield! sep1; st; yield! sep2 })
         |> many
+        |>> Seq.collect id
 
-    // Optional, and includes trailing whitespace
-    let pAccessModifier full =
-        [
-            "public";
-            "internal";
-            if full then
-                "protected";
-                "private";
-        ]
-        |> Seq.map pstring
+    let modifierOpt (parser: Parser<'a * 'a list, 'b>) =
+        parser
+        |> opt
+        |>> (fun w ->
+            match w with
+            | Some (wordm, sep) -> seq { wordm; yield! sep }
+            | None -> Seq.empty)
+
+    let modifier word =
+        keyword word
+        .>>. ignored1
+        |> modifierOpt
+
+    let modifierChoice words =
+        (*words
+        |> Seq.map (fun (word, flag) ->
+            keyword word .>> updateUserState (fun f -> f &&& flag))
         |> choice
-        |> node (SyntaxNode.createToken AccessModifier)
-        .>>. pIgnored false
-        |> nodePair
-        |> nodesOpt
-        <?> "access modifier"
+        .>>. ignored1
+        |> modifierOpt*)
+        fail "why"
 
-    let pBlock (p: NodeListParser<NodeValue>) =
-        many (pIgnored true)
-        .>>. charToken '{' LCurlyBracket
-        .>>. attempt p
-        .>>. charToken '}' RCurlyBracket
-        |>> fun (((leading, lc), middle), rc) ->
-            leading @ (lc :: middle @ [ rc ])
-        |> node (createNode Block)
-
-    let pTypeAnnotation =
-        pIgnored true
-        |> attempt
-        |> many
-        .>>. charToken ':' Colon
-        .>>. pIgnoredOpt false
-        .>>. pIdentifierChain
-        |>> (fun (((sep1, col), sep2), typeName) ->
-            let trailing =
-                [
-                    col
-                    if sep2.IsSome then
-                        sep2.Value
-                    typeName
-                ]
-            sep1 @ trailing)
-        |> attempt
-        |> nodesOpt
-        |> node (createNode TypeAnnotation)
-        <?> "type annotation"
-
-    let pNameAndType =
-        pIdentifier .>>. pTypeAnnotation |> nodePair
-
-    let pFuncBody, pFuncBodyRef = createParserForwardedToRef<SyntaxNode<NodeValue>, unit>()
-
-    let pExpression: Parser<SyntaxNode<NodeValue>, unit> =
-        let numSuffixes suffixes =
-            suffixes
-            |> List.map pstringCI
-            |> choice
-            |> optString
-            <?> "numeric suffix"
-        let decSuffixes = numSuffixes [ "d"; "f"; "m"; ]
-        let intSuffixes = numSuffixes [ "l"; "u"; "ul"; "lu" ]
-        let intDigits =
-            digit
-            .>>. manyChars (digit <|> pchar '_')
-            |>> fun (leading, trailing) ->
-                sprintf "%c%s" leading trailing
-
-        let expr = OperatorPrecedenceParser<_, _, _>()
-
-        [
-            ExprAdd, OpAdd, "+", 1, Associativity.Left;
-            ExprSub, OpSub, "-", 1, Associativity.Left;
-            ExprMul, OpMul, "*", 5, Associativity.Left;
-            ExprDiv, OpDiv, "/", 5, Associativity.Left;
-        ]
-        |> List.map (fun (exprType, operandType, symbol, prec, assoc) ->
-            let mapping op (expr1: SyntaxNode<NodeValue>) expr2 =
-                let opNode = createToken operandType symbol expr1.Position
-                createNode exprType (expr1 :: opNode :: op @ [ expr2 ]) expr1.Position
-            InfixOperator (symbol, pIgnored true |> many, prec, assoc, (), mapping))
-        |> List.iter expr.AddOperator
-
-        expr.TermParser <-
-            choice
-                [
-                    pIdentifier
-
-                    pstring "-"
-                    |> optString
-                    .>>. choice
-                        [
-                            pstringCI "0x"
-                            .>>. hex
-                            .>>. manyChars (hex <|> pchar '_')
-                            .>>. intSuffixes
-                            |>> (fun (((prefix, first), rest), suffix) ->
-                                sprintf "%s%c%s%s" prefix first rest suffix)
-                            .>>. preturn HexLit
-                            <?> "hexadecimal literal";
-
-                            pstringCI "0b"
-                            .>>. anyOf [ '0'; '1' ]
-                            .>>. manyChars (anyOf [ '0'; '1'; '_' ])
-                            .>>. intSuffixes
-                            |>> (fun (((prefix, first), rest), suffix) ->
-                                sprintf "%s%c%s%s" prefix first rest suffix)
-                            .>>. preturn BinLit
-                            <?> "binary literal";
-
-                            intDigits
-                            .>>. pstring "."
-                            .>>. intDigits
-                            .>>. decSuffixes
-                            |>> (fun (((intp, per), decp), suffix) -> intp + per + decp + suffix)
-                            .>>. preturn DecLit
-                            |> attempt
-                            <?> "numeric literal"
-
-                            intDigits
-                            .>>. intSuffixes
-                            |>> (fun (digits, suffix) -> digits + suffix)
-                            .>>. preturn IntLit
-                            <?> "integer literal";
-                        ]
-                    |>> (fun (sign, (node, numType)) -> sign + node, numType)
-                    |> node (fun (content, numType) -> createToken numType content);
-
-                    //pIdentifierChain
-                    //.>>. pIgnoredOpt false // Method or function call
-
-                    lparen
-                    .>>. pIgnoredOpt true
-                    .>>. expr.ExpressionParser
-                    .>>. pIgnoredOpt true
-                    .>>. rparen
-                    |>> (fun ((((lparen, sep1), exp), sep2), rparen) ->
-                        [
-                            lparen
-                            if sep1.IsSome then
-                                sep1.Value
-                            exp
-                            if sep2.IsSome then
-                                sep2.Value
-                            rparen
-                        ])
-                    |> node (createNode Expression);
-                ]
-            .>>. (pIgnored true |> many)
-            |> node (fun (e, ignored) pos ->
-                if List.isEmpty ignored
-                then e
-                else createNode Expression (e :: ignored) pos)
-
-        expr.ExpressionParser <?> "expression"
-
-    let pFieldOrVar =
-        pKeyword "let"
-        // TODO: Add modifiers "mutable"
-        .>>. pNameAndType
-        |>> (fun (wordl, names) -> wordl @ names)
-        .>>. pIgnoredOpt false
-        .>>. charToken '=' OpEqual
-        .>>. pIgnoredOpt false
-        .>>. pExpression
-        |>> (fun (((((def), sep1), eq), sep2), expr) ->
-            let value =
-                [
-                    if sep1.IsSome then
-                        sep1.Value
-                    eq
-                    if sep2.IsSome then
-                        sep2.Value
-                    expr
-                ]
-            List.append def value)
-        |> node (createNode FieldDef) // TODO: Differentiate between fields and local variables
-
-    let pFuncKeywords =
-        pAccessModifier true
-        // TODO: Add modifiers "mutator", "abstract", and "inline"
-
-    let pFuncParamTuple =
-        let pParam =
-            pNameAndType
-            |> node (createNode Param)
-
-        lparen
-        .>>. pIgnoredOpt false
-        .>>. nodesOpt (
-            many (
-                pParam
-                .>>. pIgnoredOpt false
-                .>>. charToken ',' Comma
-                .>>. pIgnoredOpt false
-                |>> (fun (((param, sep1), comma), sep2) ->
-                    [
-                        param
-                        if sep1.IsSome then
-                            sep1.Value
-                        comma
-                        if sep2.IsSome then
-                            sep2.Value
-                    ])
-                |> attempt)
-            |>> List.collect id
-            .>>. pParam
-            |>> fun (rest, last) -> rest @ [ last ])
-        .>>. pIgnoredOpt false
-        .>>. rparen
-        |>> (fun ((((lparen, sep1), parameters), sep2), rparen) ->
-            let left =
-                [
-                    lparen
-                    if sep1.IsSome then
-                        sep1.Value
-                ]
-            let right =
-                [
-                    rparen
-                    if sep2.IsSome then
-                        sep2.Value
-                ]
-            left @ parameters @ right)
-        |> node (createNode ParamTuple)
-        <?> "parameter tuple"
-
-    let pFuncParamList =
-        pFuncParamTuple
-        .>>. many (
-            pIgnored true
-            |> attempt
-            |> many
-            .>>. pFuncParamTuple
-            |> attempt
-            |>> fun (sep, tup) -> sep @ [ tup ])
-        |>> (fun (first, rest) ->
-            first :: List.collect id rest)
-        |> node (createNode ParamSet)
-        <?> "parameter list"
-
-    pFuncBodyRef :=
+    let memberBlock =
         choice
             [
-                pIgnored true
-                pExpression
+                ignored
             ]
         |> attempt
         |> many
-        |> pBlock
-        <?> "function body"
+        |>> Seq.collect id
+        |> block
 
-    let pMemberBlock instance =
-        choice
-            [
-                pIgnored true
+    let implements =
+        ignored1
+        .>>. keyword "implements"
+        .>>. ignored1
+        .>>. many1
+                (identifierFull
+                .>>. ignored
+                .>>. comma
+                .>>. ignored
+                |> attempt
+                |>> fun (((name, sep1), c), sep2) ->
+                    seq {
+                        name
+                        yield! sep1
+                        c
+                        yield! sep2
+                    })
+        |>> (fun (((sep1, wordi), sep2), interfaces) ->
+                seq {
+                    yield! sep1
+                    wordi
+                    yield! sep2
+                    yield! Seq.collect id interfaces
+                })
+        |> optnodes
 
-                pFieldOrVar <?>
-                    (if instance
-                    then "field definition"
-                    else "value definition");
-
-                if instance then
-                    pFuncKeywords
-                    .>>. (pIdentifier <?> "self identifier")
-                    .>>. pIgnoredOpt false
-                    .>>. period
-                    .>>. pIgnoredOpt false
-                    .>>. (pIdentifier <?> "method name")
-                    .>>. pIgnored false
-                    |>> (fun ((((((words, self), sep1), per), sep2), name), sep3) ->
-                        let header = 
-                            [
-                                self
-                                if sep1.IsSome then
-                                    sep1.Value
-                                per
-                                if sep2.IsSome then
-                                    sep2.Value
-                                name
-                                sep3
-                            ]
-                        words @ header)
-                    |> node (createNode MethodHeader)
-                    .>>. pFuncParamList
-                    .>>. pTypeAnnotation
-                    .>>. pFuncBody
-                    |>> (fun (((header, mparams), returnType), body) -> [ header; mparams; returnType; body ])
-                    |> node (createNode MethodDef)
-                    <?> "method definition";
-            ]
+    let classDef nested: Parser<SyntaxNode<NodeValue>, unit> = // TODO: Fix, need to use state to keep track of flags, but need some way of converting back to unit
+        (*accessModifier nested
+        .>> setUserState (ClassFlags.None)
+        .>>. ignored1
+        .>>. modifierChoice
+                [
+                    "abstract", ClassFlags.Abstract;
+                    "inheritable", ClassFlags.Inheritable
+                ]
+        .>>. modifier "mutable"
+        |>> (fun (((acc, sep), worda), wordm) ->
+            seq {
+                acc
+                yield! sep
+                yield! worda
+                yield! wordm
+            })
+        .>>. ignored
+        .>>. keyword "class"
         |> attempt
-        |> many
-        |> pBlock
-
-    let pClassDef nested =
-        pAccessModifier nested
-        .>>. nodesOpt (
-            nodesOpt (
-                (pKeyword "inheritable" |> attempt <|> pKeyword "abstract")
-                .>>. pIgnored false
-                |>> fun (impl, sep) -> impl @ [ sep ] )
-            .>>. nodesOpt (
-                pKeywordOpt "mutable"
-                .>>. pIgnored false
-                |>> fun (mut, sep) -> mut @ [ sep ])
-            |>> (fun (impl, mut) -> impl @ mut))
-        |>> (fun (access, modifiers) -> access @ modifiers)
-        .>>. pKeyword "class"
-        // NOTE: Implement primary constructors some other time.
-        .>>. pIdentifier
-        .>>. opt (pKeyword "extends" .>>. pIdentifierChain)
-        |>> (fun (((modifiers, wordc), name), extend) ->
-            [
-                modifiers
-                wordc
-                [ name ]
-                match extend with
-                | Some (wordex, supername) ->
-                    List.append wordex [ supername ]
-                | _ -> List.empty
-            ]
-            |> List.collect id)
-        |> attempt // Important, allows a module to be parsed if a class couldn't be parsed.
-        .>>. pMemberBlock true
-        |>> fun (header, body) -> header @ [ body ]
-        |> node (SyntaxNode.createNode ClassDef)
-        <?> "class definition"
-
-    let pModuleDef nested =
-        pAccessModifier nested
-        .>>. pKeyword "module"
-        .>>. pIdentifier
-        |>> (fun ((access, wordm), name) ->
-            List.collect id [ access; wordm; [ name ] ])
-        .>>. pMemberBlock false
-        |>> fun (header, body) -> header @ [ body ]
-        |> node (SyntaxNode.createNode ModuleDef)
-        <?> "module definition"
+        .>>. ignored1
+        .>>. identifier
+        |>> (fun ((((modifiers, sep1), wordc), sep2), name) ->
+                name,
+                seq {
+                    yield! modifiers
+                    yield! sep1
+                    wordc
+                    yield! sep2
+                    name
+                })
+        .>>. optnodes
+                (ignored1
+                .>>. keyword "extends"
+                .>>. ignored1
+                .>>. identifierFull
+                |>> fun (((sep1, worde), sep2), id) ->
+                    seq {
+                        yield! sep1
+                        worde
+                        yield! sep2
+                        id
+                    })
+        .>>. implements
+        .>>. ignored
+        |>> (fun ((((name, modifiers), extend), iimpl), sep) ->
+                name,
+                seq {
+                    yield! modifiers
+                    yield! extend
+                    yield! iimpl
+                    yield! sep
+                })
+        .>>. memberBlock
+        |>> (fun ((name, def), body) -> name, seq { yield! def; body })
+        .>>. getUserState
+        |> node (fun ((name, nodes), flags) ->
+            let classDef =
+                ClassDef
+                    ({ Name = name.ToString(); 
+                       Flags = flags;
+                       Visibility = Visibility.Public })
+            createNode classDef nodes)*)
+        fail "TEST"
 
     useStatements
-    .>>. opt (pIdentifierStatement "namespace" NamespaceDef <?> "namespace definition")
+    .>>. opt (identifierStatement "namespace" NamespaceDef <?> "namespace definition")
     .>>. useStatements
+    .>>. many
+            (choice
+                [
+                    classDef false
+                ]
+             .>>. ignored
+             |>> fun (def, sep) -> seq { def; yield! sep })
+    |>> (fun (((use1, ns), use2), defs) ->
+        seq {
+            yield! use1
+            if ns.IsSome then
+                ns.Value
+            yield! use2
+            yield! defs |> Seq.collect id
+        })
+    .>> eof
+    |> node (fun nodes ->
+        let cu =
+            CompilationUnit
+                {| Definitions =
+                       nodes
+                       |> Seq.where (fun node ->
+                           match node.Value with
+                           | ClassDef _ | ModuleDef _ -> true
+                           | _ -> false)
+                   Imports =
+                       nodes
+                       |> Seq.choose (fun node ->
+                           match node.Value with
+                           | UseStatement import -> Some import
+                           | _ -> None)
+                   Namespace =
+                       nodes
+                       |> Seq.choose (fun node ->
+                           match node.Value with
+                           | NamespaceDef ns -> Some ns
+                           | _ -> None)
+                       |> Seq.tryHead |}
+        createNode cu nodes)
     

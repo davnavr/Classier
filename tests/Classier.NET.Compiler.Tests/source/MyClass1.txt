@@ -19,7 +19,6 @@ public class MyClass1 {
 
     public self.implicit (p1, p2)
     {
-        //* Comments like this are not yet supported */
         1 + 2;
     }
 }

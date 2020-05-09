@@ -44,12 +44,12 @@ let private lengthOf (nodes: seq<SyntaxNode<'Value>>) =
     nodes
     |> Seq.sumBy (fun node -> node.Length)
 
-let createToken value content (oldPos: LinePos): SyntaxNode<'Value> =
+let createToken (value: 'Value) content (oldPos: LinePos) =
     { Content = Token content
       Position = oldPos.Advance(content.Length)
       Value = value }
 
-let createNode value children (oldPos: LinePos): SyntaxNode<'Value> =
+let createNode (value: 'Value) children (oldPos: LinePos) =
     { Content = Node children
       Position = oldPos.Advance(lengthOf children)
       Value = value }
