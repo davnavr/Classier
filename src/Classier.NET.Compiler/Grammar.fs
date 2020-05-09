@@ -55,7 +55,7 @@ type NodeValue =
     | ArgumentList of seq<seq<SyntaxNode<NodeValue>>>
     | BinLit
     | Block
-    | ClassDef of Definition
+    | ClassDef of TypeDef
     | Colon
     | Comma
     | Comment
@@ -70,13 +70,13 @@ type NodeValue =
     | HexLit
     | Identifier of string
     | IdentifierFull of seq<string>
-    | InterfaceDef of Definition
+    | InterfaceDef of TypeDef
     | IntLit
     | Keyword
     | LCurlyBracket
     | LParen
     | MethodDef of MethodOrFunc
-    | ModuleDef of Definition
+    | ModuleDef of TypeDef
     | NamespaceDef of seq<string>
     | Newline
     | OpAdd
@@ -95,7 +95,6 @@ type NodeValue =
     | UseStatement of seq<string>
     | VariableDef of FieldOrVar
     | Whitespace
-and Param = { Name: string; Type: seq<string> }
 and FieldOrVar =
     { Definition: Definition
       ValueType: seq<string>
@@ -105,6 +104,10 @@ and MethodOrFunc =
       Definition: Definition
       Parameters: seq<seq<Param>>
       RetValueType: seq<string> }
+and Param = { Name: string; Type: seq<string> }
+and TypeDef =
+    { Body: SyntaxNode<NodeValue>
+      Definition: Definition }
 
 type TypeKind =
     | Module = 0
@@ -122,7 +125,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
     let rparen = charToken ')' RParen
     let semicolon = charToken ';' Semicolon
 
-    let accessModifier full =
+    let accessModifier full = // TODO: Make this optional
         let modifiers =
             [
                 "public", Flags.Public
@@ -496,10 +499,10 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
             [
                 identifierStatement "use" UseStatement
                 <?> "use statement"
-                |>> Seq.singleton
+                |>> Seq.singleton;
 
                 ignored1
-                |>> Seq.ofList
+                |>> Seq.ofList;
             ]
         |> many
         |>> Seq.collect id
@@ -523,9 +526,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                         expr
                     })
         .>>. semicolon
-        .>>. getUserState
-        |>> (fun ((((((wordl, sep), wordm), (name, valueType)), value), smcolon), flags) ->
-            flags,
+        |>> (fun (((((wordl, sep), wordm), (name, valueType)), value), smcolon) ->
             valueType,
             name,
             seq {
@@ -538,7 +539,8 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 yield! value
                 smcolon
             })
-        |> node (fun (flags, valueType, name, nodes) ->
+        .>>. getUserState
+        |> node (fun ((valueType, name, nodes), flags) ->
             let def =
                 { Definition =
                       { Name =
@@ -613,11 +615,11 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         .>>. choice
             [
                 if kind = TypeKind.Module then
+                    variableDef VariableDef
+                    <?> "variable definition";
+
                     funcDef FuncDef
                     <?> "function definition";
-
-                //if kind >= TypeKind.Module then
-                    // classDef true
 
                 if kind >= TypeKind.Class then
                     variableDef FieldDef
@@ -625,6 +627,8 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
 
                     funcDef MethodDef
                     <?> "method definition";
+
+                // classDef true
             ]
         .>>. ignored
         |> attempt
@@ -719,15 +723,46 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                     yield! sep
                 })
         .>>. memberBlock TypeKind.Class
-        |>> (fun ((name, def), body) -> name, seq { yield! def; body })
+        |>> (fun ((name, def), body) -> name, body, seq { yield! def; body })
         .>>. getUserState
-        |> node (fun ((name, nodes), flags) ->
-            let classDef =
-                ClassDef
-                    ({ Name = name.ToString(); 
-                       Flags = flags; })
-            createNode classDef nodes)
+        |> node (fun ((name, body, nodes), flags) ->
+            let def =
+                { Definition =
+                    { Name = name.ToString()
+                      Flags = flags }
+                  Body = body }
+            createNode (ClassDef def) nodes)
         <?> "class definition"
+
+    let moduleDef nested =
+        accessModifier nested
+        .>>. ignored1
+        .>>. keyword "module"
+        |> attempt
+        .>>. ignored1
+        .>>. identifier
+        .>>. ignored
+        .>>. memberBlock TypeKind.Module
+        |>> (fun ((((((acc, sep1), wordm), sep2), name), sep3), body) ->
+            name, body,
+            seq {
+                acc
+                yield! sep1
+                wordm
+                yield! sep2
+                name
+                yield! sep3
+                body
+            })
+        .>>. getUserState
+        |> node (fun ((name, body, nodes), flags) ->
+            let def =
+                { Definition =
+                    { Name = name.ToString()
+                      Flags = flags }
+                  Body = body }
+            createNode (ModuleDef def) nodes)
+        <?> "module definition"
 
     useStatements
     .>>. opt (identifierStatement "namespace" NamespaceDef <?> "namespace definition")
@@ -736,6 +771,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
             (choice
                 [
                     classDef false
+                    moduleDef false
                 ]
              .>>. ignored
              |>> fun (def, sep) -> seq { def; yield! sep })
