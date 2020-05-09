@@ -492,14 +492,17 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
             createNode (value id) nodes)
 
     let useStatements =
-        ignored
-        .>>. (identifierStatement "use" UseStatement <?> "use statement")
-        .>>. ignored1
-        |> attempt
-        |>> (fun ((sep1, st), sep2) -> seq { yield! sep1; st; yield! sep2 })
+        choice
+            [
+                identifierStatement "use" UseStatement
+                <?> "use statement"
+                |>> Seq.singleton
+
+                ignored1
+                |>> Seq.ofList
+            ]
         |> many
         |>> Seq.collect id
-        |> seqOpt
 
     let variableDef value =
         keyword "let"
