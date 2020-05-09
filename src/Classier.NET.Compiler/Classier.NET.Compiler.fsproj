@@ -24,6 +24,7 @@
 
   <!-- Source files -->
   <ItemGroup>
+    <Compile Include="SeqParsers.fs" />
     <Compile Include="LinePos.fs" />
     <Compile Include="SyntaxNode.fs" />
     <Compile Include="NodeParsers.fs" />

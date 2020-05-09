@@ -22,15 +22,15 @@ namespace Classier.NET.Compiler
     using Xunit;
     using static Classier.NET.Compiler.Grammar;
     using static FParsec.CharParsers;
-    using SuccessResult = SuccessResult<SyntaxNode.SyntaxNode<Grammar.NodeValue>, Microsoft.FSharp.Core.Unit>;
+    using SuccessResult = SuccessResult<SyntaxNode.SyntaxNode<Grammar.NodeValue>, Grammar.Flags>;
 
     public class ParserTests
     {
-        [InlineData("Classier.NET.Compiler.source.MyAbstractClass1.txt")]
-        [InlineData("Classier.NET.Compiler.source.MyClass1.txt")]
-        [InlineData("Classier.NET.Compiler.source.MyModule1.txt")]
+        [InlineData("Classier.NET.Compiler.source.MyAbstractClass1.txt", new[] { "java", "lang" }, new[] { "java", "util" })]
+        [InlineData("Classier.NET.Compiler.source.MyClass1.txt", new[] { "System" }, new[] { "System", "IO" })]
+        [InlineData("Classier.NET.Compiler.source.MyModule1.txt", new[] { "system", "reflection" })]
         [Theory]
-        public void ParserCorrectlyParsesTestFiles(string file) ////, string[] imports)
+        public void ParserCorrectlyParsesTestFiles(string file, params string[][] imports)
         {
             // Arrange
             using var stream = typeof(ParserTests).Assembly.GetManifestResourceStream(file);
@@ -38,11 +38,12 @@ namespace Classier.NET.Compiler
             string content = reader.ReadToEnd();
 
             // Act
-            var result = new SuccessResult(() => runParserOnString(Grammar.parser, null, file, content)).Result;
+            var result = new SuccessResult(() => runParserOnString(Grammar.parser, Flags.None, file, content)).Result;
 
             // Assert
             var cunode = Assert.IsType<NodeValue.CompilationUnit>(result.Value);
-            ////Assert.Equal(imports, cunode.Item.Imports);
+            Assert.Equal(imports, cunode.Item.Imports);
+            //// Assert.Equal(ns, cunode.Item.Namespace);
             Assert.Equal(normalizeNewlines(content), result.ToString());
         }
     }

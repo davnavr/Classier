@@ -12,27 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module Classier.NET.Compiler.NodeParsers
+module Classier.NET.Compiler.SeqParsers
 
 open FParsec
 
-open Classier.NET.Compiler.SyntaxNode
-
-let node (node: 'Result -> LinePos -> SyntaxNode<'Value>) (parser: Parser<'Result, 'UserState>) =
-    getPosition
-    .>>. parser
-    |>> fun (pos, result) ->
-        node result (LinePos pos)
-
-let token value parser =
-    parser |> node (createToken value)
-
-let nodePair p =
-    p |>> fun (r1, r2) -> [ r1; r2 ]
-
-let strToken (str: string) (value: 'Value) =
-    pstring str |> node (createToken value)
-
-let charToken (c: char) (value: 'Value) =
-    strToken (string c) value
-    <?> value.ToString()
+let optseq parser =
+    parser
+    |> opt
+    |>> (fun result ->
+        match result with
+        | Some _ -> result.Value
+        | None -> Seq.empty)
