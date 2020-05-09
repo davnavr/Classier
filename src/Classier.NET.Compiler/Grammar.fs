@@ -93,6 +93,10 @@ type NodeValue =
     | ParamList of seq<seq<Param>>
     | Period
     | RCurlyBracket
+    | RecordDef of
+        {| Body: SyntaxNode<NodeValue>
+           Definition: Definition
+           Fields: seq<FieldOrVar> |}
     | RParen
     | Semicolon
     | StReturn of SyntaxNode<NodeValue>
@@ -113,10 +117,6 @@ and Param = { Name: string; Type: seq<string> }
 and TypeDef =
     { Body: SyntaxNode<NodeValue>
       Definition: Definition }
-
-type TypeKind =
-    | Module = 0
-    | Class = 1
 
 let parser: Parser<SyntaxNode<NodeValue>, Flags> =
     let colon = charToken ':' Colon
@@ -247,12 +247,12 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 | IdentifierFull names -> names
                 | _ -> Seq.empty
             createNode (TypeAnnotation valueType) nodes)
-        |> opt
         <?> "type annotation"
 
+    let typeAnnotationOpt = opt typeAnnotation
+
     let nameTypePair =
-        identifier
-        .>>. typeAnnotation
+        identifier .>>. typeAnnotationOpt
 
     let paramTuple =
         let param =
@@ -307,6 +307,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 yield! sep2
                 rp
             })
+        <?> "parameters"
         |> node (fun (pms, nodes) ->
             let parameters =
                 pms
@@ -325,6 +326,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
             |> many
             |>> Seq.collect id)
         |>> (fun (first, rest) -> seq { first; yield! rest })
+        <?> "parameter list"
         |> node (fun nodes ->
             let tuples =
                 nodes
@@ -394,25 +396,28 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         let argumentTuple =
             lparen
             .>>. ignored
-            .>>. expr.ExpressionParser
-            .>>. (ignored
-                 .>>. comma
-                 |> attempt
+            .>>. (expr.ExpressionParser
+                 .>>. (ignored
+                      .>>. comma
+                      |> attempt
+                      .>>. ignored
+                      .>>. expr.ExpressionParser
+                      |>> (fun (((sep1, c), sep2), ex) ->
+                         seq {
+                             yield! sep1
+                             c
+                             yield! sep2
+                             ex
+                         })
+                      |> many
+                      |>> Seq.collect id)
                  .>>. ignored
-                 .>>. expr.ExpressionParser
-                 |>> (fun (((sep1, c), sep2), ex) ->
-                    seq {
-                        yield! sep1
-                        c
-                        yield! sep2
-                        ex
-                    })
-                 |> many
-                 |>> Seq.collect id)
-            .>>. ignored
+                 |>> (fun ((first, rest), sep) -> seq { first; yield! rest; yield! sep })
+                 |> seqOpt)
             .>>. rparen
-            |>> (fun (((((lp, sep1), first), rest), sep2), rp) ->
-                seq { first; yield! rest }
+            |> attempt
+            |>> (fun (((lp, sep1), args), rp) ->
+                args
                 |> Seq.where (fun node ->
                     match node.Value with
                     | Expression _ -> true
@@ -420,9 +425,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 seq {
                     lp
                     yield! sep1
-                    first
-                    yield! rest
-                    yield! sep2
+                    yield! args
                     rp
                 })
             |> node (fun (args, nodes) ->
@@ -494,7 +497,6 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 (argumentTuple
                 .>>. (ignored
                      .>>. argumentTuple
-                     |> attempt
                      |>> (fun (sep, arg) -> seq { yield! sep; arg })
                      |> many
                      |>> Seq.collect id)
@@ -579,6 +581,8 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 
             createNode (value def) nodes)
 
+    let fieldDef = variableDef FieldDef <?> "field definition"
+
     let funcBody =
         ignored
         .>>. choice
@@ -652,7 +656,8 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         .>>. identifier
         .>>. ignored
         .>>. paramList
-        .>>. typeAnnotation
+        |> attempt
+        .>>. typeAnnotationOpt
         .>>. ignored
         .>>. choice
             [
@@ -693,26 +698,11 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                     |> Option.defaultValue Seq.empty }
             createNode (value def) nodes)
 
-    let memberBlock kind =
+    let methodDef = funcDef MethodDef <?> "method definition"
+
+    let memberBlock (parsers: seq<Parser<SyntaxNode<_>, _>>) =
         ignored
-        .>>. choice
-            [
-                if kind = TypeKind.Module then
-                    variableDef VariableDef
-                    <?> "variable definition";
-
-                    funcDef FuncDef
-                    <?> "function definition";
-
-                if kind >= TypeKind.Class then
-                    variableDef FieldDef
-                    <?> "field definition";
-
-                    funcDef MethodDef
-                    <?> "method definition";
-
-                // classDef true
-            ]
+        .>>. choice parsers
         .>>. ignored
         |> attempt
         |>> (fun ((sep1, node), sep2) ->
@@ -805,7 +795,11 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                     yield! iimpl
                     yield! sep
                 })
-        .>>. memberBlock TypeKind.Class
+        .>>. memberBlock
+                [
+                    fieldDef
+                    methodDef
+                ]
         |>> (fun ((name, def), body) -> name, body, seq { yield! def; body })
         .>>. getUserState
         |> node (fun ((name, body, nodes), flags) ->
@@ -817,6 +811,64 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
             createNode (ClassDef def) nodes)
         <?> "class definition"
 
+    let recordDef nested =
+        accessModifier nested
+        .>>. ignored1
+        .>>. keyword "data"
+        |> attempt
+        .>>. ignored1
+        .>>. identifier
+        .>>. ignored
+        .>>. (ignored
+             .>>. identifier
+             |> attempt
+             .>>. typeAnnotation
+             <?> "record field"
+             |> node (fun ((sep, valName), valType) ->
+                    let nodes = seq { yield! sep; valName; valType }
+                    let def =
+                        { Definition =
+                            { Name = valName.ToString()
+                              Flags = Flags.Public }
+                          ValueType =
+                            match valType.Value with
+                            | TypeAnnotation names -> names
+                            | _ -> Seq.empty
+                          Value = None }
+                    createNode (FieldDef def) nodes)
+             .>>. ignored
+             |>> (fun (field, sep) -> seq { field; yield! sep })
+             |> many
+             |>> Seq.collect id
+             |> block)
+        |>> (fun ((((((acc, sep1), word), sep2), name), sep3), body) ->
+            name, body,
+            seq {
+                acc
+                yield! sep1
+                word
+                yield! sep2
+                name
+                yield! sep3
+                body
+            })
+        .>>. getUserState
+        |> node (fun ((name, body, nodes), flags) ->
+            let def =
+                RecordDef
+                    {| Body = body
+                       Definition =
+                           { Name = name.ToString()
+                             Flags = flags }
+                       Fields =
+                           nodes
+                           |> Seq.choose (fun node ->
+                               match node.Value with
+                               | FieldDef field -> Some field
+                               | _ -> None) |}
+            createNode def nodes)
+        <?> "record definition"
+
     let moduleDef nested =
         accessModifier nested
         .>>. ignored1
@@ -825,7 +877,13 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         .>>. ignored1
         .>>. identifier
         .>>. ignored
-        .>>. memberBlock TypeKind.Module
+        .>>. memberBlock
+                [
+                    variableDef VariableDef <?> "variable definition";
+                    funcDef FuncDef <?> "function definition";
+                    recordDef true;
+                    classDef true;
+                ]
         |>> (fun ((((((acc, sep1), wordm), sep2), name), sep3), body) ->
             name, body,
             seq {
@@ -852,10 +910,8 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
     .>>. useStatements
     .>>. many
             (choice
-                [
-                    classDef false
-                    moduleDef false
-                ]
+                ([ classDef; moduleDef; recordDef ]
+                 |> List.map (fun f -> f false))
              .>>. ignored
              |>> fun (def, sep) -> seq { def; yield! sep })
     |>> (fun (((use1, ns), use2), defs) ->
@@ -891,3 +947,4 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                        |> Seq.tryHead 
                        |> Option.defaultValue Seq.empty |}
         createNode cu nodes)
+    <?> "compilation unit"

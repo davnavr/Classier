@@ -21,6 +21,7 @@ public class MyClass1 {
     public implicitTest (p1, p2)
     {
         let myLocal = (1 + 2) / 3;
+        Console.WriteLine();
         1 + 2; // An implicit return value
     }
 }
