@@ -91,6 +91,7 @@ type NodeValue =
     | RCurlyBracket
     | RParen
     | Semicolon
+    | StReturn of SyntaxNode<NodeValue>
     | TypeAnnotation of seq<string>
     | UseStatement of seq<string>
     | VariableDef of FieldOrVar
@@ -456,57 +457,6 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
 
         expr.ExpressionParser <?> "expression"
 
-    let funcBody =
-        choice
-            [
-                ignored1
-
-                expression
-                .>>. semicolon
-                |> seqPair;
-            ]
-        |> attempt
-        |> many
-        |>> Seq.collect id
-        |> block
-
-    let identifierStatement word value =
-        keyword word
-        .>>. ignored1
-        .>>. identifierFull
-        .>>. ignored
-        .>>. semicolon
-        |>> (fun ((((wrd, sep1), id), sep2), sep3) ->
-            seq {
-                wrd
-                yield! sep1
-                id
-                yield! sep2
-                sep3
-            })
-        |> node (fun nodes ->
-            let id =
-                nodes
-                |> Seq.choose (fun node ->
-                    match node.Value with
-                    | IdentifierFull names -> Some names
-                    | _ -> None)
-                |> Seq.collect id
-            createNode (value id) nodes)
-
-    let useStatements =
-        choice
-            [
-                identifierStatement "use" UseStatement
-                <?> "use statement"
-                |>> Seq.singleton;
-
-                ignored1
-                |>> Seq.ofList;
-            ]
-        |> many
-        |>> Seq.collect id
-
     let variableDef value =
         keyword "let"
         .>> setUserState Flags.Private
@@ -516,6 +466,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         .>>. seqOpt
                 (ignored
                 .>>. opequal
+                |> attempt
                 .>>. ignored
                 .>>. expression
                 |>> fun (((sep1, eq), sep2), expr) ->
@@ -563,6 +514,74 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                           | _ -> None) }
                 
             createNode (value def) nodes)
+
+    let funcBody =
+        ignored
+        .>>. choice
+            [
+                variableDef VariableDef
+                <?> "local variable";
+
+                keyword "return"
+                .>>. ignored1
+                |>> (fun (ret, sep) -> seq { ret; yield! sep })
+                |> opt
+                .>>. expression
+                .>>. semicolon
+                |>> (fun ((ret, expr), scolon) ->
+                    expr,
+                    seq {
+                        if ret.IsSome then
+                            yield! ret.Value
+                        expr
+                        scolon
+                    })
+                |> node (fun (expr, nodes) -> createNode (StReturn expr) nodes)
+                <?> "return statement";
+            ]
+        .>>. ignored
+        |> attempt
+        |>> (fun ((sep1, statement), sep2) -> seq { yield! sep1; statement; yield! sep2 })
+        |> many
+        |>> Seq.collect id
+        |> block
+
+    let identifierStatement word value =
+        keyword word
+        .>>. ignored1
+        .>>. identifierFull
+        .>>. ignored
+        .>>. semicolon
+        |>> (fun ((((wrd, sep1), id), sep2), sep3) ->
+            seq {
+                wrd
+                yield! sep1
+                id
+                yield! sep2
+                sep3
+            })
+        |> node (fun nodes ->
+            let id =
+                nodes
+                |> Seq.choose (fun node ->
+                    match node.Value with
+                    | IdentifierFull names -> Some names
+                    | _ -> None)
+                |> Seq.collect id
+            createNode (value id) nodes)
+
+    let useStatements =
+        choice
+            [
+                identifierStatement "use" UseStatement
+                <?> "use statement"
+                |>> Seq.singleton;
+
+                ignored1
+                |>> Seq.ofList;
+            ]
+        |> many
+        |>> Seq.collect id
 
     let funcDef value =
         funcKeywords

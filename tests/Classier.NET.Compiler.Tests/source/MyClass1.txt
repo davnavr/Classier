@@ -14,11 +14,13 @@ public class MyClass1 {
 
     public ExplicitTest (p1: int) (p2: int): int
     {
-        (myField) / 42;
+        let mutable someProceduralCode = p1;
+        return (myField) / 42;
     }
 
     public implicitTest (p1, p2)
     {
-        1 + 2;
+        let myLocal = (1 + 2) / 3;
+        1 + 2; // An implicit return value
     }
 }
