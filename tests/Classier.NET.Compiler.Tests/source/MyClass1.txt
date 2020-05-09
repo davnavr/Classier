@@ -7,17 +7,17 @@ public class MyClass1 {
     let myField: int = 42;
 
     // Optional type annotation for return type
-    public this.TheTest (myParam: FileInfo)
+    public TheTest (myParam: FileInfo)
     {
         84;
     }
 
-    public this.Explicit (p1: int) (p2: int): int
+    public Explicit (p1: int) (p2: int): int
     {
         (myField) / 42;
     }
 
-    public self.implicit (p1, p2)
+    public implicit (p1, p2)
     {
         1 + 2;
     }

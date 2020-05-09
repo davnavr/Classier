@@ -16,7 +16,10 @@ module Classier.NET.Compiler.SeqParsers
 
 open FParsec
 
-let optseq parser =
+let seqPair p =
+    p |>> fun (r1, r2) -> [ r1; r2 ]
+
+let seqOpt parser =
     parser
     |> opt
     |>> (fun result ->

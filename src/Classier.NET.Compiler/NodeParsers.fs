@@ -27,9 +27,6 @@ let node (node: 'Result -> LinePos -> SyntaxNode<'Value>) (parser: Parser<'Resul
 let token value parser =
     parser |> node (createToken value)
 
-let nodePair p =
-    p |>> fun (r1, r2) -> [ r1; r2 ]
-
 let strToken (str: string) (value: 'Value) =
     pstring str |> node (createToken value)
 

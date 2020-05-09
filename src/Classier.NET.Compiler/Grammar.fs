@@ -32,12 +32,11 @@ type Flags =
     | VisibilityMask = 3
     | Inline = 4
     | Abstract = 8
-    /// Indicates that a class, field, or local variable is mutable.
+    /// Indicates that a class, field, or local variable is mutable,
+    /// or that a method changes the value of a field.
     | Mutable = 16
-    /// Indicates that a method or function changes the value of a field.
-    | Mutator = 32
     /// Indicates that a class can have a subclass.
-    | Inheritable = 64
+    | Inheritable = 32
 
 type Definition =
     { Name: string
@@ -52,6 +51,8 @@ type NodeValue =
            Imports: seq<seq<string>>
            Namespace: seq<string> |}
     | AccessModifier of Flags
+    | ArgumentTuple of seq<SyntaxNode<NodeValue>>
+    | ArgumentList of seq<seq<SyntaxNode<NodeValue>>>
     | BinLit
     | Block
     | ClassDef of Definition
@@ -65,7 +66,7 @@ type NodeValue =
     | ExprSub
     | ExprMul
     | FieldDef of FieldOrVar
-    | FuncDef of Definition
+    | FuncDef of Definition * seq<seq<Param>>
     | HexLit
     | Identifier of string
     | IdentifierFull of seq<string>
@@ -73,10 +74,11 @@ type NodeValue =
     | IntLit
     | Keyword
     | LCurlyBracket
-    | LocalVarDef of FieldOrVar
     | LParen
-    | MethodDef of Definition * seq<seq<Param>>
-    | MethodHeader
+    | MethodDef of
+        {| Definition: Definition
+           Parameters: seq<seq<Param>>
+           SelfIdentifier: string option |}
     | ModuleDef of Definition
     | NamespaceDef of seq<string>
     | Newline
@@ -87,23 +89,24 @@ type NodeValue =
     | OpMul
     | Param of Param
     | ParamTuple of seq<Param>
-    | ParamSet of seq<seq<Param>>
+    | ParamList of seq<seq<Param>>
     | Period
     | RCurlyBracket
     | RParen
     | Semicolon
     | TypeAnnotation of seq<string>
     | UseStatement of seq<string>
+    | VariableDef of FieldOrVar
     | Whitespace
-and Param = { Name: string; ParamType: seq<string> }
+and Param = { Name: string; Type: seq<string> }
 and FieldOrVar =
     { Definition: Definition
       ValueType: seq<string>
       Value: SyntaxNode<NodeValue> option }
 
 type TypeKind =
-    | Class = 0
-    | Module = 1
+    | Module = 0
+    | Class = 1
 
 let parser: Parser<SyntaxNode<NodeValue>, Flags> =
     let colon = charToken ':' Colon
@@ -214,7 +217,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                     | _ -> None)
             createNode (IdentifierFull names) nodes)
     
-    let typeAnnotation =
+    let typeAnnotation = // TODO: Make this optional
         ignored
         .>>. colon
         .>>. ignored
@@ -233,10 +236,101 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 | IdentifierFull names -> names
                 | _ -> Seq.empty
             createNode (TypeAnnotation valueType) nodes)
+        <?> "type annotation"
 
     let typeNamePair =
         identifier
         .>>. typeAnnotation
+
+    let paramTuple =
+        let param =
+            typeNamePair
+            |> node (fun (name, typeName) ->
+                let paramName =
+                    match name.Value with
+                    | Identifier str -> str
+                    | _ -> String.Empty
+                let paramType =
+                    match typeName.Value with
+                    | TypeAnnotation t -> t
+                    | _ -> Seq.empty
+                createNode (Param { Name = paramName; Type = paramType }) [ name; typeName ])
+
+        lparen
+        .>>. ignored
+        .>>. seqOpt
+            (many
+                (param
+                .>>. ignored
+                .>>. comma
+                .>>. ignored
+                |> attempt
+                |>> fun (((p, sep1), com), sep2) ->
+                    seq {
+                        p
+                        yield! sep1
+                        com
+                        yield! sep2
+                    })
+             |>> Seq.collect id
+             .>>. param
+             |>> fun (rest, last) -> seq { yield! rest; last})
+        .>>. ignored
+        .>>. rparen
+        |>> (fun ((((lp, sep1), pms), sep2), rp) ->
+            pms,
+            seq {
+                lp
+                yield! sep1
+                yield! pms
+                yield! sep2
+                rp
+            })
+        |> node (fun (pms, nodes) ->
+            let parameters =
+                pms
+                |> Seq.choose (fun node ->
+                    match node.Value with
+                    | Param p -> Some p
+                    | _ -> None)
+            createNode (ParamTuple parameters) nodes)
+
+    let paramList =
+        paramTuple
+        .>>. (ignored
+            .>>. paramTuple
+            |> attempt
+            |>> fun (sep, tup) -> seq { yield! sep; tup }
+            |> many
+            |>> Seq.collect id)
+        |>> (fun (first, rest) -> seq { first; yield! rest })
+        |> node (fun nodes ->
+            let tuples =
+                nodes
+                |> Seq.choose (fun node ->
+                    match node.Value with
+                    | ParamTuple ps -> Some ps
+                    | _ -> None)
+            createNode (ParamList tuples) nodes)
+
+    let funcKeywords =
+        accessModifier true
+        .>>. ignored1
+        .>>. modifierChoice
+                [
+                    "abstract", Flags.Abstract
+                    "inline", Flags.Inline
+                ]
+        .>>. modifier "mutator" Flags.Mutable
+        .>>. getUserState
+        |>> fun ((((acc, sep), worda), wordm), flags) ->
+            flags,
+            seq {
+                acc
+                yield! sep
+                yield! worda
+                yield! wordm
+            }
 
     let expression: Parser<SyntaxNode<NodeValue>, Flags> =
         let numSuffixes suffixes =
@@ -337,6 +431,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                         })
                     |> node (createNode Expression)
                 ]
+            // .>>. argumentList
             .>>. ignored
             |> node (fun (expr, sep) pos ->
                 if Seq.isEmpty sep
@@ -344,6 +439,8 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 else createNode Expression (seq { expr; yield! sep }) pos)
 
         expr.ExpressionParser <?> "expression"
+
+    let funcBody = fail "not implemented"
 
     let identifierStatement word value =
         keyword word
@@ -377,14 +474,14 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         |>> (fun ((sep1, st), sep2) -> seq { yield! sep1; st; yield! sep2 })
         |> many
         |>> Seq.collect id
-        |> optseq
+        |> seqOpt
 
     let variable value =
         keyword "let"
         .>>. ignored1
         .>>. modifierMutable
         .>>. typeNamePair
-        .>>. optseq
+        .>>. seqOpt
                 (ignored
                 .>>. opequal
                 .>>. ignored
@@ -412,39 +509,83 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 sc
             })
         |> node (fun (flags, valueType, name, nodes) ->
-            let varType =
-                match valueType.Value with
-                | TypeAnnotation names -> names
-                | _ -> Seq.empty
-            let varName =
-                match name.Value with
-                | Identifier name -> name
-                | _ -> String.Empty
-            let varValue =
-                nodes
-                |> Seq.tryPick (fun node ->
-                    match node.Value with
-                    | Expression -> Some node
-                    | _ -> None)
+            let def =
+                { Definition =
+                      { Name =
+                            match name.Value with
+                            | Identifier name -> name
+                            | _ -> String.Empty
+                        Flags = flags }
+                  ValueType =
+                      match valueType.Value with
+                      | TypeAnnotation names -> names
+                      | _ -> Seq.empty
+                  Value =
+                      nodes
+                      |> Seq.tryPick (fun node ->
+                          match node.Value with
+                          | Expression -> Some node
+                          | _ -> None) }
                 
-            createNode (value flags varType varName varValue) nodes)
+            createNode (value def) nodes)
 
     let memberBlock kind =
         ignored
         .>>. choice
             [
                 if kind >= TypeKind.Class then
-                    variable
-                        (fun flags valueType name value ->
-                            FieldDef
-                                ({ Definition =
-                                    {
-                                        Name = name
-                                        Flags = flags
-                                    }
-                                   ValueType = valueType
-                                   Value = value }))
-                    <?> "field definition"
+                    variable FieldDef
+                    <?> "field definition";
+
+                    funcKeywords
+                    .>>. (identifier
+                        <?> "self-identifier"
+                        .>>. ignored
+                        .>>. period
+                        |> attempt
+                        .>>. ignored
+                        |>> (fun (((self, sep1), per), sep2) ->
+                            self.ToString(),
+                            seq {
+                                self
+                                yield! sep1
+                                per
+                                yield! sep2
+                            })
+                        |> opt
+                        |>> fun s ->
+                            match s with
+                            | Some (self, nodes) -> Some self, nodes
+                            | None _ -> None, Seq.empty)
+                    .>>. identifier
+                    .>>. ignored
+                    .>>. paramList
+                    .>>. ignored
+                    .>>. funcBody
+                    |>> (fun (((((((flags, modifiers), (selfid, self)), name), sep1), plist), sep2), body) ->
+                        flags, selfid, name.ToString(), plist,
+                        seq {
+                            yield! modifiers
+                            yield! self
+                            name
+                            yield! sep1
+                            plist
+                            yield! sep2
+                            body
+                        })
+                    |> node (fun (flags, selfid, name, plist, nodes) ->
+                        let def =
+                            { Name = name
+                              Flags = flags }
+                        let parameters =
+                            match plist.Value with
+                            | ParamList ps -> ps
+                            | _ -> Seq.empty
+                        createNode (MethodDef {| Definition = def; Parameters = parameters; SelfIdentifier = selfid |}) nodes)
+                    <?> "method definition";
+
+                //if kind >= TypeKind.Module then
+                    // classDef true
             ]
         .>>. ignored
         |> attempt
@@ -483,7 +624,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 yield! sep2
                 yield! Seq.collect id interfaces
             })
-        |> optseq
+        |> seqOpt
 
     let classDef nested =
         accessModifier nested
@@ -515,7 +656,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                     yield! sep2
                     name
                 })
-        .>>. optseq
+        .>>. seqOpt
                 (ignored1
                 .>>. keyword "extends"
                 |> attempt
