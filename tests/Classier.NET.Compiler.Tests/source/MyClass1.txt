@@ -12,12 +12,12 @@ public class MyClass1 {
         84;
     }
 
-    public Explicit (p1: int) (p2: int): int
+    public ExplicitTest (p1: int) (p2: int): int
     {
         (myField) / 42;
     }
 
-    public implicit (p1, p2)
+    public implicitTest (p1, p2)
     {
         1 + 2;
     }

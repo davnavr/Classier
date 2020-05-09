@@ -6,4 +6,6 @@ namespace this.is.my.space;
 
 internal abstract class MyAbstractClass1 {
   let tester: java.lang.String = someUndefinedGlobal;
+
+  public abstract noBody (iUsedToKnow);
 }
