@@ -45,6 +45,9 @@ type Definition =
     member this.Visibility =
         this.Flags ||| Flags.VisibilityMask
 
+/// An empty sequence indicates that the type must be inferred.
+type TypeName = seq<string>
+
 type NodeValue = // TODO: Add TypeAliasDef or maybe allow inline classes?
     | CompilationUnit of
         {| Definitions: seq<SyntaxNode<NodeValue>>
@@ -61,8 +64,12 @@ type NodeValue = // TODO: Add TypeAliasDef or maybe allow inline classes?
     | Comment
     | DecLit
     | DUnionDef of
+        {| Body: SyntaxNode<NodeValue>
+           Cases: seq<string * TypeName>
+           Definition: Definition |}
+    | DUnionCase of
         {| Definition: Definition
-           Cases: seq<string * seq<string>> |}
+           Type: TypeName |}
     | Expression of ExpressionKind
     | FieldDef of FieldOrVar
     | FuncDef of MethodOrFunc
@@ -95,7 +102,7 @@ type NodeValue = // TODO: Add TypeAliasDef or maybe allow inline classes?
     | RParen
     | Semicolon
     | Statement of StatementKind
-    | TypeAnnotation of seq<string>
+    | TypeAnnotation of TypeName
     | UseStatement of seq<string>
     | Whitespace
 and ExpressionKind =
@@ -109,14 +116,14 @@ and ExpressionKind =
            Target: SyntaxNode<NodeValue> |}
 and FieldOrVar =
     { Definition: Definition
-      ValueType: seq<string>
+      ValueType: TypeName
       Value: SyntaxNode<NodeValue> option }
 and MethodOrFunc =
     { Body: SyntaxNode<NodeValue> option
       Definition: Definition
       Parameters: seq<seq<Param>>
-      RetValueType: seq<string> }
-and Param = { Name: string; Type: seq<string> }
+      RetValueType: TypeName }
+and Param = { Name: string; Type: TypeName }
 and StatementKind =
     | Empty
     | VariableDef1 of FieldOrVar
@@ -129,6 +136,7 @@ and TypeDef =
     { Body: SyntaxNode<NodeValue>
       Definition: Definition }
 
+// TODO: NOTE: IMPORTANT: Flags for classes might get overriden by its members.
 let parser: Parser<SyntaxNode<NodeValue>, Flags> =
     let colon = charToken ':' Colon
     let comma = charToken ',' Comma
@@ -263,7 +271,9 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
     let typeAnnotationOpt = opt typeAnnotation
 
     let nameTypePair =
-        identifier .>>. typeAnnotationOpt
+        identifier
+        |> attempt
+        .>>. typeAnnotationOpt
 
     let paramTuple =
         let param =
@@ -366,6 +376,9 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 yield! wordm
             }
 
+    // TODO: Add parser for parsing the names of types, with support for regular identifiers,
+    // typescrit style unions (string | number), and tuples (string, string)
+
     let expression: Parser<SyntaxNode<NodeValue>, Flags> =
         let numSuffixes suffixes =
             suffixes
@@ -404,6 +417,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
             InfixOperator (symbol, ignored, prec, assoc, (), mapping))
         |> List.iter expr.AddOperator
 
+        /// NOTE: This is a parser for tuples too, should add it into the term parser later.
         let argumentTuple =
             lparen
             .>>. ignored
@@ -857,6 +871,82 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
             createNode (ClassDef def) nodes)
         <?> "class definition"
 
+    let simpleTypeNodes parser =
+        parser
+        |>> (fun ((((((acc: SyntaxNode<_>, sep1), word: SyntaxNode<_>), sep2), name: SyntaxNode<_>), sep3), body: SyntaxNode<_>) ->
+            name, body,
+            seq {
+                acc
+                yield! sep1
+                word
+                yield! sep2
+                name
+                yield! sep3
+                body
+            })
+        .>>. getUserState
+
+    let dunionDef nested =
+        accessModifier nested
+        .>>. ignored1
+        .>>. keyword "union"
+        |> attempt
+        .>>. ignored1
+        .>>. identifier
+        .>>. ignored
+        .>>. (ignored
+             .>>. nameTypePair
+             <?> "union case"
+             |>> (fun (sep, (cname, ctype)) ->
+                cname.ToString(),
+                ctype
+                |> Option.map (fun node ->
+                    match node.Value with
+                    | TypeAnnotation names -> names
+                    | _ -> Seq.empty),
+                seq {
+                    yield! sep
+                    cname
+                    if ctype.IsSome then
+                        ctype.Value
+                })
+             .>>. getUserState
+             |> node (fun ((cname, ctype, nodes), flags) ->
+                let def =
+                    DUnionCase
+                        {| Definition =
+                               { Name = cname
+                                 Flags = flags }
+                           Type =
+                               ctype
+                               |> Option.defaultValue Seq.empty |}
+                createNode def nodes)
+             .>>. ignored
+             .>>. semicolon
+             .>>. ignored
+             |>> (fun (((case, sep1), sc), sep2) -> seq { case; yield! sep1; sc; yield! sep2 })
+             |> many
+             |>> Seq.collect id
+             |> block)
+        |> simpleTypeNodes
+        |> node (fun ((name, body, nodes), flags) ->
+            let def =
+                DUnionDef
+                    {| Body = body
+                       Cases =
+                           nodes
+                           |> Seq.choose (fun node ->
+                               match node.Value with
+                               | DUnionCase case ->
+                                   Some (case.Definition.Name, case.Type)
+                               | _ -> None)
+                       Definition =
+                           { Name = name.ToString()
+                             Flags = flags }
+                    |}
+            createNode def nodes)
+        <?> "discriminated union"
+
     let recordDef nested =
         accessModifier nested
         .>>. ignored1
@@ -883,22 +973,13 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                           Value = None }
                     createNode (FieldDef def) nodes)
              .>>. ignored
-             |>> (fun (field, sep) -> seq { field; yield! sep })
+             .>>. semicolon
+             .>>. ignored
+             |>> (fun (((field, sep1), sc), sep2) -> seq { field; yield! sep1; sc; yield! sep2 })
              |> many
              |>> Seq.collect id
              |> block)
-        |>> (fun ((((((acc, sep1), word), sep2), name), sep3), body) ->
-            name, body,
-            seq {
-                acc
-                yield! sep1
-                word
-                yield! sep2
-                name
-                yield! sep3
-                body
-            })
-        .>>. getUserState
+        |> simpleTypeNodes
         |> node (fun ((name, body, nodes), flags) ->
             let def =
                 RecordDef
@@ -927,6 +1008,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 [
                     fieldDef;
                     funcDef FuncDef <?> "function definition";
+                    dunionDef true;
                     recordDef true;
                     classDef true;
                 ]
@@ -956,7 +1038,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
     .>>. useStatements
     .>>. many
             (choice
-                ([ classDef; moduleDef; recordDef ]
+                ([ classDef; moduleDef; recordDef; dunionDef ]
                  |> List.map (fun f -> f false))
              .>>. ignored
              |>> fun (def, sep) -> seq { def; yield! sep })

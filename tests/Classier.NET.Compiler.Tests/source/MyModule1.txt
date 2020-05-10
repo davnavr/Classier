@@ -34,7 +34,13 @@ public module Math {
                                             }
 
     internal data MyRecord {
-        field1: int
-        field2: string
+        field1: int;
+        field2: string;
+    }
+
+    public union MyUnion {
+        Case1;
+        Case2: long;
+        Case3: system.reflection.Assembly;
     }
 }
