@@ -45,7 +45,8 @@ type Definition =
     member this.Visibility =
         this.Flags ||| Flags.VisibilityMask
 
-type NodeValue =
+// TODO: Have expression and statements be its own du type.
+type NodeValue = // TODO: Add TypeAliasDef or maybe allow inline classes?
     | CompilationUnit of
         {| Definitions: seq<SyntaxNode<NodeValue>>
            Imports: seq<seq<string>>
@@ -60,6 +61,9 @@ type NodeValue =
     | Comma
     | Comment
     | DecLit
+    | DUnionDef of
+        {| Definition: Definition
+           Cases: seq<string * seq<string>> |}
     | Expression
     | ExprAdd
     /// A method or function call
@@ -100,6 +104,7 @@ type NodeValue =
     | RParen
     | Semicolon
     | StReturn of SyntaxNode<NodeValue>
+    | StWhile of SyntaxNode<NodeValue> * SyntaxNode<NodeValue>
     | TypeAnnotation of seq<string>
     | UseStatement of seq<string>
     | VariableDef of FieldOrVar
@@ -130,7 +135,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
     let rparen = charToken ')' RParen
     let semicolon = charToken ';' Semicolon
 
-    let accessModifier full = // TODO: Make this optional
+    let accessModifier full =
         let modifiers =
             [
                 "public", Flags.Public
@@ -227,7 +232,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                     | _ -> None)
             createNode (IdentifierFull names) nodes)
 
-    let typeAnnotation =
+    let typeAnnotation = // TODO: Eventually allow union types like TypeScript such as string | number.
         ignored
         .>>. colon
         |> attempt
@@ -583,14 +588,39 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
 
     let fieldDef = variableDef FieldDef <?> "field definition"
 
-    let funcBody =
-        ignored
-        .>>. choice
+    let funcBody, funcBodyRef = createParserForwardedToRef<SyntaxNode<_>, _>()
+
+    funcBodyRef :=
+        ignored1
+        .>>. opt 
+            (choice
             [
                 variableDef VariableDef
                 <?> "local variable";
 
+                keyword "while"
+                |> attempt
+                .>>. ignored
+                .>>. lparen
+                .>>. expression
+                .>>. rparen
+                .>>. ignored
+                .>>. funcBody
+                |>> (fun ((((((word, sep1), lp), expr), rp), sep2), body) ->
+                    expr, body,
+                    seq {
+                        word
+                        yield! sep1
+                        lp
+                        expr
+                        rp
+                        yield! sep2
+                        body
+                    })
+                |> node (fun (expr, body, nodes) -> createNode (StWhile (expr, body)) nodes)
+
                 keyword "return"
+                |> attempt
                 .>>. ignored1
                 |>> (fun (ret, sep) -> seq { ret; yield! sep })
                 |> opt
@@ -606,10 +636,16 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                     })
                 |> node (fun (expr, nodes) -> createNode (StReturn expr) nodes)
                 <?> "return statement";
-            ]
-        .>>. ignored
+
+                semicolon
+            ])
         |> attempt
-        |>> (fun ((sep1, statement), sep2) -> seq { yield! sep1; statement; yield! sep2 })
+        |>> (fun (sep, statement) ->
+            seq {
+                yield! sep
+                if statement.IsSome then
+                    statement.Value
+            })
         |> many
         |>> Seq.collect id
         |> block

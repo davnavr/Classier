@@ -9,6 +9,10 @@ public class MyClass1 {
     // Optional type annotation for return type
     public TheTest (myParam: FileInfo)
     {
+        while (thisWorks) {
+            42 * 2;
+        }
+        ;
         84;
     }
 
