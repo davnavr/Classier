@@ -45,7 +45,6 @@ type Definition =
     member this.Visibility =
         this.Flags ||| Flags.VisibilityMask
 
-// TODO: Have expression and statements be its own du type.
 type NodeValue = // TODO: Add TypeAliasDef or maybe allow inline classes?
     | CompilationUnit of
         {| Definitions: seq<SyntaxNode<NodeValue>>
@@ -64,15 +63,7 @@ type NodeValue = // TODO: Add TypeAliasDef or maybe allow inline classes?
     | DUnionDef of
         {| Definition: Definition
            Cases: seq<string * seq<string>> |}
-    | Expression
-    | ExprAdd
-    /// A method or function call
-    | ExprCall of
-        {| Arguments: SyntaxNode<NodeValue>
-           Target: SyntaxNode<NodeValue> |}
-    | ExprDiv
-    | ExprSub
-    | ExprMul
+    | Expression of ExpressionKind
     | FieldDef of FieldOrVar
     | FuncDef of MethodOrFunc
     | HexLit
@@ -103,12 +94,19 @@ type NodeValue = // TODO: Add TypeAliasDef or maybe allow inline classes?
            Fields: seq<FieldOrVar> |}
     | RParen
     | Semicolon
-    | StReturn of SyntaxNode<NodeValue>
-    | StWhile of SyntaxNode<NodeValue> * SyntaxNode<NodeValue>
+    | Statement of StatementKind
     | TypeAnnotation of seq<string>
     | UseStatement of seq<string>
-    | VariableDef of FieldOrVar
     | Whitespace
+and ExpressionKind =
+    | Unknown
+    | MathAdd
+    | MathSub
+    | MathMul
+    | MathDiv
+    | FuncCall of
+        {| Arguments: SyntaxNode<NodeValue>
+           Target: SyntaxNode<NodeValue> |}
 and FieldOrVar =
     { Definition: Definition
       ValueType: seq<string>
@@ -119,6 +117,14 @@ and MethodOrFunc =
       Parameters: seq<seq<Param>>
       RetValueType: seq<string> }
 and Param = { Name: string; Type: seq<string> }
+and StatementKind =
+    | Empty
+    | VariableDef1 of FieldOrVar
+    | Return of SyntaxNode<NodeValue>
+    | VariableDef of FieldOrVar
+    | While of
+        {| Body: SyntaxNode<NodeValue>
+           Condition: SyntaxNode<NodeValue> |}
 and TypeDef =
     { Body: SyntaxNode<NodeValue>
       Definition: Definition }
@@ -379,10 +385,10 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         let expr = OperatorPrecedenceParser<_,_,_> ()
 
         [
-            ExprAdd, OpAdd, "+", 1, Associativity.Left;
-            ExprSub, OpSub, "-", 1, Associativity.Left;
-            ExprMul, OpMul, "*", 5, Associativity.Left;
-            ExprDiv, OpDiv, "/", 5, Associativity.Left;
+            MathAdd, OpAdd, "+", 1, Associativity.Left;
+            MathSub, OpSub, "-", 1, Associativity.Left;
+            MathMul, OpMul, "*", 5, Associativity.Left;
+            MathDiv, OpDiv, "/", 5, Associativity.Left;
         ]
         |> List.map (fun (exprType, operandType, symbol, prec, assoc) ->
             let mapping op (expr1: SyntaxNode<NodeValue>) (expr2: SyntaxNode<NodeValue>) =
@@ -394,7 +400,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                         yield! op
                         expr2
                     }
-                createNode exprType nodes expr1.Position
+                createNode (Expression exprType) nodes expr1.Position
             InfixOperator (symbol, ignored, prec, assoc, (), mapping))
         |> List.iter expr.AddOperator
 
@@ -495,7 +501,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                             yield! sep2
                             rp
                         })
-                    |> node (createNode Expression)
+                    |> node (createNode (Expression Unknown))
                 ]
             .>>. ignored
             .>>. opt
@@ -519,10 +525,10 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                 | Some argsNode ->
                     { Content = Node (seq { ex; yield! sep; argsNode })
                       Position = ex.Position
-                      Value = ExprCall {| Arguments = argsNode; Target = ex |} }
+                      Value = Expression (FuncCall {| Arguments = argsNode; Target = ex |}) }
                     |> Seq.singleton
                 | None -> seq { ex; yield! sep })
-            |> node (createNode Expression)
+            |> node (createNode (Expression Unknown))
 
         expr.ExpressionParser <?> "expression"
 
@@ -581,7 +587,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                       nodes
                       |> Seq.tryPick (fun node ->
                           match node.Value with
-                          | Expression -> Some node
+                          | Expression _ -> Some node
                           | _ -> None) }
                 
             createNode (value def) nodes)
@@ -595,7 +601,8 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         .>>. opt 
             (choice
             [
-                variableDef VariableDef
+                (fun def -> Statement (VariableDef def))
+                |> variableDef
                 <?> "local variable";
 
                 keyword "while"
@@ -617,7 +624,8 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                         yield! sep2
                         body
                     })
-                |> node (fun (expr, body, nodes) -> createNode (StWhile (expr, body)) nodes)
+                |> node (fun (expr, body, nodes) ->
+                    createNode (Statement (While {| Body = body; Condition = expr |})) nodes)
 
                 keyword "return"
                 |> attempt
@@ -634,10 +642,12 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
                         expr
                         scolon
                     })
-                |> node (fun (expr, nodes) -> createNode (StReturn expr) nodes)
+                |> node (fun (expr, nodes) ->
+                    createNode (Statement (Return expr)) nodes)
                 <?> "return statement";
 
                 semicolon
+                |> node (fun node -> createNode (Statement Empty) [ node ])
             ])
         |> attempt
         |>> (fun (sep, statement) ->
@@ -915,7 +925,7 @@ let parser: Parser<SyntaxNode<NodeValue>, Flags> =
         .>>. ignored
         .>>. memberBlock
                 [
-                    variableDef VariableDef <?> "variable definition";
+                    fieldDef;
                     funcDef FuncDef <?> "function definition";
                     recordDef true;
                     classDef true;
