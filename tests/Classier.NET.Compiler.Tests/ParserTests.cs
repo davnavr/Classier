@@ -14,23 +14,27 @@
  * limitations under the License.
  */
 
-namespace Classier.NET.Compiler
+namespace Classier.NET.Compiler.Parsing
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Text;
+    using Microsoft.FSharp.Collections;
+    using Microsoft.FSharp.Core;
     using Xunit;
-    using static Classier.NET.Compiler.Grammar;
+    using static Classier.NET.Compiler.Parsing.Grammar;
     using static FParsec.CharParsers;
-    using SuccessResult = SuccessResult<SyntaxNode.SyntaxNode<Grammar.NodeValue>, Grammar.Flags>;
 
     public class ParserTests
     {
+        [InlineData("Classier.NET.Compiler.source.MultipleClasses.txt", new string[0])]
         [InlineData("Classier.NET.Compiler.source.MyAbstractClass1.txt", new[] { "java", "lang" }, new[] { "java", "util" })]
         [InlineData("Classier.NET.Compiler.source.MyClass1.txt", new[] { "System" }, new[] { "System", "IO" })]
+        [InlineData("Classier.NET.Compiler.source.MyGenericClass1.txt", new[] { "some", "name", "collections" })]
         [InlineData("Classier.NET.Compiler.source.MyModule1.txt", new[] { "system", "reflection" })]
         [Theory]
-        public void ParserCorrectlyParsesTestFiles(string file, params string[][] imports)
+        public void ParserCorrectlyParsesTestFiles(string file, params string[][] usings)
         {
             // Arrange
             using var stream = typeof(ParserTests).Assembly.GetManifestResourceStream(file);
@@ -38,13 +42,12 @@ namespace Classier.NET.Compiler
             string content = reader.ReadToEnd();
 
             // Act
-            var result = new SuccessResult(() => runParserOnString(Grammar.parser, Flags.None, file, content)).Result;
+            var result = new SuccessResult<CompilationUnit, ParserState>(
+                () => runParserOnString(parser, ParserState.Default, file, content)).Result;
 
             // Assert
-            var cunode = Assert.IsType<NodeValue.CompilationUnit>(result.Value);
-            Assert.Equal(imports, cunode.Item.Imports);
+            Assert.Equal<IEnumerable<string>>(usings, result.Usings);
             //// Assert.Equal(ns, cunode.Item.Namespace);
-            Assert.Equal(normalizeNewlines(content), result.ToString());
         }
     }
 }

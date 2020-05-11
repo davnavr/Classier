@@ -18,6 +18,7 @@ public class MyClass1 {
 
     public ExplicitTest (p1: int) (p2: int): int
     {
+        /* A fancier comment */
         let mutable someProceduralCode = p1;
         return (myField) / 42;
     }

@@ -1,6 +1,7 @@
-﻿use system.reflection;
-
+﻿
 namespace blah.blah.blah;
+
+use system.reflection;
 
 public module Math {
     let myGlobal: long = 42L;

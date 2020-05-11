@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-namespace Classier.NET.Compiler
+namespace Classier.NET.Compiler.Parsing
 
 /// Contains line number and line position.
 [<System.Runtime.CompilerServices.IsReadOnly; Struct>]
-type LinePos (lineNum: uint32, linePos: uint32) =
+type LinePos (lineNum: uint32, lineCol: uint32, name: string) =
     struct
-        new (pos: FParsec.Position) = LinePos(uint32(pos.Line), uint32(pos.Column))
-        member _.LineNum: uint32 = lineNum
-        member _.LineCol: uint32 = linePos
-        member this.Advance chars = LinePos (this.LineNum, this.LineCol + chars)
-        member this.Advance chars = this.Advance(uint32(chars))
-        member this.NextLine = LinePos (this.LineNum + 1u, 0u)
+        new (pos: FParsec.Position) = LinePos(uint32(pos.Line), uint32(pos.Column), pos.StreamName)
+        member _.Line: uint32 = lineNum
+        member _.Column: uint32 = lineCol
+        member _.Name: string = name
     end

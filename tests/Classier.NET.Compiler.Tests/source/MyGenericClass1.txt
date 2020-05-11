@@ -1,0 +1,6 @@
+
+namespace some.name.collections;
+
+public mutable class MutableList<T> {
+  let backingArray: Array<T>;
+}
