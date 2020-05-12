@@ -5,7 +5,7 @@ use system.reflection;
 
 public module Math {
     let myGlobal: long = 42L;
-    let aHexadecimalLiteral: int = 0x2A + 0x1F
+    let aHexadecimalLiteral: int = 0x2A + 0x1F;
 
             // Wow a comment!
                                                         ;

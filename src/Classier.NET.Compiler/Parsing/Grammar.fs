@@ -37,23 +37,22 @@ type Visibility =
 
 [<Flags>]
 type IntType =
-    | Unsigned = 0
-    | Signed = 1
+    | Signed = 0
+    | Unsigned = 1
     | Integer = 2
     | Long = 4
 
+[<RequireQualifiedAccess>]
 type FloatType =
     | Decimal
     | Double
     | Float
 
-    static member Default = Double
-
 type NumLiteral<'Type> =
     { Base: byte
       FracPart: char list
-      IsNegative: bool
       IntPart: char list
+      IsNegative: bool
       Type: 'Type }
 
 type Definition =
@@ -240,55 +239,60 @@ let parser: Parser<CompilationUnit, ParserState> =
                         <|> preturn decimalChars
                         <|> (pchar '.' >>. preturn []))
                     >>= (fun (neg, chars) ->
-                        let nbase = byte(chars.Length)
                         let digits c =
-                            anyOf c
-                            |> attempt
-                            .>> (skipMany (pchar '_') <?> "digit separator")
-                            |> many1
+                            attempt (anyOf c) .>> (skipMany (pchar '_') <?> "digit separator") |> many1
                         let decimalDigits = digits decimalChars
 
-                        match chars.Length with
-                        | 0 ->
-                            decimalDigits
-                            |>> fun digits ->
-                                FloatLiteral
-                                    { Base = byte(10)
-                                      FracPart = digits
-                                      IsNegative = neg.IsSome
-                                      IntPart = []
-                                      Type = FloatType.Default }
-                        | 10 ->
-                            decimalDigits
-                            .>>. opt
-                                (pchar '.'
-                                |> attempt
-                                >>. decimalDigits)
-                            |>> fun (idigits, fdigits) ->
-                                match fdigits with
-                                | Some _ ->
-                                    FloatLiteral
-                                        { Base = nbase
-                                          FracPart = fdigits.Value
-                                          IsNegative = neg.IsSome
-                                          IntPart = idigits
-                                          Type = FloatType.Default }
-                                | None ->
+                        (match chars.Length with
+                            | 0 -> decimalDigits |>> fun digits -> [], digits
+                            | 10 ->
+                                decimalDigits
+                                .>>. opt (pchar '.' |> attempt >>. decimalDigits)
+                                |>> fun (idigits, fdigits) ->
+                                    match fdigits with
+                                    | Some _ -> idigits, fdigits.Value
+                                    | None -> idigits, []
+                            | _ -> digits chars |>> fun digits -> digits, [])
+                        >>= fun (idigits, fdigits) ->
+                            let suffixes pairs none =
+                                pairs
+                                |> Seq.map (fun (s, f) -> pstringCI s >>. preturn f)
+                                |> choice
+                                |> opt
+                                |>> Option.defaultValue none
+                                <?> "numeric suffix"
+
+                            if List.isEmpty fdigits then
+                                suffixes
+                                    [
+                                        "u", IntType.Integer ||| IntType.Unsigned
+                                        "l", IntType.Long
+                                        "ul", IntType.Long ||| IntType.Unsigned
+                                        "lu", IntType.Long ||| IntType.Unsigned
+                                    ]
+                                    IntType.Integer
+                                |>> fun intType ->
                                     IntLiteral
-                                        { Base = nbase
+                                        { Base = byte(chars.Length)
                                           FracPart = []
-                                          IsNegative = neg.IsSome
                                           IntPart = idigits
-                                          Type = IntType.Integer }
-                        | _ ->
-                            digits chars
-                            |>> fun digits ->
-                                IntLiteral
-                                    { Base = nbase
-                                      FracPart = []
-                                      IsNegative = false
-                                      IntPart = digits
-                                      Type = IntType.Integer })
+                                          IsNegative = neg.IsSome
+                                          Type = intType }
+                            else
+                                suffixes
+                                    [
+                                        "d", FloatType.Double
+                                        "f", FloatType.Float
+                                        "m", FloatType.Decimal
+                                    ]
+                                    FloatType.Double
+                                |>> fun floatType ->
+                                    FloatLiteral
+                                        { Base = byte(10)
+                                          FracPart = fdigits
+                                          IntPart = idigits
+                                          IsNegative = neg.IsSome
+                                          Type = floatType })
                     <?> "numeric literal";
                 ]
 
