@@ -6,7 +6,7 @@ public class Class1 {
  * Maybe this is what documentation comments might look like
  */
 public class Class2 {
-  let thing: 5;
+  let thing = 5;
 }
 
 /// Or maybe this style is better?
