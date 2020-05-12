@@ -35,6 +35,27 @@ type Visibility =
     | Protected = 2
     | Private = 3
 
+[<Flags>]
+type IntType =
+    | Unsigned = 0
+    | Signed = 1
+    | Integer = 2
+    | Long = 4
+
+type FloatType =
+    | Decimal
+    | Double
+    | Float
+
+    static member Default = Double
+
+type NumLiteral<'Type> =
+    { Base: byte
+      FracPart: char list
+      IsNegative: bool
+      IntPart: char list
+      Type: 'Type }
+
 type Definition =
     { Flags: Flags
       Name: string
@@ -49,9 +70,13 @@ and Identifier =
 and GenericArg = TypeName
 
 type Expression =
+    | FuncCall
+    | MemberAccess of Identifier list
     | Nested of Expression
+    | IntLiteral of NumLiteral<IntType>
+    | FloatLiteral of NumLiteral<FloatType>
 
-type FieldOrVar =
+type Variable =
     { Definition: Definition
       Type: TypeName option
       Value: Expression option }
@@ -69,7 +94,7 @@ and TypeDef =
       Interfaces: TypeName list
       Members: MemberDef list }
 and MemberDef =
-    | Field of FieldOrVar
+    | Field of Variable
     | Function
     | NestedType of TypeDef
     | DUnionCase
@@ -91,6 +116,13 @@ type ParserState =
 
 // NOTE: Flags for classes might get overriden by its members.
 let parser: Parser<CompilationUnit, ParserState> =
+    let setFlags flags =
+        updateUserState
+            (fun (st: ParserState) -> { st with Flags = st.Flags ||| flags })
+    let setVisibility vis =
+        updateUserState
+            (fun (st: ParserState) -> { st with Visibility = vis })
+
     let colon = skipChar ':'
     let comma = skipChar ','
     let gtsign = skipChar '>'
@@ -114,8 +146,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             |> Seq.filter (fun (_, vis) -> vis <= lowest)
         modifiers
         |> Seq.map (fun (str, vis) ->
-            skipString str
-            .>> updateUserState (fun st -> { st with Visibility = vis }))
+            skipString str .>> setVisibility vis)
         |> choice
         <?> "access modifier"
 
@@ -154,12 +185,11 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> opt
         <?> "type annotation"
 
-    let modifier word flag =
+    let modifier word flags =
         skipString word
         |> optional
         .>> ignored
-        .>> updateUserState
-            (fun st -> { st with Flags = st.Flags ||| flag })
+        .>> setFlags flags
 
     let separator p = ignored >>. p .>> ignored
 
@@ -174,6 +204,8 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let genericArgs =
         sepBy1 typeName (separator comma)
+        |> opt
+        |>> Option.defaultValue []
         <?> "generic arguments"
 
     let identifierStr =
@@ -182,11 +214,85 @@ let parser: Parser<CompilationUnit, ParserState> =
         |>> String.Concat
         <?> "identifier"
 
-    let identifierFull =
+    let identifierList =
         sepBy1 identifier (separator period)
-        |>> Identifier
 
-    let expression = fail "not implemented"
+    let identifierFull = identifierList |>> Identifier
+
+    let expression =
+        let decimalChars = [ '0'..'9' ]
+        let expr = OperatorPrecedenceParser<_,_,_> ()
+
+        expr.TermParser <-
+            choice
+                [
+                    identifierList |>> MemberAccess;
+                    
+                    opt (pchar '-')
+                    .>>.
+                        (pchar '0'
+                        |> attempt
+                        >>. choice
+                            [
+                                anyOf [ 'b'; 'B' ] >>. preturn [ '0'; '1'; ];
+                                anyOf [ 'x'; 'X' ] >>. preturn (decimalChars @ [ 'a'..'z' ] @ [ 'A'..'Z' ]);
+                            ]
+                        <|> preturn decimalChars
+                        <|> (pchar '.' >>. preturn []))
+                    >>= (fun (neg, chars) ->
+                        let nbase = byte(chars.Length)
+                        let digits c =
+                            anyOf c
+                            |> attempt
+                            .>> (skipMany (pchar '_') <?> "digit separator")
+                            |> many1
+                        let decimalDigits = digits decimalChars
+
+                        match chars.Length with
+                        | 0 ->
+                            decimalDigits
+                            |>> fun digits ->
+                                FloatLiteral
+                                    { Base = byte(10)
+                                      FracPart = digits
+                                      IsNegative = neg.IsSome
+                                      IntPart = []
+                                      Type = FloatType.Default }
+                        | 10 ->
+                            decimalDigits
+                            .>>. opt
+                                (pchar '.'
+                                |> attempt
+                                >>. decimalDigits)
+                            |>> fun (idigits, fdigits) ->
+                                match fdigits with
+                                | Some _ ->
+                                    FloatLiteral
+                                        { Base = nbase
+                                          FracPart = fdigits.Value
+                                          IsNegative = neg.IsSome
+                                          IntPart = idigits
+                                          Type = FloatType.Default }
+                                | None ->
+                                    IntLiteral
+                                        { Base = nbase
+                                          FracPart = []
+                                          IsNegative = neg.IsSome
+                                          IntPart = idigits
+                                          Type = IntType.Integer }
+                        | _ ->
+                            digits chars
+                            |>> fun digits ->
+                                IntLiteral
+                                    { Base = nbase
+                                      FracPart = []
+                                      IsNegative = false
+                                      IntPart = digits
+                                      Type = IntType.Integer })
+                    <?> "numeric literal";
+                ]
+
+        expr.ExpressionParser <?> "expression"
 
     let variableDef =
         setUserState { ParserState.Default with Visibility = Visibility.Private }
@@ -320,7 +426,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     let typeDefs =
         accessModifier Visibility.Internal
         >>. ignored1
-        >>. modifier "inheritable" Flags.Inheritable
+        >>. modifier "inheritable" Flags.Inheritable // TODO: use >>= to check that these modifiers are only applied on classes.
         >>. modifier "abstract" Flags.Abstract
         >>. choice
             [
