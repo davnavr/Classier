@@ -73,8 +73,9 @@ type Expression =
     | FuncCall of
         {| Arguments: Expression list list
            Target: Expression |}
+    | IdentifierRef of Identifier
     | IntLit of NumLiteral<IntType>
-    | MemberAccess of Identifier list
+    | MemberAccess of Expression * Identifier
     | Nested of Expression
     | TupleLit of Expression list
     | UnitLit
@@ -154,6 +155,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     let rcurlybracket = skipChar '}' <?> "closing bracket"
     let rparen = skipChar ')' <?> "closing parenthesis"
     let semicolon = skipChar ';' <?> "semicolon"
+    let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
     let accessModifier lowest =
         let modifiers =
@@ -255,7 +257,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         let exprParser = expr.ExpressionParser <?> "expression"
 
         let mapOperator name expr1 expr2 =
-            FuncCall {| Arguments = [ [ expr2 ] ]; Target = expr1 |} // The target should be the method on expr1.
+            FuncCall {| Arguments = [ [ expr2 ] ]; Target = MemberAccess (expr1, { Name = name; GenericArgs = Seq.empty }) |} // The target should be the method on expr1.
 
         // Mathematical operators
         [
@@ -267,7 +269,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> List.map (fun (name, op, prec, assoc) -> new InfixOperator<_,_,_>(string op, ignored, prec, assoc, mapOperator name))
         |> List.iter expr.AddOperator
 
-        expr.AddOperator (PrefixOperator<_,_,_>("-", ignored, 50, true, fun exp -> FuncCall {| Arguments = []; Target = exp (* = "negate"*) |}))
+        expr.AddOperator (PrefixOperator<_,_,_>("-", ignored, 50, true, fun exp -> FuncCall {| Arguments = []; Target = MemberAccess (exp, { Name = "negate"; GenericArgs = Seq.empty })|}))
 
         let tuple =
             lparen
@@ -279,9 +281,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         expr.TermParser <-
             choice
                 [
-                    identifierList |>> MemberAccess;
+                    identifier |>> IdentifierRef;
 
                     tuple
+                    <?> "tuple"
                     |>> (fun ex ->
                         match ex with
                         | [] -> UnitLit
@@ -354,13 +357,21 @@ let parser: Parser<CompilationUnit, ParserState> =
                 ]
                 .>> ignored
                 .>>. (tuple .>> ignored |> many <?> "argument list")
-                |>> fun (target, args) ->
+                |>> (fun (target, args) ->
                     match args with
                     | [] -> target
                     | _ ->
-                        FuncCall
-                            {| Arguments = args
-                               Target = target |}
+                        FuncCall {| Arguments = args; Target = target |})
+                .>> ignored
+                .>>. opt
+                    (period
+                    |> attempt
+                    >>. ignored
+                    >>. identifier)
+                |>> fun (target, tmember) ->
+                    match tmember with
+                    | None -> target
+                    | Some _ -> MemberAccess (target, tmember.Value)
 
         exprParser
 
@@ -414,38 +425,44 @@ let parser: Parser<CompilationUnit, ParserState> =
               GenericArgs = gparams }
 
     statementBlockRef :=
-        [
-            semicolon
-            >>. preturn Empty
-            <?> "empty statement";
+        lambdaOperator
+        >>. ignored
+        >>. expression
+        |>> Return
+        |>> List.singleton
+        <|>
+        block
+            [
+                semicolon
+                >>. preturn Empty
+                <?> "empty statement";
 
-            variableDef
-            |>> LocalVar
-            <?> "local variable";
+                variableDef
+                |>> LocalVar
+                <?> "local variable";
 
-            skipString "while"
-            |> attempt
-            >>. ignored
-            >>. lparen
-            >>. expression
-            .>> rparen
-            .>> ignored
-            .>>. statementBlock
-            |>> While
-            <?> "while loop";
+                skipString "while"
+                |> attempt
+                >>. ignored
+                >>. lparen
+                >>. expression
+                .>> rparen
+                .>> ignored
+                .>>. statementBlock
+                |>> While
+                <?> "while loop";
 
-            skipString "return"
-            |> attempt
-            .>> ignored1
-            |> optional
-            >>. expression
-            |> attempt
-            |>> Return
-            <?> "return statement"
-            .>> ignored
-            .>> semicolon; // NOTE: Use >>= to check if the expression needs a semicolon.
-        ]
-        |> block
+                skipString "return"
+                |> attempt
+                .>> ignored1
+                |> optional
+                >>. expression
+                |> attempt
+                |>> Return
+                <?> "return statement"
+                .>> ignored
+                .>> semicolon; // NOTE: Use >>= to check if the expression needs a semicolon.
+            ]
     
     let nsStatementL word label =
         pstring word
@@ -499,7 +516,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. (paramTuple .>> ignored |> many1 <?> "parameter list")
         .>>. typeAnnotationOpt
         .>> ignored
-        .>>. (semicolon >>. preturn [] <|> statementBlock)
+        .>>. ((semicolon >>. preturn [] <|> statementBlock) <?> "function body")
         |>> fun (((((st, name), gparams), fparams), retType), body) ->
             Function
                 { Body = body
