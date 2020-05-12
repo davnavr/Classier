@@ -41,9 +41,13 @@ public module Math {
         field2: string;
     }
 
-    public union MyUnion {
+    public union MyDUnion {
         Case1;
         Case2: long;
         Case3: system.reflection.Assembly;
+    }
+
+    internal aUnionTest (pickOne: string | int | null) {
+        
     }
 }

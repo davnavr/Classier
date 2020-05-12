@@ -63,6 +63,7 @@ type TypeName =
     | Identifier of Identifier list
     | Inferred
     | Tuple of TypeName list
+    | Union of TypeName list
 and Identifier =
     { Name: string
       GenericArgs: seq<GenericArg> }
@@ -135,7 +136,6 @@ type ParserState =
           SymbolTable = ()
           Visibility = Visibility.Public }
 
-// NOTE: Flags for classes might get overriden by its members.
 let parser: Parser<CompilationUnit, ParserState> =
     let setFlags flags =
         updateUserState
@@ -172,9 +172,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> choice
         <?> "access modifier"
 
-    let identifier, identifierRef = createParserForwardedToRef<Identifier, _>()
-    let typeName, typeNameRef = createParserForwardedToRef<TypeName, _>()
-    let statementBlock, statementBlockRef = createParserForwardedToRef<Statement list, _>()
+    let classDef, classDefRef = createParserForwardedToRef<TypeDef,_>()
+    let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
+    let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
+    let statementBlock, statementBlockRef = createParserForwardedToRef<Statement list,_>()
 
     let ignored =
         choice
@@ -211,12 +212,19 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> opt
         |>> Option.defaultValue Inferred
 
-    let modifier word flags =
+    let modifier word flags = // TODO: Maybe have parser that parses all modifiers, and uses >>= to check if those modifiers are in valid places
         skipString word
         |> attempt
         .>> ignored1
         .>> setFlags flags
         |> optional
+    let modifierInheritable =
+        modifier "inheritable" Flags.Inheritable
+        >>. getUserState
+        >>= fun st ->
+            if st.Flags.HasFlag(Flags.Abstract)
+            then fail "Cannot apply inheritable modifier when type is already abstract."
+            else preturn ()
     let modifierAbstract = modifier "abstract" Flags.Abstract
     let modifierMutable = modifier "mutable" Flags.Mutable
 
@@ -423,7 +431,13 @@ let parser: Parser<CompilationUnit, ParserState> =
     typeNameRef :=
         choice
             [
-                identifierFull;
+                sepBy1
+                    identifierFull
+                    (pchar '|' |> separator)
+                |>> fun tlist ->
+                    match tlist with
+                    | [ one ] -> one
+                    | _ -> Union tlist
 
                 skipChar '_'
                 >>. preturn Inferred;
@@ -494,6 +508,16 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> semicolon
         <?> label
 
+    let implements =
+        ignored1
+        .>> skipString "implements"
+        |> attempt
+        .>> ignored1
+        >>. sepBy1 identifierFull (separator comma)
+        |> opt
+        |>> Option.defaultValue []
+        <?> "interface implementations"
+
     let genericParams =
         let genericParam =
             identifierStr
@@ -547,16 +571,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                       Visibility = st.Visibility }
                   Parameters = fparams
                   ReturnType = retType }
-
-    let implements =
-        ignored1
-        .>> skipString "implements"
-        |> attempt
-        .>> ignored1
-        >>. sepBy1 identifierFull (separator comma)
-        |> opt
-        |>> Option.defaultValue []
-        <?> "interface implementations"
 
     let recordDef =
         typeDef "data"
@@ -622,8 +636,11 @@ let parser: Parser<CompilationUnit, ParserState> =
               Interfaces = []
               Members = cases }
 
-    let classDef =
-        typeDef "class"
+    classDefRef :=
+        modifierInheritable
+        >>. modifierMutable
+        >>. ignored
+        >>. typeDef "class"
         .>>. identifierStr
         .>>. genericParams
         .>>. (ignored1
@@ -641,10 +658,15 @@ let parser: Parser<CompilationUnit, ParserState> =
                 accessModifier Visibility.Private
                 >>. ignored1
                 >>. modifierAbstract
-                >>. modifier "inline" Flags.Inline
-                >>. modifier "mutator" Flags.Mutable
-                >>. functionDef
-                <?> "method definition";
+                >>. choice
+                    [
+                        classDef |>> NestedType <?> "nested class";
+
+                        modifier "inline" Flags.Inline
+                        >>. modifier "mutator" Flags.Mutable
+                        >>. functionDef
+                        <?> "method definition";
+                    ]
             ]
         <?> "class definition"
         |>> fun (((((state, name), gparams), superclass), iimpls), members) ->
@@ -688,12 +710,9 @@ let parser: Parser<CompilationUnit, ParserState> =
     let typeDefs =
         accessModifier Visibility.Internal
         >>. ignored1
-        >>. modifier "inheritable" Flags.Inheritable // TODO: use >>= to check that these modifiers are only applied on classes.
-        >>. modifierAbstract
-        >>. modifierMutable
         >>. choice
             [
-                classDef
+                modifierAbstract >>. ignored >>. classDef
                 moduleDef
                 recordDef
                 unionDef

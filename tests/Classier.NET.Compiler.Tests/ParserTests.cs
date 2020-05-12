@@ -19,6 +19,7 @@ namespace Classier.NET.Compiler.Parsing
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Text;
     using Microsoft.FSharp.Collections;
     using Microsoft.FSharp.Core;
@@ -46,7 +47,7 @@ namespace Classier.NET.Compiler.Parsing
                 () => runParserOnString(parser, ParserState.Default, file, content)).Result;
 
             // Assert
-            Assert.Equal<IEnumerable<string>>(usings, result.Usings);
+            Assert.Equal(usings, result.Usings.Cast<IEnumerable<string>>());
             //// Assert.Equal(ns, cunode.Item.Namespace);
         }
     }
