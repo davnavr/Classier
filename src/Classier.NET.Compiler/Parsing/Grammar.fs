@@ -253,11 +253,11 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let expression =
         let decimalChars = [ '0'..'9' ]
-        let expr = OperatorPrecedenceParser<_,_,_> ()
+        let expr = OperatorPrecedenceParser<_,_,_>()
         let exprParser = expr.ExpressionParser <?> "expression"
-
-        let mapOperator name expr1 expr2 =
-            FuncCall {| Arguments = [ [ expr2 ] ]; Target = MemberAccess (expr1, { Name = name; GenericArgs = Seq.empty }) |} // The target should be the method on expr1.
+        let functionCall targetExpr args name =
+            let target = MemberAccess (targetExpr, { Name = name; GenericArgs = Seq.empty })
+            FuncCall {| Arguments = args; Target = target |}
 
         // Mathematical operators
         [
@@ -266,10 +266,16 @@ let parser: Parser<CompilationUnit, ParserState> =
             "multiply", '*', 20, Associativity.Left
             "multiply", '/', 20, Associativity.Left
         ]
-        |> List.map (fun (name, op, prec, assoc) -> new InfixOperator<_,_,_>(string op, ignored, prec, assoc, mapOperator name))
-        |> List.iter expr.AddOperator
-
-        expr.AddOperator (PrefixOperator<_,_,_>("-", ignored, 50, true, fun exp -> FuncCall {| Arguments = []; Target = MemberAccess (exp, { Name = "negate"; GenericArgs = Seq.empty })|}))
+        |> Seq.map (fun (name, op, prec, assoc) ->
+            let map expr1 expr2 =
+                functionCall expr1 [ [ expr2 ] ] name
+            InfixOperator<_,_,_>(string op, ignored, prec, assoc, map))
+        |> Seq.cast<Operator<_,_,_>>
+        |> Seq.append
+            [
+                PrefixOperator<_,_,_>("-", ignored, 50, true, fun exp -> functionCall exp [] "negate");
+            ]
+        |> Seq.iter expr.AddOperator
 
         let tuple =
             lparen
@@ -355,24 +361,39 @@ let parser: Parser<CompilationUnit, ParserState> =
                                           Type = floatType })
                     <?> "numeric literal";
                 ]
-                .>> ignored
-                .>>. (tuple .>> ignored |> many <?> "argument list")
-                |>> (fun (target, args) ->
-                    match args with
-                    | [] -> target
-                    | _ ->
-                        FuncCall {| Arguments = args; Target = target |})
-                .>> ignored
-                .>>. opt
-                    (period
+            .>> ignored
+            >>= fun target ->
+                let memberAccess =
+                    period
                     |> attempt
                     >>. ignored
-                    >>. identifier)
-                |>> fun (target, tmember) ->
-                    match tmember with
-                    | None -> target
-                    | Some _ -> MemberAccess (target, tmember.Value)
-
+                    >>. identifier
+                    .>> ignored
+                    <?> "member access"
+                    |> many1
+                    |>> fun members ->
+                        fun t ->
+                            Seq.fold
+                                (fun prev tmember -> MemberAccess (prev, tmember))
+                                t
+                                members
+                let funcCall =
+                    tuple
+                    .>> ignored
+                    |> many1 <?>
+                    "argument list"
+                    |>> fun args ->
+                        fun t ->
+                            match args with
+                            | [] -> target
+                            | _ -> FuncCall {| Arguments = args; Target = t |}
+                memberAccess <|> funcCall
+                .>> ignored
+                |> many1
+                <|> preturn []
+                |>> Seq.fold
+                    (fun prev next -> next prev)
+                    target
         exprParser
 
     let variableDef =
@@ -439,7 +460,7 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                 variableDef
                 |>> LocalVar
-                <?> "local variable";
+                <??> "local variable";
 
                 skipString "while"
                 |> attempt

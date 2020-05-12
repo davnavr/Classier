@@ -19,6 +19,8 @@ public module Math {
     let PI: decimal = 3.14159265m;
 
     private myFancyFunction () {
+        this.badFormatting().doThisFancyThing (this) (oh, no);
+
         return (1 + 2) +
                (3 + 4) *
                (5 + 6 / (7 * 8));
