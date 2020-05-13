@@ -48,6 +48,16 @@ public module Math {
     }
 
     internal aUnionTest (pickOne: string | int | null) {
-        
+        // These are statements
+        /*if (Math.badFormatting.thisWillNotCompileButIsSyntacticallyCorrect()) {
+          
+        }
+        else if (true) {
+        }
+        else {
+        }*/
+
+        // This is an expression (implicit return).
+        let testValue = if (true) {1} else {2};
     }
 }

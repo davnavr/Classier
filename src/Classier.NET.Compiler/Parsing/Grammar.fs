@@ -15,7 +15,6 @@
 module Classier.NET.Compiler.Parsing.Grammar
 
 open System
-
 open FParsec
 
 [<Flags>]
@@ -75,23 +74,28 @@ type Expression =
         {| Arguments: Expression list list
            Target: Expression |}
     | IdentifierRef of Identifier
+    | IfExpr of IfStatement
     | IntLit of NumLiteral<IntType>
     | MemberAccess of Expression * Identifier
     | Nested of Expression
     | TupleLit of Expression list
     | UnitLit
-
-type Variable =
-    { Definition: Definition
-      Type: TypeName
-      Value: Expression option }
-
-
-type Statement =
+and IfStatement =
+    { Condition: Expression
+      Choice1: Statement list
+      Choice2: Statement list }
+and Statement =
     | Empty
+    | If of IfStatement
+    /// An expression whose result is evaluated then discared.
+    | IgnoredExpr of Expression
     | LocalVar of Variable
     | Return of Expression
     | While of Expression * Statement list
+and Variable =
+    { Definition: Definition
+      Type: TypeName
+      Value: Expression option }
 
 type Param =
     { Name: string
@@ -187,6 +191,7 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let classDef, classDefRef = createParserForwardedToRef<TypeDef,_>()
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
+    let ifStatement, ifStatementRef = createParserForwardedToRef<IfStatement, _>()
     let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
     let statementBlock, statementBlockRef = createParserForwardedToRef<Statement list,_>()
 
@@ -229,8 +234,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         let modifier name flag target =
             if target = ParseType.Any || target.HasFlag(ptype) then
                 skipString name
-                |> attempt
                 >>. ignored1
+                |> attempt
                 >>. setFlags flag
                 |> optional
             else
@@ -309,6 +314,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         expr.TermParser <-
             choice
                 [
+                    ifStatement
+                    |>> IfExpr
+                    <?> "if expression";
+
                     identifier |>> IdentifierRef;
 
                     tuple
@@ -419,10 +428,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         exprParser
 
     let variableDef =
-        setUserState { ParserState.Default with Visibility = Visibility.Private }
-        .>> skipString "let"
-        |> attempt
+        skipString "let"
         .>> ignored1
+        |> attempt
+        .>> setUserState { ParserState.Default with Visibility = Visibility.Private }
         .>> modifiers ParseType.FieldOrVar
         >>. identifierStr
         .>>. typeAnnotationOpt
@@ -473,8 +482,45 @@ let parser: Parser<CompilationUnit, ParserState> =
             { Name = name
               GenericArgs = gparams }
 
+    ifStatementRef :=
+        skipString "if"
+        |> attempt
+        >>= fun () ->
+            let pcondition =
+                ignored
+                >>. lparen
+                >>. ignored
+                >>. expression
+                .>> rparen
+                .>> ignored
+
+            pcondition
+            .>>. statementBlock
+            .>>. choice
+                [
+                    ignored
+                    >>. skipString "else"
+                    |> attempt
+                    >>. choice
+                        [
+                            ignored1
+                            >>. ifStatement
+                            |> attempt
+                            |>> fun e -> [ If e ]
+
+                            ignored
+                            >>. statementBlock;
+                        ]
+
+                    preturn []
+                ]
+            |>> fun ((condition, body), rest) ->
+                { Condition = condition
+                  Choice1 = body
+                  Choice2 = rest }
+
     statementBlockRef :=
-        lambdaOperator
+        lambdaOperator // TODO: Move this lambda stuff to functionDef.
         >>. ignored
         >>. expression
         |>> Return
@@ -490,11 +536,11 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                 variableDef
                 |>> LocalVar
-                <??> "local variable";
+                <?> "local variable";
 
                 skipString "while"
-                |> attempt
                 >>. ignored
+                |> attempt
                 >>. lparen
                 >>. expression
                 .>> rparen
@@ -504,15 +550,33 @@ let parser: Parser<CompilationUnit, ParserState> =
                 <?> "while loop";
 
                 skipString "return"
+                >>. ignored1
                 |> attempt
-                .>> ignored1
-                |> optional
                 >>. expression
-                |> attempt
                 |>> Return
                 <?> "return statement"
                 .>> ignored
-                .>> semicolon; // NOTE: Use >>= to check if the expression needs a semicolon.
+                .>> semicolon;
+
+                ifStatement |>> If <?> "if statement";
+                
+                expression
+                .>>. choice
+                    [
+                        ignored
+                        >>. optional semicolon
+                        >>. ignored
+                        >>. followedBy rcurlybracket
+                        |> attempt
+                        >>. preturn Return
+                        <?> "implicit return"
+
+                        ignored
+                        >>. semicolon
+                        |> attempt
+                        >>. preturn IgnoredExpr
+                    ]
+                |>> fun (expr, statement) -> statement expr;
             ]
     
     let nsStatementL word label =
@@ -543,7 +607,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> gtsign
         |> opt
         |>> Option.defaultValue []
-
 
     let fieldDef =
         variableDef
@@ -587,8 +650,8 @@ let parser: Parser<CompilationUnit, ParserState> =
     let typeDef word ptype =
         modifiers ptype
         >>. skipString word
-        |> attempt
         >>. ignored1
+        |> attempt
         >>. getUserState
 
     let recordDef =
