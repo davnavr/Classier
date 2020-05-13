@@ -126,6 +126,19 @@ type CompilationUnit =
       Namespace: string list
       Usings: string list list }
 
+[<Flags>]
+type ParseType =
+    | Any = 0
+    | Class = 1
+    | DUnion = 2
+    | Interface = 4
+    | Module = 8
+    | Record = 16
+    | FieldOrVar = 32
+    | Function = 64
+    | Method = 128
+    | DUnionCase = 256
+
 type ParserState =
     { Flags: Flags
       SymbolTable: unit
@@ -212,21 +225,22 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> opt
         |>> Option.defaultValue Inferred
 
-    let modifier word flags = // TODO: Maybe have parser that parses all modifiers, and uses >>= to check if those modifiers are in valid places
-        skipString word
-        |> attempt
-        .>> ignored1
-        .>> setFlags flags
-        |> optional
-    let modifierInheritable =
-        modifier "inheritable" Flags.Inheritable
-        >>. getUserState
-        >>= fun st ->
-            if st.Flags.HasFlag(Flags.Abstract)
-            then fail "Cannot apply inheritable modifier when type is already abstract."
-            else preturn ()
-    let modifierAbstract = modifier "abstract" Flags.Abstract
-    let modifierMutable = modifier "mutable" Flags.Mutable
+    let modifiers ptype =
+        let modifier name flag target =
+            if target = ParseType.Any || target.HasFlag(ptype) then
+                skipString name
+                |> attempt
+                >>. ignored1
+                >>. setFlags flag
+                |> optional
+            else
+                preturn ()
+        
+        modifier "abstract" Flags.Abstract ParseType.Any
+        >>. modifier "inheritable" Flags.Inheritable ParseType.Class
+        >>. modifier "mutable" Flags.Mutable (ParseType.Class ||| ParseType.FieldOrVar)
+        >>. modifier "inline" Flags.Inline (ParseType.Method ||| ParseType.Function)
+        >>. modifier "mutator" Flags.Mutable ParseType.Method
 
     let separator p = ignored >>. p .>> ignored
 
@@ -409,7 +423,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> skipString "let"
         |> attempt
         .>> ignored1
-        .>> modifierMutable
+        .>> modifiers ParseType.FieldOrVar
         >>. identifierStr
         .>>. typeAnnotationOpt
         .>> ignored
@@ -465,6 +479,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. expression
         |>> Return
         |>> List.singleton
+        .>> ignored
+        .>> semicolon
         <|>
         block
             [
@@ -528,11 +544,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> opt
         |>> Option.defaultValue []
 
-    let typeDef word =
-        skipString word
-        |> attempt
-        >>. ignored1
-        >>. getUserState
 
     let fieldDef =
         variableDef
@@ -552,8 +563,9 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> rparen
         <?> "parameters"
 
-    let functionDef =
-        getUserState
+    let functionDef ftype =
+        modifiers ftype
+        >>. getUserState
         .>>. identifierStr
         .>> ignored
         .>>. genericParams
@@ -572,8 +584,15 @@ let parser: Parser<CompilationUnit, ParserState> =
                   Parameters = fparams
                   ReturnType = retType }
 
+    let typeDef word ptype =
+        modifiers ptype
+        >>. skipString word
+        |> attempt
+        >>. ignored1
+        >>. getUserState
+
     let recordDef =
-        typeDef "data"
+        typeDef "data" ParseType.Record
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
@@ -595,8 +614,8 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                 accessModifier Visibility.Private
                 >>. ignored1
-                >>. modifier "inline" Flags.Inline
-                >>. functionDef
+                >>. modifiers ParseType.Method
+                >>. functionDef ParseType.Method
                 <?> "method definition";
             ]
         <?> "record definition"
@@ -610,7 +629,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = members }
 
     let unionDef =
-        typeDef "union"
+        typeDef "union" ParseType.DUnion
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
@@ -637,10 +656,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = cases }
 
     classDefRef :=
-        modifierInheritable
-        >>. modifierMutable
-        >>. ignored
-        >>. typeDef "class"
+        typeDef "class" ParseType.Class
         .>>. identifierStr
         .>>. genericParams
         .>>. (ignored1
@@ -657,15 +673,11 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                 accessModifier Visibility.Private
                 >>. ignored1
-                >>. modifierAbstract
                 >>. choice
                     [
-                        classDef |>> NestedType <?> "nested class";
+                        classDef |>> NestedType;
 
-                        modifier "inline" Flags.Inline
-                        >>. modifier "mutator" Flags.Mutable
-                        >>. functionDef
-                        <?> "method definition";
+                        functionDef ParseType.Method <?> "method definition";
                     ]
             ]
         <?> "class definition"
@@ -679,7 +691,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = members }
 
     let moduleDef =
-        typeDef "module"
+        typeDef "module" ParseType.Module
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
@@ -689,12 +701,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                 
                 accessModifier Visibility.Private
                 >>. ignored1
-                >>. modifier "inline" Flags.Inline
                 >>. choice
                     [
                         recordDef |>> NestedType
                         unionDef |>> NestedType
-                        functionDef <?> "function definition"
+                        functionDef ParseType.Function <?> "function definition"
                     ]
             ]
         <?> "module definition"
@@ -707,22 +718,21 @@ let parser: Parser<CompilationUnit, ParserState> =
               Interfaces = []
               Members = members }
 
-    let typeDefs =
-        accessModifier Visibility.Internal
-        >>. ignored1
-        >>. choice
-            [
-                modifierAbstract >>. ignored >>. classDef
-                moduleDef
-                recordDef
-                unionDef
-            ]
-
     ignored
     >>. opt (nsStatementL "namespace" "namespace declaration")
     .>> ignored
     .>>. many (nsStatementL "use" "use statement" .>> ignored)
-    .>>. many1 (typeDefs .>> ignored)
+    .>>. (accessModifier Visibility.Internal
+         >>. ignored1
+         >>. choice
+             [
+                 classDef
+                 moduleDef
+                 recordDef
+                 unionDef
+             ]
+         .>> ignored
+         |> many1)
     .>> eof
     |>> fun ((ns, uses), defs) ->
         { Definitions = defs
