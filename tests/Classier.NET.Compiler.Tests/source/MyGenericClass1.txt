@@ -1,6 +1,8 @@
 
 namespace some.name.collections;
 
+use blah.interop.clr;
+
 public mutable class MutableList<T> {
   let backingArray: Array<T>;
 }

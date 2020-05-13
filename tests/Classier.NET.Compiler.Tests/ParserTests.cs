@@ -29,10 +29,10 @@ namespace Classier.NET.Compiler.Parsing
 
     public class ParserTests
     {
-        [InlineData("Classier.NET.Compiler.source.MultipleClasses.txt", new string[0])]
+        [InlineData("Classier.NET.Compiler.source.MultipleClasses.txt")]
         [InlineData("Classier.NET.Compiler.source.MyAbstractClass1.txt", new[] { "java", "lang" }, new[] { "java", "util" })]
         [InlineData("Classier.NET.Compiler.source.MyClass1.txt", new[] { "System" }, new[] { "System", "IO" })]
-        [InlineData("Classier.NET.Compiler.source.MyGenericClass1.txt", new[] { "some", "name", "collections" })]
+        [InlineData("Classier.NET.Compiler.source.MyGenericClass1.txt", new[] { "blah", "interop", "clr" })]
         [InlineData("Classier.NET.Compiler.source.MyModule1.txt", new[] { "system", "reflection" })]
         [Theory]
         public void ParserCorrectlyParsesTestFiles(string file, params string[][] usings)
