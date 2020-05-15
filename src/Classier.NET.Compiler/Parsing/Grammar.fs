@@ -16,6 +16,7 @@ module Classier.NET.Compiler.Parsing.Grammar
 
 open System
 open FParsec
+open Classier.NET.Compiler
 
 [<Flags>]
 type Flags =
@@ -28,24 +29,23 @@ type Flags =
     /// Indicates that a class can have a subclass.
     | Inheritable = 8
 
-type Visibility =
+type Visibility = // TODO: Merge visibility and flags together?
     | Public = 0
     | Internal = 1
     | Protected = 2
     | Private = 3
 
 [<Flags>]
-type IntType =
+type IntType = // TODO: Merge the number types together?
     | Signed = 0
     | Unsigned = 1
     | Integer = 2
     | Long = 4
 
-[<RequireQualifiedAccess>]
 type FloatType =
-    | Decimal
-    | Double
-    | Float
+    | Decimal = 0
+    | Double = 1
+    | Float = 2
 
 type NumLiteral<'Type> =
     { Base: byte
@@ -87,13 +87,13 @@ and IfStatement =
 and Statement =
     | Empty
     | If of IfStatement
-    /// An expression whose result is evaluated then discared.
+    /// An expression whose result is evaluated then discarded.
     | IgnoredExpr of Expression
     | LocalVar of Variable
     | Return of Expression
     | While of Expression * Statement list
 and Variable =
-    { Definition: Definition
+    { VarDef: Definition
       Type: TypeName
       Value: Expression option }
 
@@ -103,7 +103,7 @@ type Param =
 
 type Function =
     { Body: Statement list
-      Definition: Definition
+      FuncDef: Definition
       Parameters: Param list list
       ReturnType: TypeName }
 
@@ -122,11 +122,16 @@ and TypeDef =
 and MemberDef =
     | Field of Variable
     | Function of Function
+    | Property of 
+        {| Get: Function option
+           PropDef: Definition
+           Set: Function option
+           Value: Expression option |}
     | NestedType of TypeDef
     | DUnionCase of string * TypeName option
 
 type CompilationUnit =
-    { Definitions: TypeDef list
+    { TypeDefs: TypeDef list
       Namespace: string list
       Usings: string list list }
 
@@ -142,16 +147,22 @@ type ParseType =
     | Function = 64
     | Method = 128
     | DUnionCase = 256
+    | Property = 512
 
 type ParserState =
     { Flags: Flags
-      SymbolTable: unit
+      Symbols: SymbolTable
       Visibility: Visibility }
 
     static member Default =
         { Flags = Flags.None
-          SymbolTable = ()
+          Symbols = SymbolTable(Seq.empty)
           Visibility = Visibility.Public }
+
+    member this.CreateDefinition name =
+        { Name = name
+          Flags = this.Flags
+          Visibility = this.Visibility }
 
 let parser: Parser<CompilationUnit, ParserState> =
     let setFlags flags =
@@ -230,7 +241,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> opt
         |>> Option.defaultValue Inferred
 
-    let modifiers ptype =
+    let modifiers ptype = // TODO: Move modifiers elsewhere? Want to get rid of SymbolType as we have too many enums
         let modifier name flag target =
             if target = ParseType.Any || target.HasFlag(ptype) then
                 skipString name
@@ -249,7 +260,7 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let separator p = ignored >>. p .>> ignored
 
-    let block ps =
+    let block ps = // TODO: Don't use choice, let ps be any parser
         lcurlybracket
         |> attempt
         >>. ignored
@@ -444,7 +455,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> semicolon
         .>>. getUserState
         |>> fun (((name, tann), expr), state) ->
-            { Definition =
+            { VarDef =
                 { Name = name
                   Flags = state.Flags
                   Visibility = state.Visibility }
@@ -520,14 +531,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                   Choice2 = rest }
 
     statementBlockRef :=
-        lambdaOperator // TODO: Move this lambda stuff to functionDef.
-        >>. ignored
-        >>. expression
-        |>> Return
-        |>> List.singleton
-        .>> ignored
-        .>> semicolon
-        <|>
         block
             [
                 semicolon
@@ -636,16 +639,36 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. (paramTuple .>> ignored |> many1 <?> "parameter list")
         .>>. typeAnnotationOpt
         .>> ignored
-        .>>. ((semicolon >>. preturn [] <|> statementBlock) <?> "function body")
+        .>>. (choice
+            [
+                statementBlock;
+
+                lambdaOperator
+                |> attempt
+                >>. ignored
+                >>. expression
+                |>> Return
+                |>> List.singleton
+                .>> ignored
+                .>> semicolon;
+
+                semicolon >>. preturn [];
+            ]
+            <?> "function body")
         |>> fun (((((st, name), gparams), fparams), retType), body) ->
             Function
                 { Body = body
-                  Definition =
+                  FuncDef =
                     { Name = name
                       Flags = st.Flags
                       Visibility = st.Visibility }
                   Parameters = fparams
                   ReturnType = retType }
+
+    let methodDef = functionDef ParseType.Method <?> "method definition";
+
+    let propDef =
+        fail "not implemented"
 
     let typeDef word ptype =
         modifiers ptype
@@ -653,6 +676,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored1
         |> attempt
         >>. getUserState
+        |>> fun state -> state.CreateDefinition
 
     let recordDef =
         typeDef "data" ParseType.Record
@@ -668,7 +692,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 <?> "record field"
                 |>> fun (name, ftype) ->
                     Field
-                        { Definition =
+                        { VarDef =
                             { Name = name
                               Flags = Flags.None
                               Visibility = Visibility.Public }
@@ -677,16 +701,11 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                 accessModifier Visibility.Private
                 >>. ignored1
-                >>. modifiers ParseType.Method
-                >>. functionDef ParseType.Method
-                <?> "method definition";
+                >>. methodDef;
             ]
         <?> "record definition"
-        |>> fun (((st, name), gparams), members) ->
-            { Definition =
-                { Name = name
-                  Flags = st.Flags
-                  Visibility = st.Visibility }
+        |>> fun (((def, name), gparams), members) ->
+            { Definition = def name
               Header = Record
               Interfaces = []
               Members = members }
@@ -709,14 +728,33 @@ let parser: Parser<CompilationUnit, ParserState> =
                     | _ -> DUnionCase (name, Some ctype)
             ]
         <?> "discriminated union"
-        |>> fun (((st, name), gparams), cases) ->
-            { Definition =
-                { Name = name
-                  Flags = st.Flags
-                  Visibility = st.Visibility }
+        |>> fun (((def, name), gparams), cases) ->
+            { Definition = def name
               Header = DUnion
               Interfaces = []
               Members = cases }
+
+    let interfaceDef =
+        typeDef "interface" ParseType.Interface
+        .>>. identifierStr
+        .>>. genericParams
+        .>>. implements
+        .>> ignored
+        .>>. block
+            [
+                accessModifier Visibility.Internal
+                >>. ignored1
+                >>. choice
+                    [
+                        methodDef
+                    ]
+            ]
+        |>> (fun ((((def, name), gparams), iimpls), members) ->
+            { Definition = def name
+              Header = Interface
+              Interfaces = iimpls
+              Members = members })
+        <?> "interface definition"
 
     classDefRef :=
         typeDef "class" ParseType.Class
@@ -738,17 +776,13 @@ let parser: Parser<CompilationUnit, ParserState> =
                 >>. ignored1
                 >>. choice
                     [
-                        classDef |>> NestedType;
-
-                        functionDef ParseType.Method <?> "method definition";
+                        classDef |>> NestedType
+                        methodDef
                     ]
             ]
         <?> "class definition"
-        |>> fun (((((state, name), gparams), superclass), iimpls), members) ->
-            { Definition =
-                { Name = name
-                  Flags = state.Flags
-                  Visibility = state.Visibility }
+        |>> fun (((((def, name), gparams), superclass), iimpls), members) ->
+            { Definition = def name
               Header = Class {| SuperClass = superclass |}
               Interfaces = iimpls
               Members = members }
@@ -768,15 +802,14 @@ let parser: Parser<CompilationUnit, ParserState> =
                     [
                         recordDef |>> NestedType
                         unionDef |>> NestedType
+                        interfaceDef |>> NestedType
+                        classDef |>> NestedType
                         functionDef ParseType.Function <?> "function definition"
                     ]
             ]
         <?> "module definition"
-        |>> fun (((state, name), gparams), members) ->
-            { Definition =
-                { Name = name
-                  Flags = state.Flags 
-                  Visibility = state.Visibility }
+        |>> fun (((def, name), gparams), members) ->
+            { Definition = def name
               Header = Module
               Interfaces = []
               Members = members }
@@ -790,6 +823,7 @@ let parser: Parser<CompilationUnit, ParserState> =
          >>. choice
              [
                  classDef
+                 interfaceDef
                  moduleDef
                  recordDef
                  unionDef
@@ -798,6 +832,6 @@ let parser: Parser<CompilationUnit, ParserState> =
          |> many1)
     .>> eof
     |>> fun ((ns, uses), defs) ->
-        { Definitions = defs
+        { TypeDefs = defs
           Namespace = Option.defaultValue [] ns
           Usings = uses }

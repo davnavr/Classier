@@ -27,7 +27,7 @@ public class MyClass1 {
     {
         let myLocal = (1 + 2) / 3;
         Console.WriteLine();
-        1 + 2; // An implicit return value
+        1 + 2 // An implicit return value
     }
 
     public yes (no) (um) => no.add/* caramel sauce */(4722);

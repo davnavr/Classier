@@ -1,16 +1,29 @@
 
 public class Class1 {
+    public myProp {
+      get {
+        return 5;
+      }
+
+      set (theValue) {
+        // Do something here?
+      }
+    }
 }
 
 /**
  * Maybe this is what documentation comments might look like
  */
-public class Class2 {
+public class Class2 extends Class1 {
   let thing = 5;
 }
 
+public interface Interface1 {
+  public doAThing (thing: theThing): anotherThing;
+}
+
 /// Or maybe this style is better?
-public class Class3 {
+public class Class3 implements Interface1 {
   private class Nested {
     let parent: Class3;
   }

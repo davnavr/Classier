@@ -24,6 +24,7 @@
 
   <!-- Source files -->
   <ItemGroup>
+    <Compile Include="Parsing\SymbolTable.fs" />
     <Compile Include="Parsing\Grammar.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
