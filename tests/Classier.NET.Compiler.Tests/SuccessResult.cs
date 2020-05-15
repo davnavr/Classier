@@ -17,30 +17,38 @@
 namespace Classier.NET.Compiler
 {
     using System;
+    using System.IO;
+    using System.Text;
+    using FParsec;
+    using Microsoft.FSharp.Core;
+    using static Classier.NET.Compiler.Parsing.Grammar;
     using static FParsec.CharParsers;
 
     /// <summary>
-    /// Wraps a <see cref="ParserResult{Result, UserState}"/>, and assumes it is a <see cref="ParserResult{Result, UserState}.Success"/>.
+    /// Wraps a parser result and assumes it is a success.
     /// </summary>
-    /// <typeparam name="TResult">The result.</typeparam>
-    /// <typeparam name="TUserState">The state.</typeparam>
-    public sealed class SuccessResult<TResult, TUserState>
+    public sealed class SuccessResult
     {
-        private readonly ParserResult<TResult, TUserState> result;
+        private readonly ParserResult<CompilationUnit, ParserState> result;
 
-        public SuccessResult(Func<ParserResult<TResult, TUserState>> resultEvaluator)
+        public SuccessResult(Func<ParserResult<CompilationUnit, ParserState>> resultEvaluator)
         {
             this.result = resultEvaluator();
         }
 
-        public TResult Result => this.CastResult().Item1;
+        public SuccessResult(FSharpFunc<CharStream<ParserState>, Reply<CompilationUnit>> parser, Stream stream, string streamName, Encoding encoding)
+            : this(() => runParserOnStream(parser, ParserState.Default, streamName, stream, encoding))
+        {
+        }
 
-        private ParserResult<TResult, TUserState>.Success CastResult()
+        public CompilationUnit Result => this.CastResult().Item1;
+
+        private ParserResult<CompilationUnit, ParserState>.Success CastResult()
         {
             return this.result switch
             {
-                ParserResult<TResult, TUserState>.Success success => success,
-                ParserResult<TResult, TUserState>.Failure failure => throw new InvalidCastException(failure.Item2.ToString()),
+                ParserResult<CompilationUnit, ParserState>.Success success => success,
+                ParserResult<CompilationUnit, ParserState>.Failure failure => throw new InvalidCastException(failure.Item2.ToString()),
                 _ => throw new InvalidOperationException($"Unknown result type {this.result.GetType()}."),
             };
         }

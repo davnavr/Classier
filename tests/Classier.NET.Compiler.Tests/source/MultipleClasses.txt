@@ -1,14 +1,5 @@
 
 public class Class1 {
-    public myProp {
-      get {
-        return 5;
-      }
-
-      set (theValue) {
-        // Do something here?
-      }
-    }
 }
 
 /**

@@ -69,6 +69,9 @@ and Identifier =
 and GenericArg = TypeName
 
 type Expression =
+    | Assignment of
+        {| Target: Expression
+           Value: Expression |}
     | FloatLit of NumLiteral<FloatType>
     | FuncCall of
         {| Arguments: Expression list list
@@ -323,21 +326,24 @@ let parser: Parser<CompilationUnit, ParserState> =
             FuncCall {| Arguments = args; Target = target |}
 
         [
+            "equals", "==", 30, Associativity.Left
+
             // Mathematical operators
-            "add", '+', 10, Associativity.Left
-            "add", '-', 10, Associativity.Left
-            "multiply", '*', 20, Associativity.Left
-            "multiply", '/', 20, Associativity.Left
+            "add", "+", 40, Associativity.Left
+            "subtract", "-", 40, Associativity.Left
+            "multiply", "*", 50, Associativity.Left
+            "divide", "/", 50, Associativity.Left
         ]
         |> Seq.map (fun (name, op, prec, assoc) ->
             let map expr1 expr2 =
                 functionCall expr1 [ [ expr2 ] ] name
-            InfixOperator<_,_,_>(string op, ignored, prec, assoc, map))
+            InfixOperator<_,_,_>(op, ignored, prec, assoc, map))
         |> Seq.cast<Operator<_,_,_>>
         |> Seq.append
             [
-                PrefixOperator<_,_,_>("-", ignored, 50, true, fun exp -> functionCall exp [] "negate");
-                InfixOperator<_,_,_>("|>", ignored, 1, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
+                InfixOperator<_,_,_>("|>", ignored, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
+                PrefixOperator<_,_,_>("-", ignored, 60, true, fun exp -> functionCall exp [] "negate");
+                InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Left, fun target value -> Assignment {| Target = target; Value = value |}); // TODO: Maybe use a different symbol for assignment?
             ]
         |> Seq.iter expr.AddOperator
 
@@ -464,7 +470,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     target
         exprParser
 
-    let variableDef =
+    let variableDef = // TODO: Use var or val instead, which might be more familiar to C# and Java developers
         skipString "let"
         .>> ignored1
         |> attempt
@@ -712,9 +718,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                   ReturnType = retType }
 
     let methodDef = functionDef ParseType.Method <?> "method definition";
-
-    let propDef =
-        fail "not implemented"
 
     let typeDef word ptype =
         modifiers ptype
