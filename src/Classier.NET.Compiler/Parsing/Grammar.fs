@@ -69,9 +69,6 @@ and Identifier =
 and GenericArg = TypeName
 
 type Expression =
-    | Assignment of
-        {| Target: Expression
-           Value: Expression |}
     | FloatLit of NumLiteral<FloatType>
     | FuncCall of
         {| Arguments: Expression list list
@@ -83,6 +80,11 @@ type Expression =
     | Nested of Expression
     | TupleLit of Expression list
     | UnitLit
+    | VarAssignment of Assignment
+    | VarDeclaration of Assignment
+and Assignment =
+    { Target: Expression
+      Value: Expression }
 and IfStatement =
     { Condition: Expression
       Choice1: Statement list
@@ -269,25 +271,29 @@ let parser: Parser<CompilationUnit, ParserState> =
         
         modifier "abstract" Flags.Abstract ParseType.Any
         >>. modifier "inheritable" Flags.Inheritable ParseType.Class
-        >>. modifier "mutable" Flags.Mutable (ParseType.Class ||| ParseType.FieldOrVar)
+        >>. modifier "mutable" Flags.Mutable ParseType.Class
         >>. modifier "inline" Flags.Inline (ParseType.Method ||| ParseType.Function)
-        >>. modifier "mutator" Flags.Mutable ParseType.Method
+        >>. modifier "mutator" Flags.Mutable ParseType.Method // TODO: Modifier for allowing methods to change fields
 
     let separator p = ignored >>. p .>> ignored
 
-    let block ps = // TODO: Don't use choice, let ps be any parser
+    let block p =
         lcurlybracket
         |> attempt
         >>. ignored
-        >>. (choice ps
-            .>> ignored
-            |> many)
+        >>. p
         .>> rcurlybracket
+
+    let blockChoice p =
+        choice p
+        .>> ignored
+        |> many
+        |> block
 
     let genericArgs =
         ltsign
-        |> attempt
         >>. sepBy1 typeName (separator comma)
+        |> attempt
         .>> gtsign
         |> opt
         |>> Option.defaultValue []
@@ -324,6 +330,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         let functionCall targetExpr args name =
             let target = MemberAccess (targetExpr, { Name = name; GenericArgs = Seq.empty })
             FuncCall {| Arguments = args; Target = target |}
+        let assignment t target value = t { Target = target; Value = value }
 
         [
             "equals", "==", 30, Associativity.Left
@@ -343,7 +350,8 @@ let parser: Parser<CompilationUnit, ParserState> =
             [
                 InfixOperator<_,_,_>("|>", ignored, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
                 PrefixOperator<_,_,_>("-", ignored, 60, true, fun exp -> functionCall exp [] "negate");
-                InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Left, fun target value -> Assignment {| Target = target; Value = value |}); // TODO: Maybe use a different symbol for assignment?
+                InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Left, assignment VarAssignment);
+                InfixOperator<_,_,_>("=", ignored, 100, Associativity.Left, assignment VarDeclaration);
             ]
         |> Seq.iter expr.AddOperator
 
@@ -370,6 +378,10 @@ let parser: Parser<CompilationUnit, ParserState> =
                         | [] -> UnitLit
                         | [ nested ] -> nested
                         | _ -> TupleLit ex);
+
+                    skipString "new"
+                    >>. ignored1
+                    |> attempt;
 
                     pchar '0'
                     >>. choice
@@ -470,12 +482,17 @@ let parser: Parser<CompilationUnit, ParserState> =
                     target
         exprParser
 
-    let variableDef = // TODO: Use var or val instead, which might be more familiar to C# and Java developers
-        skipString "let"
+    let variableDef =
+        choice
+            [
+                skipString "let"
+
+                skipString "var"
+                >>. setFlags Flags.Mutable
+            ]
         .>> ignored1
         |> attempt
         .>> setUserState { ParserState.Default with Visibility = Visibility.Private }
-        .>> modifiers ParseType.FieldOrVar
         >>. identifierStr
         .>>. typeAnnotationOpt
         .>> ignored
@@ -563,7 +580,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                   Choice2 = rest }
 
     statementBlockRef :=
-        block
+        blockChoice
             [
                 semicolon
                 >>. preturn Empty
@@ -732,7 +749,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
-        .>>. block
+        .>>. blockChoice
             [
                 identifierStr
                 .>>. typeAnnotation
@@ -765,7 +782,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
-        .>>. block
+        .>>. blockChoice
             [
                 identifierStr
                 .>>. typeAnnotationOpt
@@ -791,7 +808,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. genericParams
         .>>. implements
         .>> ignored
-        .>>. block
+        .>>. blockChoice
             [
                 accessModifier Visibility.Internal
                 >>. ignored1
@@ -815,7 +832,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. extends
         .>>. implements
         .>> ignored
-        .>>. block
+        .>>. blockChoice
             [
                 fieldDef;
 
@@ -840,7 +857,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
-        .>>. block
+        .>>. blockChoice
             [
                 fieldDef;
                 
