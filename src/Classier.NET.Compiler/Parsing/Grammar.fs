@@ -69,6 +69,9 @@ and Identifier =
 and GenericArg = TypeName
 
 type Expression =
+    | CtorCall of
+        {| Arguments: Expression list
+           Type: TypeName |}
     | FloatLit of NumLiteral<FloatType>
     | FuncCall of
         {| Arguments: Expression list list
@@ -124,6 +127,11 @@ type Function =
       Parameters: Param list list
       ReturnType: TypeName }
 
+type CtorBaseCall =
+    | NoBaseCall
+    | SelfCall of Expression list
+    | SuperCall of Expression list
+
 type TypeHeader =
     | Class of TypeName option
     | DUnion
@@ -137,6 +145,11 @@ and TypeDef =
       Interfaces: TypeName list
       Members: MemberDef list }
 and MemberDef =
+    | Ctor of
+        {| BaseCall: CtorBaseCall
+           Body: Statement list
+           CtorDef: Definition
+           Parameters: Param list |}
     | Field of Variable
     | Function of Function
     | Property of 
@@ -219,7 +232,8 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let classDef, classDefRef = createParserForwardedToRef<TypeDef,_>()
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
-    let ifStatement, ifStatementRef = createParserForwardedToRef<IfStatement, _>()
+    let ifStatement, ifStatementRef = createParserForwardedToRef<IfStatement,_>()
+    let tuple, tupleRef = createParserForwardedToRef<Expression list,_>()
     let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
     let statementBlock, statementBlockRef = createParserForwardedToRef<Statement list,_>()
 
@@ -355,13 +369,6 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
         |> Seq.iter expr.AddOperator
 
-        let tuple =
-            lparen
-            |> attempt
-            >>. ignored
-            >>. sepBy exprParser (separator comma)
-            .>> rparen
-
         expr.TermParser <-
             choice
                 [
@@ -381,7 +388,11 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                     skipString "new"
                     >>. ignored1
-                    |> attempt;
+                    |> attempt
+                    >>. identifierFull
+                    .>> ignored
+                    .>>. (tuple <?> "constructor arguments")
+                    |>> (fun (ctype, args) -> CtorCall {| Arguments = args; Type = ctype |});
 
                     pchar '0'
                     >>. choice
@@ -510,6 +521,13 @@ let parser: Parser<CompilationUnit, ParserState> =
                   Visibility = state.Visibility }
               Value = expr
               Type = tann }
+
+    tupleRef :=
+        lparen
+        |> attempt
+        >>. ignored
+        >>. sepBy expression (separator comma)
+        .>> rparen
 
     typeNameRef :=
         choice
@@ -692,10 +710,62 @@ let parser: Parser<CompilationUnit, ParserState> =
         |>> Option.defaultValue []
         <?> "generic parameters"
 
+    let functionBody =
+        [
+            statementBlock;
+
+            lambdaOperator
+            |> attempt
+            >>. ignored
+            >>. expression
+            |>> Return
+            |>> List.singleton
+            .>> ignored
+            .>> semicolon;
+
+            semicolon >>. preturn [];
+        ]
+        |> choice
+        <?> "function body"
+
     let fieldDef =
         variableDef
         |>> Field
         <?> "field definition"
+
+    let ctorDef =
+        getUserState
+        .>> skipString "new"
+        .>> ignored1
+        |> attempt
+        .>>. paramTuple
+        .>> ignored
+        .>>.
+            (colon
+            |> attempt
+            >>. ignored
+            >>. choice
+                [
+                    skipString "this" >>. preturn SelfCall
+                    skipString "super" >>. preturn SuperCall
+                ]
+            .>> ignored
+            .>>. tuple
+            |> opt
+            <?> "base call"
+            |>> fun (baseCall) ->
+                match baseCall with
+                | Some (callType, args) -> callType args
+                | _ -> NoBaseCall)
+        .>> ignored
+        .>>. functionBody
+        <?> "constructor definition"
+        |>> fun (((state, parameters), baseCall), body) ->
+            Ctor
+                {| BaseCall = baseCall
+                   Body = body
+                   CtorDef = state.CreateDefinition(String.Empty)
+                   Parameters = parameters |}
 
     let functionDef ftype =
         modifiers ftype
@@ -707,22 +777,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. (paramTuple .>> ignored |> many1 <?> "parameter list")
         .>>. typeAnnotationOpt
         .>> ignored
-        .>>. (choice
-            [
-                statementBlock;
-
-                lambdaOperator
-                |> attempt
-                >>. ignored
-                >>. expression
-                |>> Return
-                |>> List.singleton
-                .>> ignored
-                .>> semicolon;
-
-                semicolon >>. preturn [];
-            ]
-            <?> "function body")
+        .>>. functionBody
         |>> fun (((((st, name), gparams), fparams), retType), body) ->
             Function
                 { Body = body
@@ -841,6 +896,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 >>. choice
                     [
                         classDef |>> NestedType
+                        ctorDef
                         methodDef
                     ]
             ]

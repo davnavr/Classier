@@ -1,5 +1,8 @@
 
 public class Class1 {
+  public new (arg1) {
+    printfn(arg1.toString());
+  }
 }
 
 /**
@@ -7,6 +10,9 @@ public class Class1 {
  */
 public class Class2 extends Class1 {
   let thing = 5;
+  public new (arg2, arg3): super(arg2) {
+    thing = 6;
+  }
 }
 
 public interface Interface1 {
