@@ -5,4 +5,10 @@ use blah.interop.clr;
 
 public mutable class MutableList<T> {
   let backingArray: Array<T>;
+
+  protected aVeryFancyMethod<E extends bleh> (test: E) {
+    test.sayHello()
+    |> string.doSomethingFancy
+    |> blah.hello.world;
+  }
 }

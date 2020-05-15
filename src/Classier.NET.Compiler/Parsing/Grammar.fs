@@ -101,21 +101,33 @@ type Param =
     { Name: string
       Type: TypeName }
 
+type GenericVariance =
+    | NoVariance
+    | Covariant
+    | Contravariant
+
+type GenericParam =
+    { Name: string
+      RequiredSuperClass: TypeName option
+      RequiredInterfaces: TypeName list
+      Variance: GenericVariance }
+
 type Function =
     { Body: Statement list
       FuncDef: Definition
+      GenericParams: GenericParam list
       Parameters: Param list list
       ReturnType: TypeName }
 
 type TypeHeader =
-    | Class of
-        {| SuperClass: TypeName option |}
+    | Class of TypeName option
     | DUnion
     | Interface
     | Module
     | Record
 and TypeDef =
     { Definition: Definition
+      GenericParams: GenericParam list
       Header: TypeHeader
       Interfaces: TypeName list
       Members: MemberDef list }
@@ -289,6 +301,19 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let identifierFull = identifierList |>> Identifier
 
+    let paramTuple =
+        lparen
+        .>> ignored
+        >>. sepBy
+                (identifierStr
+                .>>. typeAnnotationOpt
+                |>> fun (name, ptype) ->
+                    { Name = name
+                      Type = ptype })
+                (separator comma)
+        .>> rparen
+        <?> "parameters"
+
     let expression =
         let decimalChars = [ '0'..'9' ]
         let expr = OperatorPrecedenceParser<_,_,_>()
@@ -297,8 +322,8 @@ let parser: Parser<CompilationUnit, ParserState> =
             let target = MemberAccess (targetExpr, { Name = name; GenericArgs = Seq.empty })
             FuncCall {| Arguments = args; Target = target |}
 
-        // Mathematical operators
         [
+            // Mathematical operators
             "add", '+', 10, Associativity.Left
             "add", '-', 10, Associativity.Left
             "multiply", '*', 20, Associativity.Left
@@ -312,6 +337,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> Seq.append
             [
                 PrefixOperator<_,_,_>("-", ignored, 50, true, fun exp -> functionCall exp [] "negate");
+                InfixOperator<_,_,_>("|>", ignored, 1, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
             ]
         |> Seq.iter expr.AddOperator
 
@@ -591,6 +617,14 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> semicolon
         <?> label
 
+    let extends =
+        ignored1
+        .>> skipString "extends"
+        |> attempt
+        .>> ignored1
+        >>. identifierFull
+        |> opt
+
     let implements =
         ignored1
         .>> skipString "implements"
@@ -603,31 +637,42 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let genericParams =
         let genericParam =
-            identifierStr
+            choice
+                [
+                    skipString "in"
+                    >>. ignored1
+                    |> attempt
+                    >>. preturn Contravariant;
+
+                    skipString "out"
+                    >>. ignored1
+                    |> attempt
+                    >>. preturn Covariant;
+
+                    preturn NoVariance;
+                ]
+            .>>. identifierStr
+            |> attempt
+            .>>. extends
+            .>>. implements
+            <?> "generic parameter"
+            |>> fun (((variance, name), super), iimpl) ->
+                { Name = name
+                  RequiredInterfaces = iimpl
+                  RequiredSuperClass = super
+                  Variance = variance }
         ltsign
         |> attempt
         >>. sepBy1 genericParam (separator comma)
         .>> gtsign
         |> opt
         |>> Option.defaultValue []
+        <?> "generic parameters"
 
     let fieldDef =
         variableDef
         |>> Field
         <?> "field definition"
-
-    let paramTuple =
-        lparen
-        .>> ignored
-        >>. sepBy
-                (identifierStr
-                .>>. typeAnnotationOpt
-                |>> fun (name, ptype) ->
-                    { Name = name
-                      Type = ptype })
-                (separator comma)
-        .>> rparen
-        <?> "parameters"
 
     let functionDef ftype =
         modifiers ftype
@@ -662,6 +707,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     { Name = name
                       Flags = st.Flags
                       Visibility = st.Visibility }
+                  GenericParams = gparams
                   Parameters = fparams
                   ReturnType = retType }
 
@@ -706,6 +752,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         <?> "record definition"
         |>> fun (((def, name), gparams), members) ->
             { Definition = def name
+              GenericParams = gparams
               Header = Record
               Interfaces = []
               Members = members }
@@ -730,6 +777,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         <?> "discriminated union"
         |>> fun (((def, name), gparams), cases) ->
             { Definition = def name
+              GenericParams = gparams
               Header = DUnion
               Interfaces = []
               Members = cases }
@@ -751,6 +799,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
         |>> (fun ((((def, name), gparams), iimpls), members) ->
             { Definition = def name
+              GenericParams = gparams
               Header = Interface
               Interfaces = iimpls
               Members = members })
@@ -760,12 +809,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         typeDef "class" ParseType.Class
         .>>. identifierStr
         .>>. genericParams
-        .>>. (ignored1
-             .>> skipString "extends"
-             |> attempt
-             .>> ignored1
-             >>. identifierFull
-             |> opt)
+        .>>. extends
         .>>. implements
         .>> ignored
         .>>. block
@@ -783,7 +827,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         <?> "class definition"
         |>> fun (((((def, name), gparams), superclass), iimpls), members) ->
             { Definition = def name
-              Header = Class {| SuperClass = superclass |}
+              GenericParams = gparams
+              Header = Class superclass
               Interfaces = iimpls
               Members = members }
 
@@ -810,6 +855,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         <?> "module definition"
         |>> fun (((def, name), gparams), members) ->
             { Definition = def name
+              GenericParams = gparams
               Header = Module
               Interfaces = []
               Members = members }
