@@ -165,20 +165,6 @@ type CompilationUnit =
       Namespace: string list
       Usings: string list list }
 
-[<Flags>]
-type ParseType =
-    | Any = 0
-    | Class = 1
-    | DUnion = 2
-    | Interface = 4
-    | Module = 8
-    | Record = 16
-    | FieldOrVar = 32
-    | Function = 64
-    | Method = 128
-    | DUnionCase = 256
-    | Property = 512
-
 type ParserState =
     { Flags: Flags
       Symbols: SymbolTable
@@ -272,22 +258,12 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> opt
         |>> Option.defaultValue Inferred
 
-    let modifiers ptype = // TODO: Move modifiers elsewhere? Want to get rid of SymbolType as we have too many enums
-        let modifier name flag target =
-            if target = ParseType.Any || target.HasFlag(ptype) then
-                skipString name
-                >>. ignored1
-                |> attempt
-                >>. setFlags flag
-                |> optional
-            else
-                preturn ()
-        
-        modifier "abstract" Flags.Abstract ParseType.Any
-        >>. modifier "inheritable" Flags.Inheritable ParseType.Class
-        >>. modifier "mutable" Flags.Mutable ParseType.Class
-        >>. modifier "inline" Flags.Inline (ParseType.Method ||| ParseType.Function)
-        >>. modifier "mutator" Flags.Mutable ParseType.Method // TODO: Modifier for allowing methods to change fields
+    let modifier name flag =
+        skipString name
+        >>. ignored1
+        |> attempt
+        >>. setFlags flag
+        |> optional
 
     let separator p = ignored >>. p .>> ignored
 
@@ -767,14 +743,16 @@ let parser: Parser<CompilationUnit, ParserState> =
                    CtorDef = state.CreateDefinition(String.Empty)
                    Parameters = parameters |}
 
-    let functionDef ftype =
-        modifiers ftype
+    let functionDef =
+        modifier "inline" Flags.Inline
+        >>. modifier "mutator" Flags.Mutable
         >>. getUserState
         .>>. identifierStr
         .>> ignored
         .>>. genericParams
         .>> ignored
         .>>. (paramTuple .>> ignored |> many1 <?> "parameter list")
+        |> attempt
         .>>. typeAnnotationOpt
         .>> ignored
         .>>. functionBody
@@ -789,18 +767,20 @@ let parser: Parser<CompilationUnit, ParserState> =
                   Parameters = fparams
                   ReturnType = retType }
 
-    let methodDef = functionDef ParseType.Method <?> "method definition";
+    let methodDef =
+        modifier "abstract" Flags.Abstract
+        >>. functionDef
+        <?> "method definition";
 
-    let typeDef word ptype =
-        modifiers ptype
-        >>. skipString word
+    let typeDef word =
+        skipString word
         >>. ignored1
         |> attempt
         >>. getUserState
         |>> fun state -> state.CreateDefinition
 
     let recordDef =
-        typeDef "data" ParseType.Record
+        typeDef "data"
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
@@ -833,7 +813,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = members }
 
     let unionDef =
-        typeDef "union" ParseType.DUnion
+        typeDef "union"
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
@@ -858,7 +838,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = cases }
 
     let interfaceDef =
-        typeDef "interface" ParseType.Interface
+        typeDef "interface"
         .>>. identifierStr
         .>>. genericParams
         .>>. implements
@@ -881,7 +861,11 @@ let parser: Parser<CompilationUnit, ParserState> =
         <?> "interface definition"
 
     classDefRef :=
-        typeDef "class" ParseType.Class
+        modifier "abstract" Flags.Abstract
+        >>. modifier "inheritable" Flags.Inheritable
+        >>. modifier "mutable" Flags.Mutable
+        >>. typeDef "class"
+        |> attempt
         .>>. identifierStr
         .>>. genericParams
         .>>. extends
@@ -895,9 +879,9 @@ let parser: Parser<CompilationUnit, ParserState> =
                 >>. ignored1
                 >>. choice
                     [
-                        classDef |>> NestedType
                         ctorDef
                         methodDef
+                        classDef |>> NestedType
                     ]
             ]
         <?> "class definition"
@@ -909,7 +893,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = members }
 
     let moduleDef =
-        typeDef "module" ParseType.Module
+        typeDef "module"
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
@@ -925,7 +909,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                         unionDef |>> NestedType
                         interfaceDef |>> NestedType
                         classDef |>> NestedType
-                        functionDef ParseType.Function <?> "function definition"
+                        functionDef <?> "function definition"
                     ]
             ]
         <?> "module definition"
