@@ -19,7 +19,7 @@ open FParsec
 open Classier.NET.Compiler
 
 [<Flags>]
-type Flags =
+type Flags1 =
     | None = 0
     | Inline = 1
     | Abstract = 2
@@ -34,6 +34,23 @@ type Visibility = // TODO: Merge visibility and flags together?
     | Internal = 1
     | Protected = 2
     | Private = 3
+
+[<Flags>]
+type Flags =
+    | None = 0uy
+    | Public = 0uy
+    | Internal = 0x01uy
+    | Protected = 0x02uy
+    | Private = 0x03uy
+    | VisibilityMask = 0b00000011uy
+    | ModifierMask = 0b11111100uy
+    | Inline = 4uy
+    | Abstract = 8uy
+    /// Indicates that a class, field, or local variable is mutable,
+    /// or that a method changes the value of a field.
+    | Mutable = 16uy
+    /// Indicates that a class can have a subclass.
+    | Inheritable = 32uy
 
 [<Flags>]
 type IntType = // TODO: Merge the number types together?
@@ -55,8 +72,7 @@ type NumLiteral<'Type> =
 
 type Definition =
     { Flags: Flags
-      Name: string
-      Visibility: Visibility }
+      Name: string }
 
 type TypeName =
     | Identifier of Identifier list
@@ -166,27 +182,29 @@ type CompilationUnit =
       Usings: string list list }
 
 type ParserState =
-    { Flags: Flags
-      Symbols: SymbolTable
-      Visibility: Visibility }
+    { CurrentFlags: Flags
+      Symbols: SymbolTable }
 
     static member Default =
-        { Flags = Flags.None
-          Symbols = SymbolTable(Seq.empty)
-          Visibility = Visibility.Public }
+        { CurrentFlags = Flags.None
+          Symbols = SymbolTable(Seq.empty) }
+
+    member this.VisibilityFlags = this.CurrentFlags &&& Flags.VisibilityMask
 
     member this.CreateDefinition name =
-        { Name = name
-          Flags = this.Flags
-          Visibility = this.Visibility }
+        { Flags = this.CurrentFlags
+          Name = name }
 
 let parser: Parser<CompilationUnit, ParserState> =
+    let clearModifierFlags =
+        updateUserState (fun state ->
+            { state with CurrentFlags = state.VisibilityFlags })
     let setFlags flags =
-        updateUserState
-            (fun (st: ParserState) -> { st with Flags = st.Flags ||| flags })
-    let setVisibility vis =
-        updateUserState
-            (fun (st: ParserState) -> { st with Visibility = vis })
+        (fun state ->
+            let vis = flags &&& Flags.VisibilityMask
+            let mdf = flags &&& Flags.ModifierMask
+            { state with CurrentFlags = state.CurrentFlags ||| vis ||| mdf })
+        |> updateUserState
 
     let colon = skipChar ':'
     let comma = skipChar ','
@@ -204,16 +222,19 @@ let parser: Parser<CompilationUnit, ParserState> =
     let accessModifier lowest =
         let modifiers =
             [
-                "public", Visibility.Public
-                "internal", Visibility.Internal
-                "protected", Visibility.Protected
-                "private", Visibility.Private
+                "public", Flags.Public
+                "internal", Flags.Internal
+                "protected", Flags.Protected
+                "private", Flags.Private
             ]
             |> Seq.filter (fun (_, vis) -> vis <= lowest)
+            |> Seq.map (fun (str, vis) ->
+                skipString str
+                |> attempt
+                .>> setFlags vis)
+            |> choice
         modifiers
-        |> Seq.map (fun (str, vis) ->
-            skipString str .>> setVisibility vis)
-        |> choice
+        .>> clearModifierFlags
         <?> "access modifier"
 
     let classDef, classDefRef = createParserForwardedToRef<TypeDef,_>()
@@ -470,16 +491,15 @@ let parser: Parser<CompilationUnit, ParserState> =
         exprParser
 
     let variableDef =
-        choice
+        clearModifierFlags
+        >>. choice
             [
                 skipString "let"
-
-                skipString "var"
-                >>. setFlags Flags.Mutable
+                skipString "var" >>. setFlags Flags.Mutable
             ]
         .>> ignored1
         |> attempt
-        .>> setUserState { ParserState.Default with Visibility = Visibility.Private }
+        .>> setFlags Flags.Private
         >>. identifierStr
         .>>. typeAnnotationOpt
         .>> ignored
@@ -493,8 +513,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |>> fun (((name, tann), expr), state) ->
             { VarDef =
                 { Name = name
-                  Flags = state.Flags
-                  Visibility = state.Visibility }
+                  Flags = state.CurrentFlags }
               Value = expr
               Type = tann }
 
@@ -761,8 +780,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 { Body = body
                   FuncDef =
                     { Name = name
-                      Flags = st.Flags
-                      Visibility = st.Visibility }
+                      Flags = st.CurrentFlags }
                   GenericParams = gparams
                   Parameters = fparams
                   ReturnType = retType }
@@ -770,7 +788,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     let methodDef =
         modifier "abstract" Flags.Abstract
         >>. functionDef
-        <?> "method definition";
+        <?> "method definition"
 
     let typeDef word =
         skipString word
@@ -795,12 +813,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                     Field
                         { VarDef =
                             { Name = name
-                              Flags = Flags.None
-                              Visibility = Visibility.Public }
+                              Flags = Flags.Public }
                           Value = None
                           Type = ftype }
 
-                accessModifier Visibility.Private
+                accessModifier Flags.Private
                 >>. ignored1
                 >>. methodDef;
             ]
@@ -845,7 +862,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. blockChoice
             [
-                accessModifier Visibility.Internal
+                accessModifier Flags.Internal
                 >>. ignored1
                 >>. choice
                     [
@@ -873,9 +890,9 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. blockChoice
             [
-                fieldDef;
+                fieldDef
 
-                accessModifier Visibility.Private
+                accessModifier Flags.Private
                 >>. ignored1
                 >>. choice
                     [
@@ -901,7 +918,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             [
                 fieldDef;
                 
-                accessModifier Visibility.Private
+                accessModifier Flags.Private
                 >>. ignored1
                 >>. choice
                     [
@@ -924,7 +941,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     >>. opt (nsStatementL "namespace" "namespace declaration")
     .>> ignored
     .>>. many (nsStatementL "use" "use statement" .>> ignored)
-    .>>. (accessModifier Visibility.Internal
+    .>>. (accessModifier Flags.Internal
          >>. ignored1
          >>. choice
              [
