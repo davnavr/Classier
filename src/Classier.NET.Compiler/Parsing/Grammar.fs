@@ -19,31 +19,12 @@ open FParsec
 open Classier.NET.Compiler
 
 [<Flags>]
-type Flags1 =
-    | None = 0
-    | Inline = 1
-    | Abstract = 2
-    /// Indicates that a class, field, or local variable is mutable,
-    /// or that a method changes the value of a field.
-    | Mutable = 4
-    /// Indicates that a class can have a subclass.
-    | Inheritable = 8
-
-type Visibility = // TODO: Merge visibility and flags together?
-    | Public = 0
-    | Internal = 1
-    | Protected = 2
-    | Private = 3
-
-[<Flags>]
 type Flags =
     | None = 0uy
     | Public = 0uy
-    | Internal = 0x01uy
-    | Protected = 0x02uy
-    | Private = 0x03uy
-    | VisibilityMask = 0b00000011uy
-    | ModifierMask = 0b11111100uy
+    | Internal = 1uy
+    | Protected = 2uy
+    | Private = 3uy
     | Inline = 4uy
     | Abstract = 8uy
     /// Indicates that a class, field, or local variable is mutable,
@@ -51,24 +32,24 @@ type Flags =
     | Mutable = 16uy
     /// Indicates that a class can have a subclass.
     | Inheritable = 32uy
+    | VisibilityMask = 3uy
+    | ModifierMask = 252uy
 
 [<Flags>]
-type IntType = // TODO: Merge the number types together?
-    | Signed = 0
-    | Unsigned = 1
-    | Integer = 2
-    | Long = 4
+type NumType =
+    | Decimal = 0uy
+    | Double = 1uy
+    | Float = 2uy
+    | Signed = 0uy
+    | Unsigned = 4uy
+    | Integer = 8uy
+    | Long = 16uy
 
-type FloatType =
-    | Decimal = 0
-    | Double = 1
-    | Float = 2
-
-type NumLiteral<'Type> =
+type NumLiteral =
     { Base: byte
       FracPart: char list
       IntPart: char list
-      Type: 'Type }
+      Type: NumType }
 
 type Definition =
     { Flags: Flags
@@ -88,32 +69,44 @@ type Expression =
     | CtorCall of
         {| Arguments: Expression list
            Type: TypeName |}
-    | FloatLit of NumLiteral<FloatType>
     | FuncCall of
         {| Arguments: Expression list list
            Target: Expression |}
     | IdentifierRef of Identifier
-    | IfExpr of IfStatement
-    | IntLit of NumLiteral<IntType>
+    | IfExpr of If
+    | MatchExpr of Match
     | MemberAccess of Expression * Identifier
     | Nested of Expression
+    | NumLit of NumLiteral
     | TupleLit of Expression list
     | UnitLit
-    | VarAssignment of Assignment
-    | VarDeclaration of Assignment
+    | ValAssignment of Assignment
+    | ValDeclaration of Assignment
 and Assignment =
     { Target: Expression
       Value: Expression }
-and IfStatement =
+and If =
     { Condition: Expression
       Choice1: Statement list
       Choice2: Statement list }
+and Match =
+    { Against: Expression
+      Cases: MatchCase list }
+and MatchCase =
+    { Body: Statement list
+      Patterns: MatchPattern list }
+and MatchPattern =
+    | Constant of Expression
+    | CasePattern of
+        {| CaseName: Identifier list
+           Values: string option list |}
 and Statement =
     | Empty
-    | If of IfStatement
+    | IfStatement of If
     /// An expression whose result is evaluated then discarded.
     | IgnoredExpr of Expression
     | LocalVar of Variable
+    | MatchStatement of Match
     | Return of Expression
     | While of Expression * Statement list
 and Variable =
@@ -132,7 +125,7 @@ type GenericVariance =
 
 type GenericParam =
     { Name: string
-      RequiredSuperClass: TypeName option
+      RequiredSuperClass: Identifier list
       RequiredInterfaces: TypeName list
       Variance: GenericVariance }
 
@@ -149,7 +142,7 @@ type CtorBaseCall =
     | SuperCall of Expression list
 
 type TypeHeader =
-    | Class of TypeName option
+    | Class of Identifier list
     | DUnion
     | Interface
     | Module
@@ -217,6 +210,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     let rcurlybracket = skipChar '}' <?> "closing bracket"
     let rparen = skipChar ')' <?> "closing parenthesis"
     let semicolon = skipChar ';' <?> "semicolon"
+    let underscore = skipChar '_' <?> "underscore"
     let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
     let accessModifier lowest =
@@ -239,7 +233,8 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let classDef, classDefRef = createParserForwardedToRef<TypeDef,_>()
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
-    let ifStatement, ifStatementRef = createParserForwardedToRef<IfStatement,_>()
+    let ifStatement, ifStatementRef = createParserForwardedToRef<If,_>()
+    let matchStatement, matchStatementRef = createParserForwardedToRef<Match, _>()
     let tuple, tupleRef = createParserForwardedToRef<Expression list,_>()
     let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
     let statementBlock, statementBlockRef = createParserForwardedToRef<Statement list,_>()
@@ -273,7 +268,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored
         >>. typeName
         <?> "type annotation"
-
     let typeAnnotationOpt =
         typeAnnotation
         |> opt
@@ -293,8 +287,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         >>. ignored
         >>. p
+        .>> ignored
         .>> rcurlybracket
-
     let blockChoice p =
         choice p
         .>> ignored
@@ -315,10 +309,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. manyChars (asciiLetter <|> digit)
         |>> String.Concat
         <?> "identifier"
-
     let identifierList =
         sepBy1 identifier (separator period)
-
     let identifierFull = identifierList |>> Identifier
 
     let paramTuple =
@@ -361,17 +353,17 @@ let parser: Parser<CompilationUnit, ParserState> =
             [
                 InfixOperator<_,_,_>("|>", ignored, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
                 PrefixOperator<_,_,_>("-", ignored, 60, true, fun exp -> functionCall exp [] "negate");
-                InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Left, assignment VarAssignment);
-                InfixOperator<_,_,_>("=", ignored, 100, Associativity.Left, assignment VarDeclaration);
+                InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Left, assignment ValAssignment);
+                InfixOperator<_,_,_>("=", ignored, 100, Associativity.Left, assignment ValDeclaration);
             ]
         |> Seq.iter expr.AddOperator
 
         expr.TermParser <-
             choice
                 [
-                    ifStatement
-                    |>> IfExpr
-                    <?> "if expression";
+                    ifStatement |>> IfExpr <?> "if expression";
+
+                    matchStatement |>> MatchExpr <?> "match expression";
 
                     identifier |>> IdentifierRef;
 
@@ -427,14 +419,14 @@ let parser: Parser<CompilationUnit, ParserState> =
                             if List.isEmpty fdigits then
                                 suffixes
                                     [
-                                        "u", IntType.Integer ||| IntType.Unsigned
-                                        "l", IntType.Long
-                                        "ul", IntType.Long ||| IntType.Unsigned
-                                        "lu", IntType.Long ||| IntType.Unsigned
+                                        "u", NumType.Integer ||| NumType.Unsigned
+                                        "l", NumType.Long
+                                        "ul", NumType.Long ||| NumType.Unsigned
+                                        "lu", NumType.Long ||| NumType.Unsigned
                                     ]
-                                    IntType.Integer
+                                    NumType.Integer
                                 |>> fun intType ->
-                                    IntLit
+                                    NumLit
                                         { Base = byte(chars.Length)
                                           FracPart = []
                                           IntPart = idigits
@@ -442,13 +434,13 @@ let parser: Parser<CompilationUnit, ParserState> =
                             else
                                 suffixes
                                     [
-                                        "d", FloatType.Double
-                                        "f", FloatType.Float
-                                        "m", FloatType.Decimal
+                                        "d", NumType.Double
+                                        "f", NumType.Float
+                                        "m", NumType.Decimal
                                     ]
-                                    FloatType.Double
+                                    NumType.Double
                                 |>> fun floatType ->
-                                    FloatLit
+                                    NumLit
                                         { Base = byte(10)
                                           FracPart = fdigits
                                           IntPart = idigits
@@ -489,6 +481,12 @@ let parser: Parser<CompilationUnit, ParserState> =
                     (fun prev next -> next prev)
                     target
         exprParser
+    let expressionInParens =
+        lparen
+        |> attempt
+        >>. ignored
+        >>. expression
+        .>> rparen
 
     let variableDef =
         clearModifierFlags
@@ -516,6 +514,16 @@ let parser: Parser<CompilationUnit, ParserState> =
                   Flags = state.CurrentFlags }
               Value = expr
               Type = tann }
+
+    let lambdaBody =
+        lambdaOperator
+        |> attempt
+        >>. ignored
+        >>. expression
+        |>> Return
+        |>> List.singleton
+        .>> ignored
+        .>> semicolon
 
     tupleRef :=
         lparen
@@ -557,40 +565,83 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     ifStatementRef :=
         skipString "if"
-        |> attempt
-        >>= fun () ->
-            let pcondition =
+        >>. ignored
+        >>. expressionInParens
+        .>> ignored
+        .>>. statementBlock
+        .>>. choice
+            [
                 ignored
-                >>. lparen
-                >>. ignored
-                >>. expression
-                .>> rparen
-                .>> ignored
+                >>. skipString "else"
+                |> attempt
+                >>. choice
+                    [
+                        ignored1
+                        >>. ifStatement
+                        |> attempt
+                        |>> fun e -> [ IfStatement e ]
 
-            pcondition
-            .>>. statementBlock
-            .>>. choice
+                        ignored
+                        >>. statementBlock;
+                    ]
+
+                preturn []
+            ]
+        |>> fun ((condition, body), rest) ->
+            { Condition = condition
+              Choice1 = body
+              Choice2 = rest }
+
+    matchStatementRef :=
+        skipString "match"
+        >>. ignored
+        >>. expressionInParens
+        .>> ignored
+        >>= fun against ->
+            let pattern =
+                let patterns =
+                    [
+                        identifierList
+                        .>> ignored
+                        .>> lparen
+                        .>> ignored
+                        .>>. sepBy1
+                            (choice [ underscore >>. preturn None; identifierStr |>> Some ])
+                            (separator comma)
+                        .>> rparen
+                        <?> "case pattern"
+                        |>> fun (name, values) ->
+                            CasePattern
+                                {| CaseName = name
+                                   Values = values |}
+
+                        expression |>> Constant
+                    ]
+                    |> choice
+                sepBy1 patterns (separator comma)
+
+            choice
                 [
-                    ignored
-                    >>. skipString "else"
+                    skipString "case"
+                    >>. ignored1
                     |> attempt
-                    >>. choice
-                        [
-                            ignored1
-                            >>. ifStatement
-                            |> attempt
-                            |>> fun e -> [ If e ]
+                    >>. pattern
 
-                            ignored
-                            >>. statementBlock;
-                        ]
-
-                    preturn []
+                    skipString "default"
+                    |> attempt
+                    >>. preturn []
                 ]
-            |>> fun ((condition, body), rest) ->
-                { Condition = condition
-                  Choice1 = body
-                  Choice2 = rest }
+            .>> ignored
+            .>> colon
+            .>> ignored
+            .>>. expression
+            .>> ignored
+            .>> semicolon
+            |>> (fun (patterns, expr) -> { Body = [ Return expr ]; Patterns = patterns })
+            .>> ignored
+            |> many1
+            |> block
+            |>> fun cases -> { Against = against; Cases = cases }
 
     statementBlockRef :=
         blockChoice
@@ -623,7 +674,9 @@ let parser: Parser<CompilationUnit, ParserState> =
                 .>> ignored
                 .>> semicolon;
 
-                ifStatement |>> If <?> "if statement";
+                ifStatement |>> IfStatement <?> "if statement";
+
+                matchStatement |>> MatchStatement <?> "match statement";
                 
                 expression
                 .>>. choice
@@ -658,8 +711,9 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> skipString "extends"
         |> attempt
         .>> ignored1
-        >>. identifierFull
+        >>. identifierList
         |> opt
+        |>> Option.defaultValue []
 
     let implements =
         ignored1
@@ -707,18 +761,9 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let functionBody =
         [
-            statementBlock;
-
-            lambdaOperator
-            |> attempt
-            >>. ignored
-            >>. expression
-            |>> Return
-            |>> List.singleton
-            .>> ignored
-            .>> semicolon;
-
-            semicolon >>. preturn [];
+            statementBlock
+            lambdaBody
+            semicolon >>. preturn []
         ]
         |> choice
         <?> "function body"
