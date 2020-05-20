@@ -40,9 +40,19 @@ type UnknownSymbol =
       PossibleTypes: Symbol list
       PossibleParents: ResolvedSymbol list }
 
-type SymbolTable () =
-    let namespaceTable: ImmutableSortedDictionary<string list, ResolvedSymbol> = null
-    let scopes = null
+type SymbolTable =
+    { Namespaces: ImmutableSortedDictionary<string list, ResolvedSymbol list>
+       }
 
 module SymbolTable =
-    let a = "Test"
+    let empty =
+        { Namespaces = ImmutableSortedDictionary.Empty
+          }
+
+    let addNamespace ns table =
+        let namespaces =
+            if table.Namespaces.ContainsKey(ns)
+            then table.Namespaces
+            else table.Namespaces.Add(ns, List.empty)
+        { table with Namespaces = namespaces }
+

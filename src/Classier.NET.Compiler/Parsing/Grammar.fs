@@ -201,7 +201,7 @@ type ParserState =
 
     static member Default =
         { CurrentFlags = Flags.None
-          Symbols = SymbolTable() }
+          Symbols = SymbolTable.empty }
 
     member this.VisibilityFlags = this.CurrentFlags &&& Flags.VisibilityMask
 
@@ -219,6 +219,12 @@ let parser: Parser<CompilationUnit, ParserState> =
             let mdf = flags &&& Flags.ModifierMask
             { state with CurrentFlags = state.CurrentFlags ||| vis ||| mdf })
         |> updateUserState
+    let updateSymbolTable f p =
+        p
+        .>>. getUserState
+        >>= fun (data, state) ->
+            let newState = { state with Symbols = f data state.Symbols }
+            setUserState newState >>. preturn data
 
     let colon = skipChar ':'
     let comma = skipChar ','
@@ -1035,6 +1041,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored1
         |> attempt
         >>. sepBy1 identifierStr (separator period)
+        |> updateSymbolTable (SymbolTable.addNamespace)
         .>> ignored
         .>> semicolon
         <?> "namespace declaration")

@@ -43,6 +43,8 @@ namespace Classier.NET.Compiler
 
         public CompilationUnit Result => this.CastResult().Item1;
 
+        public ParserState State => this.CastResult().Item2;
+
         private ParserResult<CompilationUnit, ParserState>.Success CastResult()
         {
             return this.result switch

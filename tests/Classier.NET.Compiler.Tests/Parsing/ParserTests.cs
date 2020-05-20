@@ -16,10 +16,9 @@
 
 namespace Classier.NET.Compiler.Parsing
 {
-    using System.Collections.Generic;
     using System.Linq;
     using System.Text;
-    using FParsec;
+    using Microsoft.FSharp.Collections;
     using Xunit;
     using static Classier.NET.Compiler.Parsing.Grammar;
     using static FParsec.CharParsers;
@@ -73,12 +72,21 @@ namespace Classier.NET.Compiler.Parsing
             Assert.Equal(column, error.Item2.Position.Column);
         }
 
-        /*
-        [InlineData()]
+        [InlineData("MyAbstractClass1.txt", "this.is.my.space")]
         [Theory]
-        public void ParserForIndividualFilesHasUnresolvedSymbols(string name, string[] unresolvedSymbols)
+        public void ParserIncludesNamespaceInSymbolTable(string file, string expectedNamespace)
         {
+            // Arrange
+            using var stream = new EmbeddedSourceFile(file).GetStream();
+
+            // Act
+            var namespaces = new SuccessResult(parser, stream, file, Encoding.UTF8).State.Symbols.Namespaces;
+
+            // Assert
+            Assert.True(
+                namespaces.ContainsKey(
+                    ListModule.OfArray(
+                        expectedNamespace.Split('.'))));
         }
-        */
     }
 }
