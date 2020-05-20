@@ -27,10 +27,10 @@ namespace Classier.NET.Compiler.Parsing
     public class ParserTests
     {
         [InlineData("MultipleClasses.txt")]
-        [InlineData("MyAbstractClass1.txt", new[] { "java", "lang" }, new[] { "java", "util" })]
-        [InlineData("MyModule1.txt", new[] { "system", "reflection" })]
+        [InlineData("MyAbstractClass1.txt", "java.lang._", "java.util.ArrayList<1>")]
+        [InlineData("MyModule1.txt", "system.reflection.Assembly")]
         [Theory]
-        public void ParserCorrectlySetsUsings(string name, params string[][] usings)
+        public void ParserCorrectlySetsUsedTypes(string name, params string[] usedTypes)
         {
             // Arrange
             using var stream = new EmbeddedSourceFile(name).GetStream();
@@ -39,7 +39,7 @@ namespace Classier.NET.Compiler.Parsing
             var result = new SuccessResult(parser, stream, name, Encoding.UTF8).Result;
 
             // Assert
-            Assert.Equal(usings, result.Usings.Cast<IEnumerable<string>>());
+            Assert.Equal(usedTypes, result.Usings.Select(use => use.ToString()));
         }
 
         [InlineData("MyClass1.txt", new string[0])]

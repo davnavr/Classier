@@ -170,10 +170,30 @@ and MemberDef =
     | NestedType of TypeDef
     | DUnionCase of string * TypeName option
 
+type UsedType =
+    { Namespace: string list
+      TypeName: (string * int) option }
+
+    override this.ToString() =
+        let typeName =
+            match this.TypeName with
+            | Some (name, gcount) ->
+                if gcount > 0
+                then sprintf "%s<%i>" name gcount
+                else name
+            | _ -> "_"
+        match this.Namespace with
+        | [] -> typeName
+        | _ ->
+            Seq.append
+                (Seq.map (fun name -> name + ".") this.Namespace)
+                [ typeName ]
+            |> String.Concat
+
 type CompilationUnit =
     { TypeDefs: TypeDef list
       Namespace: string list
-      Usings: string list list }
+      Usings: UsedType list }
 
 type ParserState =
     { CurrentFlags: Flags
@@ -693,15 +713,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                     ]
                 |>> fun (expr, statement) -> statement expr;
             ]
-    
-    let nsStatementL word label =
-        pstring word
-        |> attempt
-        >>. ignored1
-        >>. sepBy identifierStr (separator period)
-        .>> ignored
-        .>> semicolon
-        <?> label
 
     let extends =
         ignored1
@@ -979,10 +990,56 @@ let parser: Parser<CompilationUnit, ParserState> =
               Interfaces = []
               Members = members }
 
+    let usings =
+        let gcount =
+            ltsign
+            |> attempt
+            .>> ignored
+            >>. many1Chars digit
+            .>> ignored
+            .>> gtsign
+            |> opt
+            |>> (Option.map int >> Option.defaultValue 0)
+            <?> "generic parameter count"
+        skipString "use"
+        >>. ignored1
+        |> attempt
+        >>. many
+            (identifierStr
+            .>> ignored
+            .>> period
+            |> attempt
+            .>> ignored)
+        .>>. choice
+            [
+                identifierStr
+                |> attempt
+                .>> ignored
+                .>>. gcount
+                |>> Some
+                <?> "type or module name"
+
+                underscore
+                >>. preturn None
+            ]
+        .>> ignored
+        .>> semicolon
+        |>> (fun (ns, tname) -> { Namespace = ns; TypeName = tname })
+        <?> "use statement"
+        .>> ignored
+        |> many
+
     ignored
-    >>. opt (nsStatementL "namespace" "namespace declaration")
+    >>. opt
+        (skipString "namespace"
+        >>. ignored1
+        |> attempt
+        >>. sepBy1 identifierStr (separator period)
+        .>> ignored
+        .>> semicolon
+        <?> "namespace declaration")
     .>> ignored
-    .>>. many (nsStatementL "use" "use statement" .>> ignored)
+    .>>. usings
     .>>. (accessModifier Flags.Internal
          >>. ignored1
          >>. choice

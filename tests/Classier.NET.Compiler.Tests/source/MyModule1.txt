@@ -1,7 +1,7 @@
 ﻿
 namespace blah.blah.blah;
 
-use system.reflection;
+use system.reflection.Assembly;
 
 public module Math {
     let myGlobal: long = 42L;

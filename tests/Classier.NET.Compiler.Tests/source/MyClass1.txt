@@ -1,6 +1,6 @@
 ﻿
-use System;
-use System.IO;
+use System._;
+use System.IO.FileInfo;
 
 // This is a comment
 public class MyClass1 {
