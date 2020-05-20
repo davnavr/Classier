@@ -15,21 +15,34 @@
 namespace Classier.NET.Compiler
 
 open System.Collections.Immutable
+open FParsec
 
-type SymbolType =
-    /// Local variable or parameter
+type SymbolOrigin =
+    /// Indicates that the symbol originated from some other source, such as a *.dll file.
+    | External of string
+    | SourceCode of Position
+
+type Symbol =
+    | GParam
+    /// Local variable or parameter.
     | Local
     | Member
     | Namespace
-    | Type
+    | Type // of Scope
 
 type ResolvedSymbol =
     { FullName: string list
-      Type: SymbolType }
+      Origin: SymbolOrigin
+      Symbol: Symbol }
 
 type UnknownSymbol =
     { Name: string
-      PossibleTypes: SymbolType list }
+      PossibleTypes: Symbol list
+      PossibleParents: ResolvedSymbol list }
 
-type SymbolTable (symbols) =
-    let globalTable: ImmutableSortedDictionary<SymbolType, ImmutableSortedDictionary<_, _>> = ImmutableSortedDictionary.Empty
+type SymbolTable () =
+    let namespaceTable: ImmutableSortedDictionary<string list, ResolvedSymbol> = null
+    let scopes = null
+
+module SymbolTable =
+    let a = "Test"

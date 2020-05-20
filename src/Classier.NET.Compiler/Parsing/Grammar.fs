@@ -100,6 +100,7 @@ and MatchPattern =
     | CasePattern of
         {| CaseName: Identifier list
            Values: string option list |}
+    | Default
 and Statement =
     | Empty
     | IfStatement of If
@@ -180,7 +181,7 @@ type ParserState =
 
     static member Default =
         { CurrentFlags = Flags.None
-          Symbols = SymbolTable(Seq.empty) }
+          Symbols = SymbolTable() }
 
     member this.VisibilityFlags = this.CurrentFlags &&& Flags.VisibilityMask
 
@@ -599,8 +600,9 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         >>= fun against ->
             let pattern =
-                let patterns =
+                choice
                     [
+
                         identifierList
                         .>> ignored
                         .>> lparen
@@ -609,30 +611,24 @@ let parser: Parser<CompilationUnit, ParserState> =
                             (choice [ underscore >>. preturn None; identifierStr |>> Some ])
                             (separator comma)
                         .>> rparen
-                        <?> "case pattern"
+                        <??> "case pattern"
                         |>> fun (name, values) ->
                             CasePattern
                                 {| CaseName = name
                                    Values = values |}
 
                         expression |>> Constant
+
+                        underscore
+                        >>. ignored
+                        >>. preturn Default
                     ]
-                    |> choice
-                sepBy1 patterns (separator comma)
 
-            choice
-                [
-                    skipString "case"
-                    >>. ignored1
-                    |> attempt
-                    >>. pattern
-
-                    skipString "default"
-                    |> attempt
-                    >>. preturn []
-                ]
+            sepBy1 pattern (separator comma)
+            <?> "pattern"
             .>> ignored
             .>> colon
+            |> attempt
             .>> ignored
             .>>. expression
             .>> ignored
@@ -640,6 +636,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             |>> (fun (patterns, expr) -> { Body = [ Return expr ]; Patterns = patterns })
             .>> ignored
             |> many1
+            <?> "cases"
             |> block
             |>> fun cases -> { Against = against; Cases = cases }
 
