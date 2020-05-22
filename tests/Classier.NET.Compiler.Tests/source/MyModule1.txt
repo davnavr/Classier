@@ -52,7 +52,7 @@ public module Math {
         if (Math.badFormatting.thisWillNotCompileButIsSyntacticallyCorrect()) {
           
         }
-        else if (true) {
+        else if (true && false || true) {
             new System.String ()
         }
         else {

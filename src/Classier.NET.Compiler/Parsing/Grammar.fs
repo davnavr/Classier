@@ -96,8 +96,8 @@ type Expression =
     | NumLit of NumLiteral
     | TupleLit of Expression list
     | UnitLit
-    | ValAssignment of Assignment
-    | ValDeclaration of Assignment
+    | VarAssignment of Assignment
+    | VarDeclaration of Assignment
 and Assignment =
     { Target: Expression
       Value: Expression }
@@ -361,13 +361,17 @@ let parser: Parser<CompilationUnit, ParserState> =
         let assignment t target value = t { Target = target; Value = value }
 
         [
-            "equals", "==", 30, Associativity.Left
+            "equals", "==", 38, Associativity.Left
 
             // Mathematical operators
             "add", "+", 40, Associativity.Left
             "subtract", "-", 40, Associativity.Left
             "multiply", "*", 50, Associativity.Left
             "divide", "/", 50, Associativity.Left
+
+            // Boolean operators
+            "or", "||", 34, Associativity.Left
+            "and", "&&", 36, Associativity.Left
         ]
         |> Seq.map (fun (name, op, prec, assoc) ->
             let map expr1 expr2 =
@@ -376,10 +380,12 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> Seq.cast<Operator<_,_,_>>
         |> Seq.append
             [
+                InfixOperator<_,_,_>(">>", ignored, 18, Associativity.Left, fun f g -> invalidOp "Composition operator is not implemented");
                 InfixOperator<_,_,_>("|>", ignored, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
+                PrefixOperator<_,_,_>("!", ignored, 32, true, fun exp -> functionCall exp [] "not");
                 PrefixOperator<_,_,_>("-", ignored, 60, true, fun exp -> functionCall exp [] "negate");
-                InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Left, assignment ValAssignment);
-                InfixOperator<_,_,_>("=", ignored, 100, Associativity.Left, assignment ValDeclaration);
+                InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Right, assignment VarAssignment);
+                InfixOperator<_,_,_>("=", ignored, 100, Associativity.Right, assignment VarDeclaration); // TODO: Remove this?
             ]
         |> Seq.iter expr.AddOperator
 
