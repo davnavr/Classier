@@ -41,22 +41,22 @@ public module Math {
         field2: string;
     }
 
-    public union MyDUnion { // TODO: Change to enum like syntax, use keyword enum instead
-        Case1;
-        Case2: long;
-        Case3: system.reflection.Assembly;
+    public union MyDUnion {
+        Case1,
+        Case2: long,
+        Case3: system.reflection.Assembly,
     }
 
     internal aUnionTest (pickOne: string | int | null) {
         // These are statements
-        /*if (Math.badFormatting.thisWillNotCompileButIsSyntacticallyCorrect()) {
+        if (Math.badFormatting.thisWillNotCompileButIsSyntacticallyCorrect()) {
           
         }
         else if (true) {
             new System.String ()
         }
         else {
-        }*/
+        }
 
         // This is an expression (implicit return).
         let testValue = if (true) {1} else {2};

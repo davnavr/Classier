@@ -388,8 +388,6 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                     matchStatement |>> MatchExpr <?> "match expression";
 
-                    identifier |>> IdentifierRef;
-
                     tuple
                     <?> "tuple"
                     |>> (fun ex ->
@@ -401,10 +399,16 @@ let parser: Parser<CompilationUnit, ParserState> =
                     skipString "new"
                     >>. ignored1
                     |> attempt
-                    >>. identifierFull
+                    >>. opt identifierFull
                     .>> ignored
                     .>>. (tuple <?> "constructor arguments")
-                    |>> (fun (ctype, args) -> CtorCall {| Arguments = args; Type = ctype |});
+                    <?> "constructor call"
+                    |>> (fun (ctype, args) ->
+                        CtorCall
+                            {| Arguments = args
+                               Type = Option.defaultValue Inferred ctype |});
+
+                    identifier |>> IdentifierRef;
 
                     pchar '0'
                     >>. choice
@@ -592,6 +596,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. expressionInParens
         .>> ignored
         .>>. statementBlock
+        |> attempt
         .>>. choice
             [
                 ignored
@@ -605,8 +610,10 @@ let parser: Parser<CompilationUnit, ParserState> =
                         |>> fun e -> [ IfStatement e ]
 
                         ignored
-                        >>. statementBlock;
+                        >>. statementBlock
+                        |> attempt;
                     ]
+                <?> "else or else-if"
 
                 preturn []
             ]
@@ -717,8 +724,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
 
     let extends =
-        ignored1
-        .>> skipString "extends"
+        skipString "extends"
         .>> ignored1
         |> attempt
         >>. identifierList
@@ -726,8 +732,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |>> Option.defaultValue []
 
     let implements =
-        ignored1
-        .>> skipString "implements"
+        skipString "implements"
         .>> ignored1
         |> attempt
         >>. sepBy1 identifierFull (separator comma)
@@ -753,6 +758,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 ]
             .>>. identifierStr
             |> attempt
+            .>> ignored
             .>>. extends
             .>>. implements
             <?> "generic parameter"
@@ -894,7 +900,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 identifierStr
                 .>>. typeAnnotationOpt
                 .>> ignored
-                .>> semicolon
+                .>> comma
                 <?> "union case"
                 |>> fun (name, ctype) ->
                     match ctype with
@@ -932,6 +938,11 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = members })
         <?> "interface definition"
 
+    let classNested =
+        classDef
+        <?> "nested class"
+        |>> NestedType
+
     classDefRef :=
         modifier "abstract" Flags.Abstract
         >>. modifier "inheritable" Flags.Inheritable
@@ -940,6 +951,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         .>>. identifierStr
         .>>. genericParams
+        .>> ignored
         .>>. extends
         .>>. implements
         .>> ignored
@@ -949,11 +961,12 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                 accessModifier Flags.Private
                 >>. ignored1
+                |> attempt
                 >>. choice
                     [
                         ctorDef
                         methodDef
-                        classDef |>> NestedType
+                        classNested
                     ]
             ]
         <?> "class definition"
@@ -980,7 +993,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                         recordDef |>> NestedType
                         unionDef |>> NestedType
                         interfaceDef |>> NestedType
-                        classDef |>> NestedType
+                        classNested
                         functionDef <?> "function definition"
                     ]
             ]
