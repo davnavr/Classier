@@ -2,6 +2,7 @@
 namespace some.name.collections;
 
 use blah.interop.clr.SomeClass;
+use some.StaticClass<String>.Nested;
 
 public mutable class MutableList<T> {
   let backingArray: Array<T>;

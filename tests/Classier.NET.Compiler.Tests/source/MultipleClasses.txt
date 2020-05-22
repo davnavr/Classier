@@ -31,3 +31,7 @@ public class Class3 implements Interface1 {
     let parent: Class3;
   }
 }
+
+public class Class4 extends Class3 implements Interface1 {
+  
+}

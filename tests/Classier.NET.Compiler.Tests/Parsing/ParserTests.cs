@@ -16,6 +16,7 @@
 
 namespace Classier.NET.Compiler.Parsing
 {
+    using System.Collections.Generic;
     using System.Linq;
     using System.Text;
     using Microsoft.FSharp.Collections;
@@ -26,7 +27,7 @@ namespace Classier.NET.Compiler.Parsing
     public class ParserTests
     {
         [InlineData("MultipleClasses.txt")]
-        [InlineData("MyAbstractClass1.txt", "java.lang._", "java.util.ArrayList<1>")]
+        [InlineData("MyAbstractClass1.txt", "java.lang", "java.util")]
         [InlineData("MyModule1.txt", "system.reflection.Assembly")]
         [Theory]
         public void ParserCorrectlySetsUsedTypes(string name, params string[] usedTypes)
@@ -38,7 +39,7 @@ namespace Classier.NET.Compiler.Parsing
             var result = new SuccessResult(parser, stream, name, Encoding.UTF8).Result;
 
             // Assert
-            Assert.Equal(usedTypes, result.Usings.Select(use => use.ToString()));
+            Assert.Equal(usedTypes, result.Usings.Select(names => string.Join('.', names)));
         }
 
         [InlineData("MyClass1.txt", new string[0])]

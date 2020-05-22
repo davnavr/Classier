@@ -41,7 +41,7 @@ public module Math {
         field2: string;
     }
 
-    public union MyDUnion {
+    public union MyDUnion { // TODO: Change to enum like syntax, use keyword enum instead
         Case1;
         Case2: long;
         Case3: system.reflection.Assembly;

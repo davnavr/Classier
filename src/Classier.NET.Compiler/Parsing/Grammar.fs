@@ -60,9 +60,25 @@ type TypeName =
     | Inferred
     | Tuple of TypeName list
     | Union of TypeName list
+
+    override this.ToString() =
+        match this with
+        | Identifier names -> String.Join('.', names)
+        | Inferred -> "_"
+        | Tuple types ->
+            String.Join(", ", types)
+            |> sprintf "(%s)"
+        | Union options -> String.Join(" | ", options)
 and Identifier =
     { Name: string
-      GenericArgs: seq<GenericArg> }
+      GenericArgs: GenericArg list }
+
+    override this.ToString() =
+        match this.GenericArgs with
+        | [] -> this.Name
+        | _ ->
+            let gargs = String.Join(", ", this.GenericArgs)
+            sprintf "%s<%s>" this.Name gargs
 and GenericArg = TypeName
 
 type Expression =
@@ -170,30 +186,10 @@ and MemberDef =
     | NestedType of TypeDef
     | DUnionCase of string * TypeName option
 
-type UsedType =
-    { Namespace: string list
-      TypeName: (string * int) option }
-
-    override this.ToString() =
-        let typeName =
-            match this.TypeName with
-            | Some (name, gcount) ->
-                if gcount > 0
-                then sprintf "%s<%i>" name gcount
-                else name
-            | _ -> "_"
-        match this.Namespace with
-        | [] -> typeName
-        | _ ->
-            Seq.append
-                (Seq.map (fun name -> name + ".") this.Namespace)
-                [ typeName ]
-            |> String.Concat
-
 type CompilationUnit =
     { TypeDefs: TypeDef list
       Namespace: string list
-      Usings: UsedType list }
+      Usings: Identifier list list }
 
 type ParserState =
     { CurrentFlags: Flags
@@ -233,7 +229,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     let lparen = skipChar '(' <?> "opening parenthesis"
     let ltsign = skipChar '<'
     let opequal = skipChar '='
-    let period = skipChar '.'
+    let period = skipChar '.' <?> "period"
     let rcurlybracket = skipChar '}' <?> "closing bracket"
     let rparen = skipChar ')' <?> "closing parenthesis"
     let semicolon = skipChar ';' <?> "semicolon"
@@ -358,7 +354,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         let expr = OperatorPrecedenceParser<_,_,_>()
         let exprParser = expr.ExpressionParser <?> "expression"
         let functionCall targetExpr args name =
-            let target = MemberAccess (targetExpr, { Name = name; GenericArgs = Seq.empty })
+            let target = MemberAccess (targetExpr, { Name = name; GenericArgs = List.empty })
             FuncCall {| Arguments = args; Target = target |}
         let assignment t target value = t { Target = target; Value = value }
 
@@ -723,8 +719,8 @@ let parser: Parser<CompilationUnit, ParserState> =
     let extends =
         ignored1
         .>> skipString "extends"
-        |> attempt
         .>> ignored1
+        |> attempt
         >>. identifierList
         |> opt
         |>> Option.defaultValue []
@@ -732,8 +728,8 @@ let parser: Parser<CompilationUnit, ParserState> =
     let implements =
         ignored1
         .>> skipString "implements"
-        |> attempt
         .>> ignored1
+        |> attempt
         >>. sepBy1 identifierFull (separator comma)
         |> opt
         |>> Option.defaultValue []
@@ -996,45 +992,6 @@ let parser: Parser<CompilationUnit, ParserState> =
               Interfaces = []
               Members = members }
 
-    let usings =
-        let gcount =
-            ltsign
-            |> attempt
-            .>> ignored
-            >>. many1Chars digit
-            .>> ignored
-            .>> gtsign
-            |> opt
-            |>> (Option.map int >> Option.defaultValue 0)
-            <?> "generic parameter count"
-        skipString "use"
-        >>. ignored1
-        |> attempt
-        >>. many
-            (identifierStr
-            .>> ignored
-            .>> period
-            |> attempt
-            .>> ignored)
-        .>>. choice
-            [
-                identifierStr
-                |> attempt
-                .>> ignored
-                .>>. gcount
-                |>> Some
-                <?> "type or module name"
-
-                underscore
-                >>. preturn None
-            ]
-        .>> ignored
-        .>> semicolon
-        |>> (fun (ns, tname) -> { Namespace = ns; TypeName = tname })
-        <?> "use statement"
-        .>> ignored
-        |> many
-
     ignored
     >>. opt
         (skipString "namespace"
@@ -1046,7 +1003,15 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> semicolon
         <?> "namespace declaration")
     .>> ignored
-    .>>. usings
+    .>>. many
+        (skipString "use"
+        >>. ignored1
+        |> attempt
+        >>. identifierList
+        .>> ignored
+        .>> semicolon
+        <?> "use statement"
+        .>> ignored)
     .>>. (accessModifier Flags.Internal
          >>. ignored1
          >>. choice

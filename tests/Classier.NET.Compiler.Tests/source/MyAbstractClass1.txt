@@ -1,8 +1,8 @@
 
 namespace this.is.my.space;
 
-use java.lang._;
-use java.util.ArrayList<1>;
+use java.lang;
+use java.util;
 
 internal abstract class MyAbstractClass1 {
   let tester: java.lang.String = someUndefinedGlobal;
