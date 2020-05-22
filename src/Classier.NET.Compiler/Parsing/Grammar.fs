@@ -193,10 +193,12 @@ type CompilationUnit =
 
 type ParserState =
     { CurrentFlags: Flags
-      Symbols: SymbolTable }
+      CurrentParent: Identifier list
+      Symbols: SymbolTable<Identifier> }
 
     static member Default =
         { CurrentFlags = Flags.None
+          CurrentParent = List.empty
           Symbols = SymbolTable.empty }
 
     member this.VisibilityFlags = this.CurrentFlags &&& Flags.VisibilityMask
@@ -858,7 +860,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. getUserState
         |>> fun state -> state.CreateDefinition
 
-    let recordDef =
+    let recordDef = // TODO: Allow methods and other members.
         typeDef "data"
         .>>. identifierStr
         .>>. genericParams
@@ -890,7 +892,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Interfaces = []
               Members = members }
 
-    let unionDef =
+    let unionDef = // TODO: Pick better keyword to use than "union".
         typeDef "union"
         .>>. identifierStr
         .>>. genericParams
@@ -1011,7 +1013,14 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored1
         |> attempt
         >>. sepBy1 identifierStr (separator period)
-        |> updateSymbolTable (SymbolTable.addNamespace)
+        //|> updateSymbolTable (SymbolTable.addNamespace)
+        >>= (fun names ->
+            (fun state ->
+                let table = state.Symbols |> SymbolTable.addNamespace names
+                let parent = names |> List.map(fun name -> { Name = name; GenericArgs = [] })
+                { state with CurrentParent = parent; Symbols = table })
+            |> updateUserState
+            >>. preturn names)
         .>> ignored
         .>> semicolon
         <?> "namespace declaration")

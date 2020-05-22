@@ -24,30 +24,26 @@ type SymbolOrigin =
 
 type Symbol =
     | GParam
-    /// Local variable or parameter.
-    | Local
     | Member
     | Namespace
-    | Type // of Scope
+    | Type
 
-type ResolvedSymbol =
-    { FullName: string list
+type ResolvedSymbol<'Name> =
+    { FullName: 'Name list
       Origin: SymbolOrigin
       Symbol: Symbol }
 
-type UnknownSymbol =
-    { Name: string
+type UnknownSymbol<'Name> =
+    { Name: 'Name
       PossibleTypes: Symbol list
-      PossibleParents: ResolvedSymbol list }
+      PossibleParents: ResolvedSymbol<'Name> list }
 
-type SymbolTable =
-    { Namespaces: ImmutableSortedDictionary<string list, ResolvedSymbol list>
-       }
+type SymbolTable<'Name> =
+    { Namespaces: ImmutableSortedDictionary<string list, ResolvedSymbol<'Name> list> }
 
 module SymbolTable =
-    let empty =
-        { Namespaces = ImmutableSortedDictionary.Empty
-          }
+    let empty<'Name> =
+        { Namespaces = ImmutableSortedDictionary.Empty } : SymbolTable<'Name>
 
     let addNamespace ns table =
         let namespaces =
@@ -55,4 +51,3 @@ module SymbolTable =
             then table.Namespaces
             else table.Namespaces.Add(ns, List.empty)
         { table with Namespaces = namespaces }
-
