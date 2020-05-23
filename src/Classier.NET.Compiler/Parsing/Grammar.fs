@@ -94,6 +94,7 @@ type Expression =
     | MemberAccess of Expression * Identifier
     | Nested of Expression
     | NumLit of NumLiteral
+    | ThrowExpr of Expression
     | TupleLit of Expression list
     | UnitLit
     | VarAssignment of Assignment
@@ -125,7 +126,12 @@ and Statement =
     | LocalVar of Variable
     | MatchStatement of Match
     | Return of Expression
+    | Throw of Expression option
     | While of Expression * Statement list
+and Try =
+    { TryBody: Statement list
+      Handlers: MatchCase list
+      Finally: Statement list }
 and Variable =
     { VarDef: Definition
       Type: TypeName
@@ -259,7 +265,8 @@ let parser: Parser<CompilationUnit, ParserState> =
     let classDef, classDefRef = createParserForwardedToRef<TypeDef,_>()
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
     let ifStatement, ifStatementRef = createParserForwardedToRef<If,_>()
-    let matchStatement, matchStatementRef = createParserForwardedToRef<Match, _>()
+    let matchStatement, matchStatementRef = createParserForwardedToRef<Match,_>()
+    let tryBlock, tryBlockRef = createParserForwardedToRef<Try,_>()
     let tuple, tupleRef = createParserForwardedToRef<Expression list,_>()
     let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
     let statementBlock, statementBlockRef = createParserForwardedToRef<Statement list,_>()
@@ -351,7 +358,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> rparen
         <?> "parameters"
 
-    let expression =
+    let expression = // TODO: Add throw expression
         let decimalChars = [ '0'..'9' ]
         let expr = OperatorPrecedenceParser<_,_,_>()
         let exprParser = expr.ExpressionParser <?> "expression"
@@ -392,10 +399,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         expr.TermParser <-
             choice
                 [
-                    ifStatement |>> IfExpr <?> "if expression";
-
-                    matchStatement |>> MatchExpr <?> "match expression";
-
                     tuple
                     <?> "tuple"
                     |>> (fun ex ->
@@ -403,6 +406,16 @@ let parser: Parser<CompilationUnit, ParserState> =
                         | [] -> UnitLit
                         | [ nested ] -> nested
                         | _ -> TupleLit ex);
+
+                    ifStatement |>> IfExpr <?> "if expression";
+
+                    matchStatement |>> MatchExpr <?> "match expression";
+
+                    skipString "throw"
+                    >>. ignored1
+                    |> attempt
+                    >>. exprParser
+                    |>> ThrowExpr
 
                     skipString "new"
                     >>. ignored1
@@ -648,7 +661,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                             (choice [ underscore >>. preturn None; identifierStr |>> Some ])
                             (separator comma)
                         .>> rparen
-                        <??> "case pattern"
+                        <?> "case pattern"
                         |>> fun (name, values) ->
                             CasePattern
                                 {| CaseName = name
@@ -662,7 +675,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                     ]
 
             sepBy1 pattern (separator comma)
-            <?> "pattern"
             .>> ignored
             .>> colon
             |> attempt
@@ -708,6 +720,22 @@ let parser: Parser<CompilationUnit, ParserState> =
                 .>> ignored
                 .>> semicolon;
 
+                skipString "throw"
+                >>. choice
+                    [
+                        ignored1
+                        |> attempt
+                        >>. expression
+                        |>> Some
+
+                        ignored
+                        >>. semicolon
+                        >>. preturn None
+                    ]
+                |> attempt
+                |>> Throw
+                <?> "throw statement"
+
                 ifStatement |>> IfStatement <?> "if statement";
 
                 matchStatement |>> MatchStatement <?> "match statement";
@@ -730,6 +758,30 @@ let parser: Parser<CompilationUnit, ParserState> =
                     ]
                 |>> fun (expr, statement) -> statement expr;
             ]
+
+    tryBlockRef :=
+        skipString "try"
+        >>. ignored
+        >>. statementBlock
+        |> attempt
+        .>>. preturn []
+        .>>.
+            (ignored
+            >>. skipString "finally"
+            >>. ignored
+            >>. statementBlock
+            |> attempt
+            <?> "finally block"
+            |> opt
+            |>> Option.defaultValue [])
+        >>= fun ((tryBlock, catchBlock), finallyBlock) ->
+            if List.isEmpty catchBlock && List.isEmpty finallyBlock then
+                fail "Expected at least one catch or finally block."
+            else
+                preturn
+                    { TryBody = tryBlock
+                      Handlers = catchBlock
+                      Finally = finallyBlock }
 
     let extends =
         skipString "extends"
@@ -867,7 +919,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |>> fun state -> state.CreateDefinition
 
     let recordDef = // TODO: Allow methods and other members.
-        typeDef "data"
+        typeDef "data" // TODO: Pick different keyword, "record" or "data class"?
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
@@ -898,8 +950,8 @@ let parser: Parser<CompilationUnit, ParserState> =
               Interfaces = []
               Members = members }
 
-    let unionDef = // TODO: Pick better keyword to use than "union".
-        typeDef "union"
+    let unionDef = // TODO: Replace dunion with case classes like in Scala or do what Kotlin does https://www.howtobuildsoftware.com/index.php/how-do/SmZ/kotlin-discriminated-union-kotlin-and-discriminated-unions-sum-types
+        typeDef "union" // TODO: Pick better keyword to use than "union".
         .>>. identifierStr
         .>>. genericParams
         .>> ignored

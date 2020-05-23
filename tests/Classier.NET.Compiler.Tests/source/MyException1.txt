@@ -1,0 +1,12 @@
+
+public class MyException1 extends System.Exception {
+    let myField = throw test /*"test"*/;
+
+    public doSomething () {
+        throw new MyException1();
+    }
+
+    public somethingElse (one, two, three, four, five) {
+        
+    }
+}
