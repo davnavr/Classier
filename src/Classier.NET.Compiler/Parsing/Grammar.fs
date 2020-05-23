@@ -95,6 +95,7 @@ type Expression =
     | Nested of Expression
     | NumLit of NumLiteral
     | ThrowExpr of Expression
+    | TryExpr of Try
     | TupleLit of Expression list
     | UnitLit
     | VarAssignment of Assignment
@@ -127,6 +128,7 @@ and Statement =
     | MatchStatement of Match
     | Return of Expression
     | Throw of Expression option
+    | TryStatement of Try
     | While of Expression * Statement list
 and Try =
     { TryBody: Statement list
@@ -244,6 +246,8 @@ let parser: Parser<CompilationUnit, ParserState> =
     let underscore = skipChar '_' <?> "underscore"
     let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
+    let optList p = opt p |>> Option.defaultValue []
+
     let accessModifier lowest =
         let modifiers =
             [
@@ -332,8 +336,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. sepBy1 typeName (separator comma)
         |> attempt
         .>> gtsign
-        |> opt
-        |>> Option.defaultValue []
+        |> optList
         <?> "generic arguments"
 
     let identifierStr =
@@ -358,7 +361,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> rparen
         <?> "parameters"
 
-    let expression = // TODO: Add throw expression
+    let expression =
         let decimalChars = [ '0'..'9' ]
         let expr = OperatorPrecedenceParser<_,_,_>()
         let exprParser = expr.ExpressionParser <?> "expression"
@@ -407,9 +410,9 @@ let parser: Parser<CompilationUnit, ParserState> =
                         | [ nested ] -> nested
                         | _ -> TupleLit ex);
 
-                    ifStatement |>> IfExpr <?> "if expression";
+                    ifStatement |>> IfExpr <?> "if expression"
 
-                    matchStatement |>> MatchExpr <?> "match expression";
+                    matchStatement |>> MatchExpr <?> "match expression"
 
                     skipString "throw"
                     >>. ignored1
@@ -428,6 +431,8 @@ let parser: Parser<CompilationUnit, ParserState> =
                         CtorCall
                             {| Arguments = args
                                Type = Option.defaultValue Inferred ctype |});
+
+                    tryBlock |>> TryExpr <?> "try expression"
 
                     identifier |>> IdentifierRef;
 
@@ -573,6 +578,45 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>> semicolon
 
+    let matchCases =
+        let pattern =
+            choice
+                [
+
+                    identifierList
+                    .>> ignored
+                    .>> lparen
+                    .>> ignored
+                    .>>. sepBy1
+                        (choice [ underscore >>. preturn None; identifierStr |>> Some ])
+                        (separator comma)
+                    .>> rparen
+                    <?> "case pattern"
+                    |>> fun (name, values) ->
+                        CasePattern
+                            {| CaseName = name
+                               Values = values |}
+
+                    expression |>> Constant
+
+                    underscore
+                    >>. ignored
+                    >>. preturn Default
+                ]
+        sepBy1 pattern (separator comma)
+        .>> ignored
+        .>> colon
+        |> attempt
+        .>> ignored
+        .>>. expression
+        .>> ignored
+        .>> semicolon
+        |>> (fun (patterns, expr) -> { Body = [ Return expr ]; Patterns = patterns })
+        .>> ignored
+        |> many1
+        |> block
+        <?> "cases"
+
     tupleRef :=
         lparen
         |> attempt
@@ -648,46 +692,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored
         >>. expressionInParens
         .>> ignored
-        >>= fun against ->
-            let pattern =
-                choice
-                    [
-
-                        identifierList
-                        .>> ignored
-                        .>> lparen
-                        .>> ignored
-                        .>>. sepBy1
-                            (choice [ underscore >>. preturn None; identifierStr |>> Some ])
-                            (separator comma)
-                        .>> rparen
-                        <?> "case pattern"
-                        |>> fun (name, values) ->
-                            CasePattern
-                                {| CaseName = name
-                                   Values = values |}
-
-                        expression |>> Constant
-
-                        underscore
-                        >>. ignored
-                        >>. preturn Default
-                    ]
-
-            sepBy1 pattern (separator comma)
-            .>> ignored
-            .>> colon
-            |> attempt
-            .>> ignored
-            .>>. expression
-            .>> ignored
-            .>> semicolon
-            |>> (fun (patterns, expr) -> { Body = [ Return expr ]; Patterns = patterns })
-            .>> ignored
-            |> many1
-            <?> "cases"
-            |> block
-            |>> fun cases -> { Against = against; Cases = cases }
+        .>>. matchCases
+        |>> fun (against, cases) -> { Against = against; Cases = cases }
 
     statementBlockRef :=
         blockChoice
@@ -736,9 +742,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                 |>> Throw
                 <?> "throw statement"
 
-                ifStatement |>> IfStatement <?> "if statement";
+                ifStatement |>> IfStatement <?> "if statement"
 
-                matchStatement |>> MatchStatement <?> "match statement";
+                matchStatement |>> MatchStatement <?> "match statement"
+
+                tryBlock |>> TryStatement <?> "try statement"
                 
                 expression
                 .>>. choice
@@ -764,7 +772,11 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored
         >>. statementBlock
         |> attempt
-        .>>. preturn []
+        .>>. (ignored
+            >>. skipString "catch"
+            >>. ignored
+            >>. matchCases
+            |> optList)
         .>>.
             (ignored
             >>. skipString "finally"
@@ -772,8 +784,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             >>. statementBlock
             |> attempt
             <?> "finally block"
-            |> opt
-            |>> Option.defaultValue [])
+            |> optList)
         >>= fun ((tryBlock, catchBlock), finallyBlock) ->
             if List.isEmpty catchBlock && List.isEmpty finallyBlock then
                 fail "Expected at least one catch or finally block."
@@ -788,16 +799,14 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored1
         |> attempt
         >>. identifierList
-        |> opt
-        |>> Option.defaultValue []
+        |> optList
 
     let implements =
         skipString "implements"
         .>> ignored1
         |> attempt
         >>. sepBy1 identifierFull (separator comma)
-        |> opt
-        |>> Option.defaultValue []
+        |> optList
         <?> "interface implementations"
 
     let genericParams =
@@ -831,8 +840,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         >>. sepBy1 genericParam (separator comma)
         .>> gtsign
-        |> opt
-        |>> Option.defaultValue []
+        |> optList
         <?> "generic parameters"
 
     let functionBody =
@@ -1066,7 +1074,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = members }
 
     ignored
-    >>. opt
+    >>. optList
         (skipString "namespace"
         >>. ignored1
         |> attempt
@@ -1107,5 +1115,5 @@ let parser: Parser<CompilationUnit, ParserState> =
     .>> eof
     |>> fun ((ns, uses), defs) ->
         { TypeDefs = defs
-          Namespace = Option.defaultValue [] ns
+          Namespace = ns
           Usings = uses }
