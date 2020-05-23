@@ -59,6 +59,7 @@ namespace Classier.NET.Compiler.Parsing
         }
 
         [InlineData("MissingBrackets1.txt", "closing bracket", 9, 1)]
+        [InlineData("NoCatchOrFinally.txt", "at least one catch", 6, 6)]
         [Theory]
         public void ParserHasPredictedError(string name, string errorSubstring, long line, long column)
         {

@@ -1,6 +1,6 @@
 
 public class MyException1 extends System.Exception {
-    let myField = throw test /* please work "test"*/;
+    let myField = throw "test" /* please work */;
 
     public doSomething () {
         throw new MyException1();
@@ -17,5 +17,15 @@ public class MyException1 extends System.Exception {
             // take out the trash
             one.Dispose();
         }
+    }
+
+    public two (three) {
+      try {
+        somethingElse (three, three, three, this, three);
+      }
+      finally {
+        printfn ("line 1\u000Aline 2");
+        three.close ();
+      }
     }
 }

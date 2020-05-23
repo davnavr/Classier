@@ -1,0 +1,8 @@
+
+public module MyModule {
+  public myFunc () {
+    try {
+        throw new system.InvalidOperationException();
+    }
+  }
+}

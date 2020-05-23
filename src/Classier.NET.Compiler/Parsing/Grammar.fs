@@ -94,6 +94,7 @@ type Expression =
     | MemberAccess of Expression * Identifier
     | Nested of Expression
     | NumLit of NumLiteral
+    | StrLit of string
     | ThrowExpr of Expression
     | TryExpr of Try
     | TupleLit of Expression list
@@ -234,6 +235,7 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let colon = skipChar ':'
     let comma = skipChar ','
+    let dquotes = skipChar '\"'
     let gtsign = skipChar '>'
     let lcurlybracket = skipChar '{' <?> "opening bracket"
     let lparen = skipChar '(' <?> "opening parenthesis"
@@ -363,12 +365,17 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let expression =
         let decimalChars = [ '0'..'9' ]
+
         let expr = OperatorPrecedenceParser<_,_,_>()
         let exprParser = expr.ExpressionParser <?> "expression"
+
         let functionCall targetExpr args name =
             let target = MemberAccess (targetExpr, { Name = name; GenericArgs = List.empty })
             FuncCall {| Arguments = args; Target = target |}
         let assignment t target value = t { Target = target; Value = value }
+
+        let strChar = manySatisfy (fun c -> c <> '\\' && c <> '"')
+        let strEscaped = skipString "\\u" >>. parray 4 hex |>> String
 
         [
             "equals", "==", 38, Associativity.Left
@@ -402,6 +409,13 @@ let parser: Parser<CompilationUnit, ParserState> =
         expr.TermParser <-
             choice
                 [
+                    between
+                        dquotes
+                        dquotes
+                        (stringsSepBy strChar strEscaped)
+                    |>> StrLit
+                    <?> "string literal"
+
                     tuple
                     <?> "tuple"
                     |>> (fun ex ->
@@ -775,14 +789,15 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. (ignored
             >>. skipString "catch"
             >>. ignored
+            |> attempt
             >>. matchCases
             |> optList)
         .>>.
             (ignored
             >>. skipString "finally"
             >>. ignored
-            >>. statementBlock
             |> attempt
+            >>. statementBlock
             <?> "finally block"
             |> optList)
         >>= fun ((tryBlock, catchBlock), finallyBlock) ->
