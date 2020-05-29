@@ -26,14 +26,13 @@ type Flags =
     | Protected = 2uy
     | Private = 3uy
     | Inline = 4uy
-    | Abstract = 8uy
-    /// Indicates that a class, field, or local variable is mutable,
-    /// or that a method changes the value of a field.
+    /// Indicates that a method does not have an implementation or that a class cannot be instantiated.
+    | MissingImpl = 8uy
+    /// Indicates that a class or local variable is mutable.
     | Mutable = 16uy
     /// Indicates that a class can have a subclass.
     | Inheritable = 32uy
     | VisibilityMask = 3uy
-    | ModifierMask = 252uy
 
 [<Flags>]
 type NumType =
@@ -220,11 +219,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         updateUserState (fun state ->
             { state with CurrentFlags = state.VisibilityFlags })
     let setFlags flags =
-        (fun state ->
-            let vis = flags &&& Flags.VisibilityMask
-            let mdf = flags &&& Flags.ModifierMask
-            { state with CurrentFlags = state.CurrentFlags ||| vis ||| mdf })
+        (fun state -> { state with CurrentFlags = state.CurrentFlags ||| flags })
         |> updateUserState
+    let getFlags = getUserState |>> fun state -> state.CurrentFlags
+
     let updateSymbolTable f p =
         p
         .>>. getUserState
@@ -274,7 +272,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     let tryBlock, tryBlockRef = createParserForwardedToRef<Try,_>()
     let tuple, tupleRef = createParserForwardedToRef<Expression list,_>()
     let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
-    let statementBlock, statementBlockRef = createParserForwardedToRef<Statement list,_>()
+    let statement, statementRef = createParserForwardedToRef<Statement,_>()
 
     let ignored =
         choice
@@ -310,12 +308,25 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> opt
         |>> Option.defaultValue Inferred
 
-    let modifier name flag =
-        skipString name
-        >>. ignored1
-        |> attempt
-        >>. setFlags flag
-        |> optional
+    let modifiers =
+        [
+            "abstract", Flags.MissingImpl ||| Flags.Inheritable
+            "inheritable", Flags.Inheritable
+            "inline", Flags.Inline
+            "mutable", Flags.Mutable
+        ]
+        |> Seq.map (fun (word, flag) ->
+            skipString word
+            >>. ignored1
+            |> attempt
+            >>. getFlags
+            >>= fun currentFlags ->
+                if currentFlags &&& flag > Flags.None
+                then sprintf "Unexpected modifier '%s'" word |> failFatally <??> "THIS ERROR SHOULD POP UP WHEN DUPLICATE"
+                else setFlags flag)
+        |> choice
+        |> skipMany
+        <?> "modifiers"
 
     let separator p = ignored >>. p .>> ignored
 
@@ -331,6 +342,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         |> many
         |> block
+
+    let statementBlock = blockChoice [ statement ]
 
     let genericArgs =
         ltsign
@@ -637,7 +650,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> rparen
 
     typeNameRef :=
-        choice
+        choiceL
             [
                 sepBy1
                     identifierFull
@@ -657,7 +670,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 |>> Tuple
                 <?> "tuple";
             ]
-        <?> "type name"
+            "type name"
 
     identifierRef :=
         identifierStr
@@ -707,8 +720,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. matchCases
         |>> fun (against, cases) -> { Against = against; Cases = cases }
 
-    statementBlockRef :=
-        blockChoice
+    statementRef :=
+        choiceL
             [
                 semicolon
                 >>. preturn Empty
@@ -774,6 +787,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     ]
                 |>> fun (expr, statement) -> statement expr;
             ]
+            "statement"
 
     tryBlockRef :=
         skipString "try"
@@ -796,7 +810,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             |> optList)
         >>= fun ((tryBlock, catchBlock), finallyBlock) ->
             if List.isEmpty catchBlock && List.isEmpty finallyBlock then
-                fail "Expected at least one catch or finally block."
+                fail "Expected at least one catch or finally block"
             else
                 preturn
                     { TryBody = tryBlock
@@ -861,6 +875,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> choice
         <?> "function body"
 
+    // TODO: Remove fieldDef and ctorDef.
     let fieldDef =
         variableDef
         |>> Field
@@ -901,8 +916,8 @@ let parser: Parser<CompilationUnit, ParserState> =
                    Parameters = parameters |}
 
     let functionDef =
-        modifier "inline" Flags.Inline
-        >>. modifier "mutator" Flags.Mutable
+        // TODO: Figure out way to disallow abstract on functions, but allow it on methods.
+        modifiers
         >>. getUserState
         .>>. identifierStr
         .>> ignored
@@ -923,13 +938,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                   Parameters = fparams
                   ReturnType = retType }
 
-    let methodDef =
-        modifier "abstract" Flags.Abstract
-        >>. functionDef
-        <?> "method definition"
+    let methodDef = functionDef <?> "method definition"
 
     let typeDef word =
-        skipString word
+        modifiers
+        >>. skipString word
         >>. ignored1
         |> attempt
         >>. getUserState
@@ -1021,10 +1034,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |>> NestedType
 
     classDefRef :=
-        modifier "abstract" Flags.Abstract
-        >>. modifier "inheritable" Flags.Inheritable
-        >>. modifier "mutable" Flags.Mutable
-        >>. typeDef "class"
+        typeDef "class"
         |> attempt
         .>>. identifierStr
         .>>. genericParams
