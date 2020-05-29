@@ -1,19 +1,20 @@
 
-public class Class1(arg1) {
-  printfn(arg1.toString());
+public class Class1 {
+  public new (arg1) { // TODO: Will switch to primary constructor syntax.
+    printfn(arg1.toString());
 
-  match (arg1) {
-    1 : 3;
-    3, 4 : 5;
-    _ : 0;
+    match (arg1) {
+      1 : 3;
+      3, 4 : 5;
+      _ : 0;
+    }
   }
 }
 
 /**
  * Maybe this is what documentation comments might look like
  */
-public class Class2(arg2, arg3) extends Class1(arg2) {
-  let thing = 5;
+public class Class2 extends Class1 {
 }
 
 public interface Interface1 {
@@ -27,14 +28,6 @@ public class Class3 implements Interface1 {
   }
 }
 
-public class Class4(arg4) extends Class2(arg4 + 5) implements Interface1 {
-  
-}
-
-public class Class5 extends Class3 {
-  
-}
-
-public class Class6 private (arg6) extends Class4(arg6) {
+public class Class4 extends Class3 implements Interface1 {
   
 }
