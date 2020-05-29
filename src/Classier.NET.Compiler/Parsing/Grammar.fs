@@ -25,15 +25,13 @@ type Flags =
     | Internal = 1uy
     | Protected = 2uy
     | Private = 3uy
+    | VisibilityMask = 3uy
     | Inline = 4uy
     | Abstract = 8uy
-    /// Indicates that a class, field, or local variable is mutable,
-    /// or that a method changes the value of a field.
+    /// Indicates that a class or local variable is mutable.
     | Mutable = 16uy
     /// Indicates that a class can have a subclass.
     | Inheritable = 32uy
-    | VisibilityMask = 3uy
-    | ModifierMask = 252uy
 
 [<Flags>]
 type NumType =
@@ -124,6 +122,8 @@ and Statement =
     | IfStatement of If
     /// An expression whose result is evaluated then discarded.
     | IgnoredExpr of Expression
+    /// Used in the body of classes and modules.
+    | LocalMember of MemberDef
     | LocalVar of Variable
     | MatchStatement of Match
     | Return of Expression
@@ -138,35 +138,25 @@ and Variable =
     { VarDef: Definition
       Type: TypeName
       Value: Expression option }
-
-type Param =
+and Param =
     { Name: string
       Type: TypeName }
-
-type GenericVariance =
+and GenericVariance =
     | NoVariance
     | Covariant
     | Contravariant
-
-type GenericParam =
+and GenericParam =
     { Name: string
       RequiredSuperClass: Identifier list
       RequiredInterfaces: TypeName list
       Variance: GenericVariance }
-
-type Function =
+and Function =
     { Body: Statement list
       FuncDef: Definition
       GenericParams: GenericParam list
       Parameters: Param list list
       ReturnType: TypeName }
-
-type CtorBaseCall =
-    | NoBaseCall
-    | SelfCall of Expression list
-    | SuperCall of Expression list
-
-type TypeHeader =
+and TypeHeader =
     | Class of Identifier list
     | DUnion
     | Interface
@@ -179,11 +169,6 @@ and TypeDef =
       Interfaces: TypeName list
       Members: MemberDef list }
 and MemberDef =
-    | Ctor of
-        {| BaseCall: CtorBaseCall
-           Body: Statement list
-           CtorDef: Definition
-           Parameters: Param list |}
     | Field of Variable
     | Function of Function
     | Property of 
@@ -220,10 +205,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         updateUserState (fun state ->
             { state with CurrentFlags = state.VisibilityFlags })
     let setFlags flags =
-        (fun state ->
-            let vis = flags &&& Flags.VisibilityMask
-            let mdf = flags &&& Flags.ModifierMask
-            { state with CurrentFlags = state.CurrentFlags ||| vis ||| mdf })
+        (fun state -> { state with CurrentFlags = state.CurrentFlags ||| flags })
         |> updateUserState
     let updateSymbolTable f p =
         p
@@ -274,7 +256,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     let tryBlock, tryBlockRef = createParserForwardedToRef<Try,_>()
     let tuple, tupleRef = createParserForwardedToRef<Expression list,_>()
     let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
-    let statementBlock, statementBlockRef = createParserForwardedToRef<Statement list,_>()
+    let statement, statementRef = createParserForwardedToRef<Statement,_>()
 
     let ignored =
         choice
@@ -331,6 +313,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         |> many
         |> block
+    let statementBlock = blockChoice [ statement ]
 
     let genericArgs =
         ltsign
@@ -637,7 +620,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> rparen
 
     typeNameRef :=
-        choice
+        choiceL
             [
                 sepBy1
                     identifierFull
@@ -657,7 +640,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 |>> Tuple
                 <?> "tuple";
             ]
-        <?> "type name"
+            "type name"
 
     identifierRef :=
         identifierStr
@@ -707,8 +690,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. matchCases
         |>> fun (against, cases) -> { Against = against; Cases = cases }
 
-    statementBlockRef :=
-        blockChoice
+    statementRef :=
+        choiceL
             [
                 semicolon
                 >>. preturn Empty
@@ -774,6 +757,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     ]
                 |>> fun (expr, statement) -> statement expr;
             ]
+            "statement"
 
     tryBlockRef :=
         skipString "try"
@@ -853,56 +837,16 @@ let parser: Parser<CompilationUnit, ParserState> =
         <?> "generic parameters"
 
     let functionBody =
-        [
-            statementBlock
-            lambdaBody
-            semicolon >>. preturn []
-        ]
-        |> choice
-        <?> "function body"
-
-    let fieldDef =
-        variableDef
-        |>> Field
-        <?> "field definition"
-
-    let ctorDef =
-        getUserState
-        .>> skipString "new"
-        .>> ignored1
-        |> attempt
-        .>>. paramTuple
-        .>> ignored
-        .>>.
-            (colon
-            |> attempt
-            >>. ignored
-            >>. choice
-                [
-                    skipString "this" >>. preturn SelfCall
-                    skipString "super" >>. preturn SuperCall
-                ]
-            .>> ignored
-            .>>. tuple
-            |> opt
-            <?> "base call"
-            |>> fun (baseCall) ->
-                match baseCall with
-                | Some (callType, args) -> callType args
-                | _ -> NoBaseCall)
-        .>> ignored
-        .>>. functionBody
-        <?> "constructor definition"
-        |>> fun (((state, parameters), baseCall), body) ->
-            Ctor
-                {| BaseCall = baseCall
-                   Body = body
-                   CtorDef = state.CreateDefinition(String.Empty)
-                   Parameters = parameters |}
+        choiceL
+            [
+                statementBlock
+                lambdaBody
+                semicolon >>. preturn []
+            ]
+            "function body"
 
     let functionDef =
         modifier "inline" Flags.Inline
-        >>. modifier "mutator" Flags.Mutable
         >>. getUserState
         .>>. identifierStr
         .>> ignored
@@ -1015,10 +959,32 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = members })
         <?> "interface definition"
 
-    let classNested =
-        classDef
-        <?> "nested class"
-        |>> NestedType
+    let memberBlockInit members =
+        blockChoice
+            [
+                accessModifier Flags.Private
+                >>. ignored1
+                |> attempt
+                >>. choice members
+                |>> LocalMember
+
+                statement
+            ]
+        |>> fun st ->
+            let members = // TODO: Optimize this?
+                st
+                |> List.choose (function
+                    | LocalMember m -> Some m
+                    | _ -> None)
+            let body =
+                st
+                |> List.choose (fun s ->
+                    match s with
+                    | LocalMember _ -> None
+                    | _ -> Some s)
+            members, body
+
+    let classNested = classDef <?> "nested class" |>> NestedType
 
     classDefRef :=
         modifier "abstract" Flags.Abstract
@@ -1032,22 +998,13 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. extends
         .>>. implements
         .>> ignored
-        .>>. blockChoice
+        .>>. memberBlockInit
             [
-                fieldDef
-
-                accessModifier Flags.Private
-                >>. ignored1
-                |> attempt
-                >>. choice
-                    [
-                        ctorDef
-                        methodDef
-                        classNested
-                    ]
+                methodDef
+                classNested
             ]
         <?> "class definition"
-        |>> fun (((((def, name), gparams), superclass), iimpls), members) ->
+        |>> fun (((((def, name), gparams), superclass), iimpls), (members, body)) ->
             { Definition = def name
               GenericParams = gparams
               Header = Class superclass
@@ -1059,23 +1016,16 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
-        .>>. blockChoice
+        .>>. memberBlockInit
             [
-                fieldDef;
-                
-                accessModifier Flags.Private
-                >>. ignored1
-                >>. choice
-                    [
-                        recordDef |>> NestedType
-                        unionDef |>> NestedType
-                        interfaceDef |>> NestedType
-                        classNested
-                        functionDef <?> "function definition"
-                    ]
+                recordDef |>> NestedType
+                unionDef |>> NestedType
+                interfaceDef |>> NestedType
+                classNested
+                functionDef <?> "function definition"
             ]
         <?> "module definition"
-        |>> fun (((def, name), gparams), members) ->
+        |>> fun (((def, name), gparams), (members, body)) ->
             { Definition = def name
               GenericParams = gparams
               Header = Module
