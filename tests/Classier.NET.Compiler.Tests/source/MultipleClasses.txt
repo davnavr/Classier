@@ -1,6 +1,6 @@
 
 public class Class1 {
-  public new (arg1) {
+  public new (arg1) { // TODO: Will switch to primary constructor syntax.
     printfn(arg1.toString());
 
     match (arg1) {
@@ -15,10 +15,6 @@ public class Class1 {
  * Maybe this is what documentation comments might look like
  */
 public class Class2 extends Class1 {
-  let thing = 5;
-  public new (arg2, arg3): super(arg2) {
-    thing = 6;
-  }
 }
 
 public interface Interface1 {

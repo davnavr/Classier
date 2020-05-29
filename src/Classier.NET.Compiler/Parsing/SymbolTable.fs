@@ -17,6 +17,7 @@ namespace Classier.NET.Compiler
 open System.Collections.Immutable
 open FParsec
 
+// TODO: Symbol table should only be filled with classes, modules, interfaces, methods, functions, etc. & should ignore local vars.
 type SymbolOrigin =
     /// Indicates that the symbol originated from some other source, such as a *.dll file.
     | External of string

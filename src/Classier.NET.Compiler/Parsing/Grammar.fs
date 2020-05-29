@@ -100,7 +100,6 @@ type Expression =
     | TupleLit of Expression list
     | UnitLit
     | VarAssignment of Assignment
-    | VarDeclaration of Assignment
 and Assignment =
     { Target: Expression
       Value: Expression }
@@ -402,7 +401,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                 PrefixOperator<_,_,_>("!", ignored, 32, true, fun exp -> functionCall exp [] "not");
                 PrefixOperator<_,_,_>("-", ignored, 60, true, fun exp -> functionCall exp [] "negate");
                 InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Right, assignment VarAssignment);
-                InfixOperator<_,_,_>("=", ignored, 100, Associativity.Right, assignment VarDeclaration); // TODO: Remove this?
             ]
         |> Seq.iter expr.AddOperator
 
@@ -763,20 +761,16 @@ let parser: Parser<CompilationUnit, ParserState> =
                 tryBlock |>> TryStatement <?> "try statement"
                 
                 expression
+                .>> ignored
                 .>>. choice
                     [
-                        ignored
-                        >>. optional semicolon
-                        >>. ignored
-                        >>. followedBy rcurlybracket
-                        |> attempt
+                        followedBy rcurlybracket
                         >>. preturn Return
                         <?> "implicit return"
 
-                        ignored
-                        >>. semicolon
-                        |> attempt
+                        semicolon
                         >>. preturn IgnoredExpr
+                        <?> "ignored expression"
                     ]
                 |>> fun (expr, statement) -> statement expr;
             ]

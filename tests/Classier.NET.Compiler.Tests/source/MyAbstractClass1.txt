@@ -31,6 +31,6 @@ internal abstract class MyAbstractClass1 {
         java.lang.System.out.println(this);
     }
 
-    tester.doThingsWith(this);
+    tester.doThingsWith(this) // implicit return here.
   }
 }
