@@ -18,6 +18,7 @@ open System
 open System.Collections.Immutable
 open FParsec
 open Classier.NET.Compiler
+open Classier.NET.Compiler.ParserState
 
 [<Flags>]
 type NumType =
@@ -34,7 +35,6 @@ type NumLiteral =
       FracPart: char list
       IntPart: char list
       Type: NumType }
-
 
 type Expression =
     | CtorCall of
@@ -156,16 +156,6 @@ type CompilationUnit =
       Usings: Identifier list list }
 
 let parser: Parser<CompilationUnit, ParserState> =
-    let clearModifierFlags =
-        updateUserState (fun state -> { state with CurrentFlags = state.VisibilityFlags })
-    let setFlags flags =
-        updateUserState (fun state -> { state with CurrentFlags = state.CurrentFlags ||| flags })
-    let updateSymbolTable f p =
-        p .>>. getUserState
-        >>= fun (data, state) ->
-            let newState = { state with Symbols = f data state.Symbols }
-            setUserState newState >>. preturn data
-
     let colon = skipChar ':'
     let comma = skipChar ','
     let dquotes = skipChar '\"'
@@ -226,18 +216,17 @@ let parser: Parser<CompilationUnit, ParserState> =
             |> Seq.map (fun (str, vis) ->
                 skipString str
                 |> attempt
-                .>> setFlags vis)
+                .>> updateUserState (setFlags vis))
 
-        [
-            choice modifiers
-            .>> ignored1
-            |> attempt
-            .>> clearModifierFlags // TODO: Let some other function handle the clearing of flags.
-            <?> "access modifier"
+        choice
+            [
+                choice modifiers
+                .>> ignored1
+                |> attempt
+                <?> "access modifier"
 
-            setFlags Flags.Public
-        ]
-        |> choice
+                updateUserState (setFlags Flags.Public)
+            ]
 
     let typeAnnotation =
         ignored
@@ -255,7 +244,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         skipString name
         >>. ignored1
         |> attempt
-        >>. setFlags flag
+        >>. updateUserState (setFlags flag)
         |> optional
     
     let separator p = ignored >>. p .>> ignored
@@ -496,15 +485,15 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> rparen
 
     let variableDef = // TODO: Ensure that 'let' declarations always have a value in the declaration, ex: let myNum = 5.
-        clearModifierFlags
+        updateUserState newFlags
         >>. choice
             [
                 skipString "let"
-                skipString "var" >>. setFlags Flags.Mutable
+                skipString "var" >>. updateUserState (setFlags Flags.Mutable)
             ]
         .>> ignored1
         |> attempt
-        .>> setFlags Flags.Private
+        .>> updateUserState (setFlags Flags.Private)
         >>. identifierStr
         .>>. typeAnnotationOpt
         .>> ignored
@@ -515,10 +504,9 @@ let parser: Parser<CompilationUnit, ParserState> =
             >>. expression)
         .>> semicolon
         .>>. getUserState
+        .>> updateUserState popFlags
         |>> fun (((name, tann), expr), state) ->
-            { VarDef =
-                { Name = name
-                  Flags = state.CurrentFlags }
+            { VarDef = Definition.ofState name state
               Value = expr
               Type = tann }
 
@@ -804,7 +792,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
             "function body"
 
-    let functionDef =
+    let functionDef = // TODO: Ensure newFlags is called before modifiers or access modifiers are parsed.
         modifier "inline" Flags.Inline
         >>. getUserState
         .>>. identifierStr
@@ -816,12 +804,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. typeAnnotationOpt
         .>> ignored
         .>>. functionBody
-        |>> fun (((((st, name), gparams), fparams), retType), body) ->
+        |>> fun (((((state, name), gparams), fparams), retType), body) ->
             Function
                 { Body = body
-                  FuncDef =
-                    { Name = name
-                      Flags = st.CurrentFlags }
+                  FuncDef = Definition.ofState name state
                   GenericParams = gparams
                   Parameters = fparams
                   ReturnType = retType }
@@ -863,7 +849,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
         <?> "record definition"
         |>> fun (((state, name), gparams), members) ->
-            { Definition = state.CreateDefinition name
+            { Definition = Definition.ofState name state
               GenericParams = gparams
               InitBody = []
               Header = Record
@@ -889,7 +875,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
         <?> "discriminated union"
         |>> fun (((state, name), gparams), cases) ->
-            { Definition = state.CreateDefinition name
+            { Definition = Definition.ofState name state
               GenericParams = gparams
               Header = DUnion
               InitBody = []
@@ -912,7 +898,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     ]
             ]
         |>> (fun ((((state, name), gparams), iimpls), members) ->
-            { Definition = state.CreateDefinition name
+            { Definition = Definition.ofState name state
               GenericParams = gparams
               Header = Interface
               InitBody = []
@@ -958,7 +944,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. opt
             (accessModifier Flags.Private
-            >>. ignored
             >>. paramTuple
             .>> ignored)
         .>>. extends
@@ -971,7 +956,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
         <?> "class definition"
         |>> fun ((((((state, name), gparams), ctor), superclass), iimpls), (members, body)) ->
-            { Definition = state.CreateDefinition name
+            { Definition = Definition.ofState name state
               GenericParams = gparams
               Header = Class
                 { PrimaryCtor = ctor
@@ -995,7 +980,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
         <?> "module definition"
         |>> fun (((state, name), gparams), (members, body)) ->
-            { Definition = state.CreateDefinition name
+            { Definition = Definition.ofState name state
               GenericParams = gparams
               Header = Module
               InitBody = body
@@ -1008,12 +993,9 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored1
         |> attempt
         >>. sepBy1 identifierStr (separator period)
-        //|> updateSymbolTable (SymbolTable.addNamespace)
         >>= (fun names ->
-            (fun state ->
-                let table = state.Symbols |> SymbolTable.addNamespace names
-                let parent = names |> List.map(fun name -> { Name = name; GenericArgs = [] })
-                { state with CurrentParent = parent; Symbols = table })
+            updateSymbols (SymbolTable.addNamespace names)
+            >> pushParent (Identifier.ofStrings names)
             |> updateUserState
             >>. preturn names)
         .>> ignored

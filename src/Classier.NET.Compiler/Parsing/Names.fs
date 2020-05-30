@@ -41,3 +41,10 @@ and Identifier =
             let gargs = String.Join(", ", this.GenericArgs)
             sprintf "%s<%s>" this.Name gargs
 and GenericArg = TypeName
+
+module Identifier =
+    let ofStrings names =
+        names
+        |> List.map (fun name ->
+            { Name = name
+              GenericArgs = [] })

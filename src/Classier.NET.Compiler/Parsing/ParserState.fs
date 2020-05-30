@@ -14,22 +14,45 @@
 
 namespace Classier.NET.Compiler
 
-type Definition =
-    { Flags: Flags
-      Name: string }
+open System.Collections.Immutable
 
 type ParserState =
-    { CurrentFlags: Flags // TODO: Use a 'stack' of flags instead and push or pop as necessary.
-      CurrentParent: Identifier list
-      Symbols: SymbolTable<Identifier> }
+    { Flags: ImmutableStack<Flags>
+      Parents: ImmutableStack<Identifier list>
+      Symbols: SymbolTable }
 
-    static member Default =
-        { CurrentFlags = Flags.None
-          CurrentParent = List.empty
+module ParserState =
+    let defaultState =
+        { Flags = ImmutableStack.Empty
+          Parents = ImmutableStack.Empty
           Symbols = SymbolTable.empty }
 
-    member this.VisibilityFlags = this.CurrentFlags &&& Flags.VisibilityMask
+    let currentFlags state =
+        if state.Flags.IsEmpty
+        then Flags.None
+        else state.Flags.Peek()
 
-    member this.CreateDefinition name =
-        { Flags = this.CurrentFlags
-          Name = name }
+    let currentParent state =
+        if state.Parents.IsEmpty
+        then List.empty
+        else state.Parents.Peek()
+
+    let visibilityFlags state = currentFlags state &&& Flags.VisibilityMask
+
+    let pushFlags flags state = { state with Flags = state.Flags.Push(flags) }
+
+    let newFlags state = pushFlags Flags.None state
+
+    let pushParent parent state = { state with Parents = state.Parents.Push(parent) }
+
+    let popFlags state = { state with Flags = state.Flags.Pop() }
+
+    let setFlags flags state =
+        let newFlags = currentFlags state ||| flags
+        state
+        |> popFlags
+        |> pushFlags newFlags
+
+    let updateSymbols f state = { state with Symbols = f state.Symbols }
+
+    let clearParents state = { state with Parents = ImmutableStack.Empty }

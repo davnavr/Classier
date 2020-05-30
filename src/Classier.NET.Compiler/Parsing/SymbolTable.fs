@@ -29,22 +29,22 @@ type Symbol =
     | Namespace
     | Type
 
-type ResolvedSymbol<'Name> =
-    { FullName: 'Name list
+type ResolvedSymbol =
+    { FullName: Identifier list
       Origin: SymbolOrigin
       Symbol: Symbol }
 
-type UnknownSymbol<'Name> =
-    { Name: 'Name
+type UnknownSymbol =
+    { Name: Identifier
       PossibleTypes: Symbol list
-      PossibleParents: ResolvedSymbol<'Name> list }
+      PossibleParents: ResolvedSymbol list }
 
-type SymbolTable<'Name> =
-    { Namespaces: ImmutableSortedDictionary<string list, ResolvedSymbol<'Name> list> }
+type SymbolTable =
+    { Namespaces: ImmutableSortedDictionary<string list, ResolvedSymbol list> }
 
 module SymbolTable =
-    let empty<'Name> =
-        { Namespaces = ImmutableSortedDictionary.Empty } : SymbolTable<'Name>
+    let empty =
+        { Namespaces = ImmutableSortedDictionary.Empty } : SymbolTable
 
     let addNamespace ns table =
         let namespaces =
