@@ -30,6 +30,7 @@ namespace Classier.NET.Compiler.Parsing
         [InlineData("MyAbstractClass1.txt", "java.lang", "java.util")]
         [InlineData("MyException1.txt")]
         [InlineData("MyModule1.txt", "system.reflection.Assembly")]
+        [InlineData("NoAcessModifiers.txt", "System")]
         [Theory]
         public void ParserCorrectlySetsUsings(string name, params string[] usings)
         {

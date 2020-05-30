@@ -21,17 +21,17 @@ open Classier.NET.Compiler
 [<Flags>]
 type Flags =
     | None = 0uy
-    | Public = 0uy
-    | Internal = 1uy
-    | Protected = 2uy
-    | Private = 3uy
-    | VisibilityMask = 3uy
-    | Inline = 4uy
+    | Public = 1uy
+    | Internal = 2uy
+    | Protected = 3uy
+    | Private = 4uy
+    | VisibilityMask = 4uy
     | Abstract = 8uy
     /// Indicates that a class or local variable is mutable.
     | Mutable = 16uy
     /// Indicates that a class can have a subclass.
     | Inheritable = 32uy
+    | Inline = 64uy
 
 [<Flags>]
 type NumType =
@@ -156,8 +156,11 @@ and Function =
       GenericParams: GenericParam list
       Parameters: Param list list
       ReturnType: TypeName }
+and ClassHeader =
+    { PrimaryCtor: Constructor option
+      SuperClass: Identifier list }
 and TypeHeader =
-    | Class of Identifier list
+    | Class of ClassHeader
     | DUnion
     | Interface
     | Module
@@ -166,9 +169,20 @@ and TypeDef =
     { Definition: Definition
       GenericParams: GenericParam list
       Header: TypeHeader
+      InitBody: Statement list
       Interfaces: TypeName list
       Members: MemberDef list }
+and Constructor =
+    { BaseCall: ConstructorBase
+      Body: Statement list
+      CtorDef: Definition
+      Parameters: Param list }
+and ConstructorBase =
+    | NoCall
+    | SelfCall of Expression list
+    | SuperCall of Expression list
 and MemberDef =
+    | Ctor of Constructor
     | Field of Variable
     | Function of Function
     | Property of 
@@ -185,7 +199,7 @@ type CompilationUnit =
       Usings: Identifier list list }
 
 type ParserState =
-    { CurrentFlags: Flags
+    { CurrentFlags: Flags // TODO: Use a 'stack' of flags instead and push or pop as necessary.
       CurrentParent: Identifier list
       Symbols: SymbolTable<Identifier> }
 
@@ -202,14 +216,11 @@ type ParserState =
 
 let parser: Parser<CompilationUnit, ParserState> =
     let clearModifierFlags =
-        updateUserState (fun state ->
-            { state with CurrentFlags = state.VisibilityFlags })
+        updateUserState (fun state -> { state with CurrentFlags = state.VisibilityFlags })
     let setFlags flags =
-        (fun state -> { state with CurrentFlags = state.CurrentFlags ||| flags })
-        |> updateUserState
+        updateUserState (fun state -> { state with CurrentFlags = state.CurrentFlags ||| flags })
     let updateSymbolTable f p =
-        p
-        .>>. getUserState
+        p .>>. getUserState
         >>= fun (data, state) ->
             let newState = { state with Symbols = f data state.Symbols }
             setUserState newState >>. preturn data
@@ -231,7 +242,7 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let optList p = opt p |>> Option.defaultValue []
 
-    let accessModifier lowest =
+    let accessModifier lowest = // TODO: Make it optional
         let modifiers =
             [
                 "public", Flags.Public
@@ -536,7 +547,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. expression
         .>> rparen
 
-    let variableDef =
+    let variableDef = // TODO: Ensure that 'let' declarations always have a value in the declaration, ex: let myNum = 5.
         clearModifierFlags
         >>. choice
             [
@@ -573,7 +584,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>> semicolon
 
-    let matchCases =
+    let matchCases = // TODO: Redo pattern matching syntax, since colon should only be used for type annotations.
         let pattern =
             choice
                 [
@@ -877,7 +888,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored1
         |> attempt
         >>. getUserState
-        |>> fun state -> state.CreateDefinition
 
     let recordDef = // TODO: Allow methods and other members.
         typeDef "data" // TODO: Pick different keyword, "record" or "data class"?
@@ -904,9 +914,10 @@ let parser: Parser<CompilationUnit, ParserState> =
                 >>. methodDef;
             ]
         <?> "record definition"
-        |>> fun (((def, name), gparams), members) ->
-            { Definition = def name
+        |>> fun (((state, name), gparams), members) ->
+            { Definition = state.CreateDefinition name
               GenericParams = gparams
+              InitBody = []
               Header = Record
               Interfaces = []
               Members = members }
@@ -929,10 +940,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                     | _ -> DUnionCase (name, Some ctype)
             ]
         <?> "discriminated union"
-        |>> fun (((def, name), gparams), cases) ->
-            { Definition = def name
+        |>> fun (((state, name), gparams), cases) ->
+            { Definition = state.CreateDefinition name
               GenericParams = gparams
               Header = DUnion
+              InitBody = []
               Interfaces = []
               Members = cases }
 
@@ -951,10 +963,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                         methodDef
                     ]
             ]
-        |>> (fun ((((def, name), gparams), iimpls), members) ->
-            { Definition = def name
+        |>> (fun ((((state, name), gparams), iimpls), members) ->
+            { Definition = state.CreateDefinition name
               GenericParams = gparams
               Header = Interface
+              InitBody = []
               Interfaces = iimpls
               Members = members })
         <?> "interface definition"
@@ -995,6 +1008,11 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
+        .>>. opt
+            (accessModifier Flags.Private
+            >>. ignored
+            >>. paramTuple
+            .>> ignored)
         .>>. extends
         .>>. implements
         .>> ignored
@@ -1004,10 +1022,13 @@ let parser: Parser<CompilationUnit, ParserState> =
                 classNested
             ]
         <?> "class definition"
-        |>> fun (((((def, name), gparams), superclass), iimpls), (members, body)) ->
-            { Definition = def name
+        |>> fun ((((((state, name), gparams), ctor), superclass), iimpls), (members, body)) ->
+            { Definition = state.CreateDefinition name
               GenericParams = gparams
-              Header = Class superclass
+              Header = Class
+                { PrimaryCtor = ctor
+                  SuperClass = superclass }
+              InitBody = body
               Interfaces = iimpls
               Members = members }
 
@@ -1025,10 +1046,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                 functionDef <?> "function definition"
             ]
         <?> "module definition"
-        |>> fun (((def, name), gparams), (members, body)) ->
-            { Definition = def name
+        |>> fun (((state, name), gparams), (members, body)) ->
+            { Definition = state.CreateDefinition name
               GenericParams = gparams
               Header = Module
+              InitBody = body
               Interfaces = []
               Members = members }
 

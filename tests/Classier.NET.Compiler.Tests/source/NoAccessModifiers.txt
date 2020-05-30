@@ -1,0 +1,8 @@
+
+use System;
+
+class MyExample {
+  myMethod (myParam) {
+    printfn "Hello!"
+  }
+}
