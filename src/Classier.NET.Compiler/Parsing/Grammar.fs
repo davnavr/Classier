@@ -15,23 +15,9 @@
 module Classier.NET.Compiler.Parsing.Grammar
 
 open System
+open System.Collections.Immutable
 open FParsec
 open Classier.NET.Compiler
-
-[<Flags>]
-type Flags =
-    | None = 0uy
-    | Public = 1uy
-    | Internal = 2uy
-    | Protected = 3uy
-    | Private = 4uy
-    | VisibilityMask = 4uy
-    | Abstract = 8uy
-    /// Indicates that a class or local variable is mutable.
-    | Mutable = 16uy
-    /// Indicates that a class can have a subclass.
-    | Inheritable = 32uy
-    | Inline = 64uy
 
 [<Flags>]
 type NumType =
@@ -49,35 +35,6 @@ type NumLiteral =
       IntPart: char list
       Type: NumType }
 
-type Definition =
-    { Flags: Flags
-      Name: string }
-
-type TypeName =
-    | Identifier of Identifier list
-    | Inferred
-    | Tuple of TypeName list
-    | Union of TypeName list
-
-    override this.ToString() =
-        match this with
-        | Identifier names -> String.Join('.', names)
-        | Inferred -> "_"
-        | Tuple types ->
-            String.Join(", ", types)
-            |> sprintf "(%s)"
-        | Union options -> String.Join(" | ", options)
-and Identifier =
-    { Name: string
-      GenericArgs: GenericArg list }
-
-    override this.ToString() =
-        match this.GenericArgs with
-        | [] -> this.Name
-        | _ ->
-            let gargs = String.Join(", ", this.GenericArgs)
-            sprintf "%s<%s>" this.Name gargs
-and GenericArg = TypeName
 
 type Expression =
     | CtorCall of
@@ -198,22 +155,6 @@ type CompilationUnit =
       Namespace: string list
       Usings: Identifier list list }
 
-type ParserState =
-    { CurrentFlags: Flags // TODO: Use a 'stack' of flags instead and push or pop as necessary.
-      CurrentParent: Identifier list
-      Symbols: SymbolTable<Identifier> }
-
-    static member Default =
-        { CurrentFlags = Flags.None
-          CurrentParent = List.empty
-          Symbols = SymbolTable.empty }
-
-    member this.VisibilityFlags = this.CurrentFlags &&& Flags.VisibilityMask
-
-    member this.CreateDefinition name =
-        { Flags = this.CurrentFlags
-          Name = name }
-
 let parser: Parser<CompilationUnit, ParserState> =
     let clearModifierFlags =
         updateUserState (fun state -> { state with CurrentFlags = state.VisibilityFlags })
@@ -241,24 +182,6 @@ let parser: Parser<CompilationUnit, ParserState> =
     let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
     let optList p = opt p |>> Option.defaultValue []
-
-    let accessModifier lowest = // TODO: Make it optional
-        let modifiers =
-            [
-                "public", Flags.Public
-                "internal", Flags.Internal
-                "protected", Flags.Protected
-                "private", Flags.Private
-            ]
-            |> Seq.filter (fun (_, vis) -> vis <= lowest)
-            |> Seq.map (fun (str, vis) ->
-                skipString str
-                |> attempt
-                .>> setFlags vis)
-            |> choice
-        modifiers
-        .>> clearModifierFlags
-        <?> "access modifier"
 
     let classDef, classDefRef = createParserForwardedToRef<TypeDef,_>()
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
@@ -290,6 +213,31 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         |> skipMany
     let ignored1 = notEmpty ignored
+    
+    let accessModifier lowest =
+        let modifiers =
+            [
+                "public", Flags.Public
+                "internal", Flags.Internal
+                "protected", Flags.Protected
+                "private", Flags.Private
+            ]
+            |> Seq.filter (fun (_, vis) -> vis <= lowest)
+            |> Seq.map (fun (str, vis) ->
+                skipString str
+                |> attempt
+                .>> setFlags vis)
+
+        [
+            choice modifiers
+            .>> ignored1
+            |> attempt
+            .>> clearModifierFlags // TODO: Let some other function handle the clearing of flags.
+            <?> "access modifier"
+
+            setFlags Flags.Public
+        ]
+        |> choice
 
     let typeAnnotation =
         ignored
@@ -309,7 +257,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         >>. setFlags flag
         |> optional
-
+    
     let separator p = ignored >>. p .>> ignored
 
     let block p =
