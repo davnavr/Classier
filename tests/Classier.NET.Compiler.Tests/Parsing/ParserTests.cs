@@ -68,7 +68,7 @@ namespace Classier.NET.Compiler.Parsing
             using var stream = new EmbeddedSourceFile(name).GetStream();
 
             // Act
-            var error = (ParserResult<CompilationUnit, ParserState>.Failure)runParserOnStream(parser, ParserState.Default, name, stream, Encoding.UTF8);
+            var error = (ParserResult<CompilationUnit, ParserState>.Failure)runParserOnStream(parser, ParserStateModule.defaultState, name, stream, Encoding.UTF8);
 
             // Assert
             Assert.Contains(errorSubstring, error.Item1);

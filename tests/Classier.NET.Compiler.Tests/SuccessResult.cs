@@ -37,7 +37,7 @@ namespace Classier.NET.Compiler
         }
 
         public SuccessResult(FSharpFunc<CharStream<ParserState>, Reply<CompilationUnit>> parser, Stream stream, string streamName, Encoding encoding)
-            : this(() => runParserOnStream(parser, ParserState.Default, streamName, stream, encoding))
+            : this(() => runParserOnStream(parser, ParserStateModule.defaultState, streamName, stream, encoding))
         {
         }
 

@@ -15,7 +15,6 @@
 module Classier.NET.Compiler.Parsing.Grammar
 
 open System
-open System.Collections.Immutable
 open FParsec
 open Classier.NET.Compiler
 open Classier.NET.Compiler.ParserState
@@ -135,7 +134,6 @@ and Constructor =
       CtorDef: Definition
       Parameters: Param list }
 and ConstructorBase =
-    | NoCall
     | SelfCall of Expression list
     | SuperCall of Expression list
 and MemberDef =
@@ -178,7 +176,7 @@ let parser: Parser<CompilationUnit, ParserState> =
     let ifStatement, ifStatementRef = createParserForwardedToRef<If,_>()
     let matchStatement, matchStatementRef = createParserForwardedToRef<Match,_>()
     let tryBlock, tryBlockRef = createParserForwardedToRef<Try,_>()
-    let tuple, tupleRef = createParserForwardedToRef<Expression list,_>()
+    let tupleExpr, tupleExprRef = createParserForwardedToRef<Expression list,_>()
     let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
     let statement, statementRef = createParserForwardedToRef<Statement,_>()
 
@@ -218,13 +216,12 @@ let parser: Parser<CompilationUnit, ParserState> =
                 |> attempt
                 .>> updateUserState (setFlags vis))
 
+        choice modifiers <?> "access modifier"
+
+    let accessModifierOpt lowest =
         choice
             [
-                choice modifiers
-                .>> ignored1
-                |> attempt
-                <?> "access modifier"
-
+                accessModifier lowest
                 updateUserState (setFlags Flags.Public)
             ]
 
@@ -345,7 +342,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     |>> StrLit
                     <?> "string literal"
 
-                    tuple
+                    tupleExpr
                     <?> "tuple"
                     |>> (fun ex ->
                         match ex with
@@ -368,7 +365,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     |> attempt
                     >>. opt identifierFull
                     .>> ignored
-                    .>>. (tuple <?> "constructor arguments")
+                    .>>. (tupleExpr <?> "constructor arguments")
                     <?> "constructor call"
                     |>> (fun (ctype, args) ->
                         CtorCall
@@ -460,7 +457,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                                 t
                                 members
                 let funcCall =
-                    tuple
+                    tupleExpr
                     .>> ignored
                     |> many1 <?>
                     "argument list"
@@ -559,7 +556,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> block
         <?> "cases"
 
-    tupleRef :=
+    tupleExprRef :=
         lparen
         |> attempt
         >>. ignored
@@ -792,7 +789,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             ]
             "function body"
 
-    let functionDef = // TODO: Ensure newFlags is called before modifiers or access modifiers are parsed.
+    let functionDef =
         modifier "inline" Flags.Inline
         >>. getUserState
         .>>. identifierStr
@@ -906,6 +903,7 @@ let parser: Parser<CompilationUnit, ParserState> =
               Members = members })
         <?> "interface definition"
 
+    /// Allows both members and statements.
     let memberBlockInit members =
         blockChoice
             [
@@ -932,6 +930,14 @@ let parser: Parser<CompilationUnit, ParserState> =
             members, body
 
     let classNested = classDef <?> "nested class" |>> NestedType
+    let classPrimaryCtor =
+        accessModifierOpt Flags.Private
+        >>. ignored
+        >>. opt (paramTuple .>> ignored)
+    let classExtends =
+        extends
+        .>>. optList (tupleExpr .>> ignored)
+        .>> ignored
 
     classDefRef :=
         modifier "abstract" Flags.Abstract
@@ -942,11 +948,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
-        .>>. opt
-            (accessModifier Flags.Private
-            >>. paramTuple
-            .>> ignored)
-        .>>. extends
+        .>>. classPrimaryCtor
+        .>>. classExtends
         .>>. implements
         .>> ignored
         .>>. memberBlockInit
@@ -955,11 +958,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                 classNested
             ]
         <?> "class definition"
-        |>> fun ((((((state, name), gparams), ctor), superclass), iimpls), (members, body)) ->
+        |>> fun ((((((state, name), gparams), ctorParams), (superclass, baseArgs)), iimpls), (members, body)) ->
             { Definition = Definition.ofState name state
               GenericParams = gparams
               Header = Class
-                { PrimaryCtor = ctor
+                { PrimaryCtor = None
                   SuperClass = superclass }
               InitBody = body
               Interfaces = iimpls
@@ -1024,6 +1027,7 @@ let parser: Parser<CompilationUnit, ParserState> =
          .>> ignored
          |> many1)
     .>> eof
+    .>> updateUserState (clearAllFlags >> clearAllParents)
     |>> fun ((ns, uses), defs) ->
         { TypeDefs = defs
           Namespace = ns

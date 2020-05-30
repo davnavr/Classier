@@ -45,7 +45,10 @@ module ParserState =
 
     let pushParent parent state = { state with Parents = state.Parents.Push(parent) }
 
-    let popFlags state = { state with Flags = state.Flags.Pop() }
+    let popFlags state =
+        if state.Flags.IsEmpty
+        then state
+        else { state with Flags = state.Flags.Pop() }
 
     let setFlags flags state =
         let newFlags = currentFlags state ||| flags
@@ -55,4 +58,5 @@ module ParserState =
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
 
-    let clearParents state = { state with Parents = ImmutableStack.Empty }
+    let clearAllParents state = { state with Parents = ImmutableStack.Empty }
+    let clearAllFlags state = { state with Flags = ImmutableStack.Empty }
