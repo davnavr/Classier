@@ -28,6 +28,8 @@ namespace Classier.NET.Compiler
 
         public EmbeddedSourceFile(string name) => this.resource = "Classier.NET.Compiler.source." + name;
 
-        public Stream GetStream() => typeof(EmbeddedSourceFile).Assembly.GetManifestResourceStream(this.resource);
+        public Stream GetStream() =>
+            typeof(EmbeddedSourceFile).Assembly.GetManifestResourceStream(this.resource)
+            ?? throw new InvalidOperationException($"Unable to find resource {this.resource}");
     }
 }

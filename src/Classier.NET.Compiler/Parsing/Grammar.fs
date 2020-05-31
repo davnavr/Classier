@@ -36,6 +36,7 @@ type NumLiteral =
       Type: NumType }
 
 type Expression =
+    | AnonFunc of Function
     | CtorCall of
         {| Arguments: Expression list
            Type: TypeName |}
@@ -66,13 +67,12 @@ and Match =
       Cases: MatchCase list }
 and MatchCase =
     { Body: Statement list
-      Patterns: MatchPattern list }
-and MatchPattern =
+      Patterns: Pattern list }
+and Pattern =
     | Constant of Expression
-    | CasePattern of
-        {| CaseName: Identifier list
-           Values: string option list |}
     | Default
+    | TuplePattern of Param list
+    | VarPattern of string * TypeName
 and Statement =
     | Empty
     | IfStatement of If
@@ -91,8 +91,8 @@ and Try =
       Handlers: MatchCase list
       Finally: Statement list }
 and Variable =
-    { VarDef: Definition
-      Type: TypeName
+    { Pattern: Pattern
+      VarFlags: Flags
       Value: Expression option }
 and Param =
     { Name: string
@@ -201,7 +201,14 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         |> skipMany
     let ignored1 = notEmpty ignored
+    let ignored1OrSep =
+        choice
+            [
+                ignored1
+                followedBy lparen
+            ]
     
+    let defaultAccess = updateUserState (setFlags Flags.Public)
     let accessModifier lowest =
         let modifiers =
             [
@@ -217,12 +224,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                 .>> updateUserState (setFlags vis))
 
         choice modifiers <?> "access modifier"
-
     let accessModifierOpt lowest =
         choice
             [
                 accessModifier lowest
-                updateUserState (setFlags Flags.Public)
+                defaultAccess
             ]
 
     let typeAnnotation =
@@ -244,7 +250,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. updateUserState (setFlags flag)
         |> optional
     
-    let separator p = ignored >>. p .>> ignored
+    let separator p = ignored >>. attempt p .>> ignored
 
     let block p =
         lcurlybracket
@@ -274,8 +280,11 @@ let parser: Parser<CompilationUnit, ParserState> =
         |>> String.Concat
         <?> "identifier"
     let identifierList =
-        sepBy1 identifier (separator period)
-    let identifierFull = identifierList |>> Identifier
+        sepBy1 identifier (separator period |> attempt)
+    let identifierFull =
+        identifierList
+        |>> Identifier
+        <?> "fully qualified identifier"
 
     let paramTuple =
         lparen
@@ -289,6 +298,11 @@ let parser: Parser<CompilationUnit, ParserState> =
                 (separator comma)
         .>> rparen
         <?> "parameters"
+    let paramTupleList =
+        paramTuple
+        .>> ignored
+        |> many1
+        <?> "parameter list"
 
     let expression =
         let decimalChars = [ '0'..'9' ]
@@ -474,38 +488,17 @@ let parser: Parser<CompilationUnit, ParserState> =
                     (fun prev next -> next prev)
                     target
         exprParser
-    let expressionInParens =
+    let expressionInParens = // NOTE: Tuples might not parse correctly here.
         lparen
         |> attempt
         >>. ignored
         >>. expression
         .>> rparen
-
-    let variableDef = // TODO: Ensure that 'let' declarations always have a value in the declaration, ex: let myNum = 5.
-        updateUserState newFlags
-        >>. choice
-            [
-                skipString "let"
-                skipString "var" >>. updateUserState (setFlags Flags.Mutable)
-            ]
-        .>> ignored1
+    let equalsExpression =
+        opequal
         |> attempt
-        .>> updateUserState (setFlags Flags.Private)
-        >>. identifierStr
-        .>>. typeAnnotationOpt
-        .>> ignored
-        .>>. opt
-            (opequal
-            |> attempt
-            >>. ignored
-            >>. expression)
-        .>> semicolon
-        .>>. getUserState
-        .>> updateUserState popFlags
-        |>> fun (((name, tann), expr), state) ->
-            { VarDef = Definition.ofState name state
-              Value = expr
-              Type = tann }
+        >>. ignored
+        >>. expression
 
     let lambdaBody =
         lambdaOperator
@@ -517,32 +510,37 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>> semicolon
 
+    let pattern =
+        [
+            identifierStr
+            .>> ignored
+            .>>. typeAnnotationOpt
+            |>> VarPattern
+            <?> "variable pattern"
+
+            paramTuple
+            |>> TuplePattern
+            <?> "tuple deconstruction"
+        ]
+        |> choice
+
     let matchCases = // TODO: Redo pattern matching syntax, since colon should only be used for type annotations.
-        let pattern =
-            choice
-                [
+        let matchPattern =
+            [
+                pattern
 
-                    identifierList
-                    .>> ignored
-                    .>> lparen
-                    .>> ignored
-                    .>>. sepBy1
-                        (choice [ underscore >>. preturn None; identifierStr |>> Some ])
-                        (separator comma)
-                    .>> rparen
-                    <?> "case pattern"
-                    |>> fun (name, values) ->
-                        CasePattern
-                            {| CaseName = name
-                               Values = values |}
+                expression
+                |>> Constant
+                <?> "constant pattern"
 
-                    expression |>> Constant
-
-                    underscore
-                    >>. ignored
-                    >>. preturn Default
-                ]
-        sepBy1 pattern (separator comma)
+                underscore
+                >>. ignored
+                |> attempt
+                >>. preturn Default
+                <?> "default pattern"
+            ]
+            |> choice
+        sepBy1 matchPattern (separator comma)
         .>> ignored
         .>> colon
         |> attempt
@@ -568,7 +566,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             [
                 sepBy1
                     identifierFull
-                    (pchar '|' |> separator)
+                    (pchar '|' |> separator |> attempt)
                 |>> fun tlist ->
                     match tlist with
                     | [ one ] -> one
@@ -640,10 +638,73 @@ let parser: Parser<CompilationUnit, ParserState> =
                 semicolon
                 >>. preturn Empty
                 <?> "empty statement";
+                
+                skipString "var"
+                >>. ignored1OrSep
+                |> attempt
+                >>. updateUserState newFlags
+                >>. updateUserState (setFlags Flags.Mutable)
+                >>. pattern
+                .>> ignored
+                .>>. opt (equalsExpression .>> ignored .>> semicolon)
+                .>>. getUserState
+                .>> updateUserState popFlags
+                |>> (fun ((p, value), state) ->
+                    LocalVar
+                        { Pattern = p
+                          VarFlags = ParserState.currentFlags state
+                          Value = value })
+                <?> "mutable variable"
 
-                variableDef
+                skipString "let"
+                >>. ignored1OrSep
+                |> attempt
+                >>. updateUserState newFlags
+                >>. pattern
+                .>> ignored
+                .>>. getUserState
+                >>= (fun (p, state) ->
+                    let value =
+                        equalsExpression
+                        |> attempt
+                        .>> ignored
+                        .>> semicolon
+                    let rest =
+                        (match p with
+                        | VarPattern (name, vtype) ->
+                            match vtype with
+                            | Inferred ->
+                                [
+                                    value
+
+                                    paramTupleList
+                                    .>> ignored
+                                    .>>. typeAnnotationOpt
+                                    .>> ignored
+                                    .>>. (statementBlock <?> "local function body")
+                                    |>> fun ((parameters, retType), body) ->
+                                        { Body = body 
+                                          FuncDef =
+                                            { Name = name
+                                              Flags = ParserState.currentFlags state }
+                                          GenericParams = []
+                                          Parameters = parameters
+                                          ReturnType = retType }
+                                        |> AnonFunc
+                                ]
+                                |> choice
+                                |> Some
+                            | _ -> None
+                        | _ -> None)
+                    rest
+                    |> Option.defaultValue value
+                    |>> fun value ->
+                        { Pattern = p
+                          VarFlags = ParserState.currentFlags state
+                          Value = Some value })
+                .>> updateUserState popFlags
+                <?> "local variable or function"
                 |>> LocalVar
-                <?> "local variable";
 
                 skipString "while"
                 >>. ignored
@@ -654,7 +715,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 .>> ignored
                 .>>. statementBlock
                 |>> While
-                <?> "while loop";
+                <?> "while loop"
 
                 skipString "return"
                 >>. ignored1
@@ -663,7 +724,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 |>> Return
                 <?> "return statement"
                 .>> ignored
-                .>> semicolon;
+                .>> semicolon
 
                 skipString "throw"
                 >>. choice
@@ -699,7 +760,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                         >>. preturn IgnoredExpr
                         <?> "ignored expression"
                     ]
-                |>> fun (expr, statement) -> statement expr;
+                |>> fun (expr, statement) -> statement expr
             ]
             "statement"
 
@@ -796,7 +857,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. genericParams
         .>> ignored
-        .>>. (paramTuple .>> ignored |> many1 <?> "parameter list")
+        .>>. paramTupleList
         |> attempt
         .>>. typeAnnotationOpt
         .>> ignored
@@ -819,39 +880,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored1
         |> attempt
         >>. getUserState
-
-    let recordDef = // TODO: Allow methods and other members.
-        typeDef "data" // TODO: Pick different keyword, "record" or "data class"?
-        .>>. identifierStr
-        .>>. genericParams
-        .>> ignored
-        .>>. blockChoice
-            [
-                identifierStr
-                .>>. typeAnnotation
-                .>> ignored
-                .>> semicolon
-                <?> "record field"
-                |>> fun (name, ftype) ->
-                    Field
-                        { VarDef =
-                            { Name = name
-                              Flags = Flags.Public }
-                          Value = None
-                          Type = ftype }
-
-                accessModifier Flags.Private
-                >>. ignored1
-                >>. methodDef;
-            ]
-        <?> "record definition"
-        |>> fun (((state, name), gparams), members) ->
-            { Definition = Definition.ofState name state
-              GenericParams = gparams
-              InitBody = []
-              Header = Record
-              Interfaces = []
-              Members = members }
 
     let unionDef = // TODO: Replace dunion with case classes like in Scala or do what Kotlin does https://www.howtobuildsoftware.com/index.php/how-do/SmZ/kotlin-discriminated-union-kotlin-and-discriminated-unions-sum-types
         typeDef "union" // TODO: Pick better keyword to use than "union".
@@ -939,6 +967,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. optList (tupleExpr .>> ignored)
         .>> ignored
 
+    // TODO: Add "data class" which are records
     classDefRef :=
         modifier "abstract" Flags.Abstract
         >>. modifier "inheritable" Flags.Inheritable
@@ -975,7 +1004,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. memberBlockInit
             [
-                recordDef |>> NestedType
                 unionDef |>> NestedType
                 interfaceDef |>> NestedType
                 classNested
@@ -1021,7 +1049,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                  classDef
                  interfaceDef
                  moduleDef
-                 recordDef
                  unionDef
              ]
          .>> ignored

@@ -17,6 +17,9 @@ namespace Classier.NET.Compiler
 open System
 
 type TypeName =
+    | FuncType of
+        {| ParamType: TypeName
+           ReturnType: TypeName |}
     | Identifier of Identifier list
     | Inferred
     | Tuple of TypeName list
@@ -24,11 +27,10 @@ type TypeName =
 
     override this.ToString() =
         match this with
+        | FuncType f -> sprintf "%A => %A" (f.ParamType) (f.ReturnType)
         | Identifier names -> String.Join('.', names)
         | Inferred -> "_"
-        | Tuple types ->
-            String.Join(", ", types)
-            |> sprintf "(%s)"
+        | Tuple types -> sprintf "(%s)" (String.Join(", ", types))
         | Union options -> String.Join(" | ", options)
 and Identifier =
     { Name: string

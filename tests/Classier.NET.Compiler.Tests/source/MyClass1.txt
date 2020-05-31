@@ -28,6 +28,9 @@ public class MyClass1 {
     {
         let myLocal = (1 + 2) / 3;
         Console.WriteLine();
+
+        let (one, two) = (1, "tuple deconstruction");
+
         1 + 2 // An implicit return value
     }
 

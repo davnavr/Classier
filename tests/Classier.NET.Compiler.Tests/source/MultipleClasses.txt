@@ -2,11 +2,11 @@
 public class Class1(arg1) {
   printfn(arg1.toString());
 
-  match (arg1) {
+  /*match (arg1) {
     1 : 3;
     3, 4 : 5;
     _ : 0;
-  }
+  }*/
 }
 
 /**
@@ -23,7 +23,7 @@ public interface Interface1 {
 /// Or maybe this style is better?
 public class Class3 implements Interface1 {
   private class Nested {
-    let parent: Class3;
+    var parent: Class3;
   }
 }
 
