@@ -510,7 +510,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         ]
         |> choice
 
-    let matchCases = // TODO: Redo pattern matching syntax, since colon should only be used for type annotations.
+    let matchCases =
         let matchPattern =
             [
                 pattern
@@ -526,9 +526,9 @@ let parser: Parser<CompilationUnit, ParserState> =
                 <?> "default pattern"
             ]
             |> choice
-        sepBy1 matchPattern (separator comma)
+        sepBy1 matchPattern (separator comma |> attempt)
         .>> ignored
-        .>> colon
+        .>> lambdaOperator
         |> attempt
         .>> ignored
         .>>. expression

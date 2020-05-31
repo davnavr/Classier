@@ -2,11 +2,13 @@
 public class Class1(arg1) {
   printfn(arg1.toString());
 
-  /*match (arg1) {
-    1 : 3;
-    3, 4 : 5;
-    _ : 0;
-  }*/
+  match (arg1) {
+    1 => 3;
+    3, 4 => 5;
+    thing => 6;
+    (one, two) => 7;
+    _ => 0;
+  }
 }
 
 /**
