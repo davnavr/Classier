@@ -10,6 +10,7 @@ type TypeName =
     | Inferred
     | Tuple of TypeName list
     | Union of TypeName list
+    | Unit
 
     override this.ToString() =
         match this with
@@ -18,6 +19,7 @@ type TypeName =
         | Inferred -> "_"
         | Tuple types -> sprintf "(%s)" (String.Join(", ", types))
         | Union options -> String.Join(" | ", options)
+        | Unit -> "()"
 and Identifier =
     { Name: string
       GenericArgs: GenericArg list }

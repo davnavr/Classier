@@ -94,7 +94,7 @@ and GenericParam =
       Variance: GenericVariance }
 and Function =
     { Body: Statement list
-      FuncDef: Definition
+      FuncDef: Definition option
       GenericParams: GenericParam list
       Parameters: Param list list
       ReturnType: TypeName }
@@ -342,6 +342,22 @@ let parser: Parser<CompilationUnit, ParserState> =
                     |>> StrLit
                     <?> "string literal"
 
+                    paramTuple
+                    .>> ignored
+                    .>> ignored
+                    .>> lambdaOperator
+                    |> attempt
+                    .>> ignored
+                    .>>. exprParser
+                    <?> "anonymous function"
+                    |>> fun (parameters, retVal) ->
+                        { Body = [ Return retVal ]
+                          FuncDef = None
+                          GenericParams = []
+                          Parameters = [ parameters ]
+                          ReturnType = Inferred }
+                        |> AnonFunc
+
                     tupleExpr
                     <?> "tuple"
                     |>> (fun ex ->
@@ -565,8 +581,10 @@ let parser: Parser<CompilationUnit, ParserState> =
                     lparen
                     rparen
                     (sepBy typeName (separator comma))
-                |>> Tuple
-                <?> "tuple";
+                <?> "tuple"
+                |>> function
+                | [] -> Unit
+                | items -> Tuple items
             ]
             "type name"
         .>>. opt
@@ -683,6 +701,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                                           FuncDef =
                                             { Name = name
                                               Flags = ParserState.currentFlags state }
+                                            |> Some
                                           GenericParams = []
                                           Parameters = parameters
                                           ReturnType = retType }
@@ -861,7 +880,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |>> fun (((((state, name), gparams), fparams), retType), body) ->
             Function
                 { Body = body
-                  FuncDef = Definition.ofState name state
+                  FuncDef = Some (Definition.ofState name state)
                   GenericParams = gparams
                   Parameters = fparams
                   ReturnType = retType }
