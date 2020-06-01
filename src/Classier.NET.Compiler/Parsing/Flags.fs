@@ -14,3 +14,4 @@ type Flags =
     /// Indicates that a class can have a subclass.
     | Inheritable = 32uy
     | Inline = 64uy
+    | Override = 128uy

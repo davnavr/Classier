@@ -42,6 +42,12 @@ public module Math {
 
     public data class MyRecord (item1: string, item2: int, item3: Some.Fancy.Item);
 
+    public data class RecordWithMembers (item4: boolean) {
+        public myOtherMember () {
+          return item4;
+        }
+    }
+
     internal aUnionTest (pickOne: string | int | null) {
         // These are statements
         if (Math.badFormatting.thisWillNotCompileButIsSyntacticallyCorrect()) {
@@ -53,8 +59,10 @@ public module Math {
         else {
         }
 
-        // This is an expression (implicit return).
         let testValue = if (true) {1} else {2};
+        
+        // This is an expression (implicit return).
+        testValue
     }
 
     public functionTest (f: int => int) {

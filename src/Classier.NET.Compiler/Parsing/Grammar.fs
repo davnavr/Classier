@@ -306,6 +306,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         let assignment t target value = t { Target = target; Value = value }
 
         let strChar = manySatisfy (fun c -> c <> '\\' && c <> '"')
+        // TODO: Check that the correct character is used when parsing escape sequences, and allow stuff like \n or \r.
         let strEscaped = skipString "\\u" >>. parray 4 hex |>> String
 
         [
@@ -591,7 +592,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     (sepBy typeName (separator comma))
                 <?> "tuple"
                 |>> function
-                | [] -> Unit
+                | [] -> Primitive PrimitiveType.Unit
                 | items -> Tuple items
             ]
             "type name"
@@ -674,7 +675,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 |>> (fun ((p, value), state) ->
                     LocalVar
                         { Pattern = p
-                          VarFlags = ParserState.currentFlags state
+                          VarFlags = currentFlags state
                           Value = value })
                 <?> "mutable variable"
 
@@ -708,7 +709,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                                         { Body = body 
                                           FuncDef =
                                             { Name = name
-                                              Flags = ParserState.currentFlags state }
+                                              Flags = currentFlags state }
                                             |> Some
                                           GenericParams = []
                                           Parameters = parameters
@@ -723,7 +724,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                     |> Option.defaultValue value
                     |>> fun value ->
                         { Pattern = p
-                          VarFlags = ParserState.currentFlags state
+                          VarFlags = currentFlags state
                           Value = Some value })
                 .>> updateUserState popFlags
                 <?> "local variable or function"
@@ -912,13 +913,16 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. blockChoice
             [
-                accessModifier Flags.Internal
+                updateUserState newFlags
+                >>. accessModifier Flags.Internal
                 >>. ignored1
+                |> attempt
                 >>. choice
                     [
                         methodDef
                         nestedTypes
                     ]
+                .>> updateUserState popFlags
             ]
         |>> (fun ((((state, name), gparams), iimpls), members) ->
             { Definition = Definition.ofState name state
@@ -933,10 +937,12 @@ let parser: Parser<CompilationUnit, ParserState> =
     let memberBlockInit members =
         blockChoice
             [
-                accessModifier Flags.Private
+                updateUserState newFlags
+                >>. accessModifier Flags.Private
                 >>. ignored1
                 |> attempt
                 >>. choice members
+                .>> updateUserState popFlags
                 |>> LocalMember
 
                 statement
@@ -955,14 +961,13 @@ let parser: Parser<CompilationUnit, ParserState> =
                     | _ -> Some s)
             members, body
 
-    // TODO: Add "data class" which are records
     let classDef =
         let primaryCtor =
-            updateUserState ParserState.newFlags
+            updateUserState newFlags
             >>. accessModifierOpt Flags.Private
             >>. ignored
             >>. getUserState
-            .>> updateUserState ParserState.popFlags
+            .>> updateUserState popFlags
             .>>. optList (paramTuple .>> ignored)
         let classExtends =
             extends
@@ -975,7 +980,16 @@ let parser: Parser<CompilationUnit, ParserState> =
                 "inheritable", Flags.Inheritable
                 "mutable", Flags.Mutable
             ]
-        >>. typeDef "class"
+        >>. choice
+            [
+                skipString "data"
+                >>. ignored1
+                |> attempt
+                >>. preturn true
+
+                preturn false
+            ]
+        .>>. typeDef "class"
         |> attempt
         .>>. identifierStr
         .>>. genericParams
@@ -995,7 +1009,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 semicolon >>. preturn ([], [])
             ]
         <?> "class definition"
-        |>> fun ((((((state, name), gparams), (ctorState, ctorParams)), (superclass, baseArgs)), iimpls), (members, body)) ->
+        |>> fun (((((((isRecord, state), name), gparams), (ctorState, ctorParams)), (superclass, baseArgs)), iimpls), (members, body)) ->
             let primaryCtor =
                 let ctor flags =
                     { BaseCall = SuperCall baseArgs
@@ -1004,7 +1018,31 @@ let parser: Parser<CompilationUnit, ParserState> =
                       Parameters = ctorParams }
                 match ctorParams with
                 | [] -> ctor Flags.Public
-                | _ -> ctor (ParserState.currentFlags ctorState)
+                | _ -> ctor (currentFlags ctorState)
+            let recordMembers () =
+                ctorParams
+                |> List.map (fun p ->
+                    { Body = [ { Name = p.Name; GenericArgs = [] } |> IdentifierRef |> Return ]
+                      FuncDef =
+                        { Flags = Flags.Public
+                          Name = p.Name }
+                        |> Some
+                      GenericParams = []
+                      Parameters = []
+                      ReturnType = p.Type }
+                    |> Function)
+                |> List.append
+                    [
+                        { Body = []
+                          FuncDef =
+                            { Flags = Flags.Public ||| Flags.Override
+                              Name = "equals" }
+                            |> Some
+                          GenericParams = []
+                          Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
+                          ReturnType = Primitive PrimitiveType.Boolean }
+                        |> Function
+                    ]
 
             { Definition = Definition.ofState name state
               GenericParams = gparams
@@ -1013,7 +1051,10 @@ let parser: Parser<CompilationUnit, ParserState> =
                   SuperClass = superclass }
               InitBody = body
               Interfaces = iimpls
-              Members = members }
+              Members =
+                if isRecord
+                then members @ recordMembers()
+                else members }
 
     let moduleDef =
         typeDef "module"
@@ -1067,8 +1108,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> semicolon
         <?> "use statement"
         .>> ignored)
-    .>>. (accessModifier Flags.Internal
+    .>>. (updateUserState newFlags
+         >>. accessModifier Flags.Internal
          >>. ignored1
+         |> attempt
          >>. choice
              [
                  classDef
@@ -1076,6 +1119,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                  moduleDef
              ]
          .>> ignored
+         .>> updateUserState popFlags
          |> many1)
     .>> eof
     .>> updateUserState (clearAllFlags >> clearAllParents)

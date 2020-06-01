@@ -2,24 +2,34 @@
 
 open System
 
+[<RequireQualifiedAccess>]
+type PrimitiveType =
+    | Boolean
+    | Unit
+
+    override this.ToString() =
+        match this with
+        | Boolean -> "boolean"
+        | Unit -> "()"
+
 type TypeName =
     | FuncType of
         {| ParamType: TypeName
            ReturnType: TypeName |}
     | Identifier of Identifier list
     | Inferred
+    | Primitive of PrimitiveType
     | Tuple of TypeName list
     | Union of TypeName list
-    | Unit
 
     override this.ToString() =
         match this with
         | FuncType f -> sprintf "%A => %A" (f.ParamType) (f.ReturnType)
         | Identifier names -> String.Join('.', names)
         | Inferred -> "_"
+        | Primitive p -> p.ToString()
         | Tuple types -> sprintf "(%s)" (String.Join(", ", types))
         | Union options -> String.Join(" | ", options)
-        | Unit -> "()"
 and Identifier =
     { Name: string
       GenericArgs: GenericArg list }
