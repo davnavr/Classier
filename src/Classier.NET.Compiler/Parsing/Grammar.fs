@@ -99,7 +99,7 @@ and Function =
       Parameters: Param list list
       ReturnType: TypeName }
 and ClassHeader =
-    { PrimaryCtor: Constructor option
+    { PrimaryCtor: Constructor
       SuperClass: Identifier list }
 and TypeHeader =
     | Class of ClassHeader
@@ -117,7 +117,7 @@ and TypeDef =
 and Constructor =
     { BaseCall: ConstructorBase
       Body: Statement list
-      CtorDef: Definition
+      CtorFlags: Flags
       Parameters: Param list }
 and ConstructorBase =
     | SelfCall of Expression list
@@ -896,8 +896,9 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         >>. getUserState
 
-    let unionDef = // TODO: Replace dunion with case classes like in Scala or do what Kotlin does https://www.howtobuildsoftware.com/index.php/how-do/SmZ/kotlin-discriminated-union-kotlin-and-discriminated-unions-sum-types
-        typeDef "union" // TODO: Pick better keyword to use than "union".
+    // TODO: Replace dunion with case classes like in Scala or do what Kotlin does https://www.howtobuildsoftware.com/index.php/how-do/SmZ/kotlin-discriminated-union-kotlin-and-discriminated-unions-sum-types
+    let unionDef =
+        typeDef "union"
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
@@ -959,7 +960,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 statement
             ]
         |>> fun st ->
-            let members = // TODO: Optimize this?
+            let members =
                 st
                 |> List.choose (function
                     | LocalMember m -> Some m
@@ -974,9 +975,12 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let classNested = classDef <?> "nested class" |>> NestedType
     let classPrimaryCtor =
-        accessModifierOpt Flags.Private
+        updateUserState ParserState.newFlags
+        >>. accessModifierOpt Flags.Private
         >>. ignored
-        >>. opt (paramTuple .>> ignored)
+        >>. getUserState
+        .>> updateUserState ParserState.popFlags
+        .>>. optList (paramTuple .>> ignored)
     let classExtends =
         extends
         .>>. optList (tupleExpr .>> ignored)
@@ -1002,11 +1006,21 @@ let parser: Parser<CompilationUnit, ParserState> =
                 classNested
             ]
         <?> "class definition"
-        |>> fun ((((((state, name), gparams), ctorParams), (superclass, baseArgs)), iimpls), (members, body)) ->
+        |>> fun ((((((state, name), gparams), (ctorState, ctorParams)), (superclass, baseArgs)), iimpls), (members, body)) ->
+            let primaryCtor =
+                let ctor flags =
+                    { BaseCall = SuperCall baseArgs
+                      Body = body
+                      CtorFlags = flags
+                      Parameters = ctorParams }
+                match ctorParams with
+                | [] -> ctor Flags.Public
+                | _ -> ctor (ParserState.currentFlags ctorState)
+
             { Definition = Definition.ofState name state
               GenericParams = gparams
               Header = Class
-                { PrimaryCtor = None
+                { PrimaryCtor = primaryCtor
                   SuperClass = superclass }
               InitBody = body
               Interfaces = iimpls
