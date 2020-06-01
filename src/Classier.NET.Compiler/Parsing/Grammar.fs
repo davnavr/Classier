@@ -157,10 +157,10 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let optList p = opt p |>> Option.defaultValue []
 
-    let classDef, classDefRef = createParserForwardedToRef<TypeDef,_>()
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
     let ifStatement, ifStatementRef = createParserForwardedToRef<If,_>()
     let matchStatement, matchStatementRef = createParserForwardedToRef<Match,_>()
+    let nestedTypes, nestedTypesRef = createParserForwardedToRef<MemberDef,_>()
     let tryBlock, tryBlockRef = createParserForwardedToRef<Try,_>()
     let tupleExpr, tupleExprRef = createParserForwardedToRef<Expression list,_>()
     let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
@@ -235,6 +235,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         >>. updateUserState (setFlags flag)
         |> optional
+    let modifiers pairs =
+        pairs
+        |> Seq.map (fun (name, flag) -> modifier name flag)
+        |> Seq.reduce (fun one two -> one >>. two)
     
     let separator p = ignored >>. attempt p .>> ignored
 
@@ -896,33 +900,6 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> attempt
         >>. getUserState
 
-    // TODO: Replace dunion with case classes like in Scala or do what Kotlin does https://www.howtobuildsoftware.com/index.php/how-do/SmZ/kotlin-discriminated-union-kotlin-and-discriminated-unions-sum-types
-    let unionDef =
-        typeDef "union"
-        .>>. identifierStr
-        .>>. genericParams
-        .>> ignored
-        .>>. blockChoice
-            [
-                identifierStr
-                .>>. typeAnnotationOpt
-                .>> ignored
-                .>> comma
-                <?> "union case"
-                |>> fun (name, ctype) ->
-                    match ctype with
-                    | Inferred -> DUnionCase (name, None)
-                    | _ -> DUnionCase (name, Some ctype)
-            ]
-        <?> "discriminated union"
-        |>> fun (((state, name), gparams), cases) ->
-            { Definition = Definition.ofState name state
-              GenericParams = gparams
-              Header = DUnion
-              InitBody = []
-              Interfaces = []
-              Members = cases }
-
     let interfaceDef =
         typeDef "interface"
         .>>. identifierStr
@@ -936,6 +913,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 >>. choice
                     [
                         methodDef
+                        nestedTypes
                     ]
             ]
         |>> (fun ((((state, name), gparams), iimpls), members) ->
@@ -973,37 +951,39 @@ let parser: Parser<CompilationUnit, ParserState> =
                     | _ -> Some s)
             members, body
 
-    let classNested = classDef <?> "nested class" |>> NestedType
-    let classPrimaryCtor =
-        updateUserState ParserState.newFlags
-        >>. accessModifierOpt Flags.Private
-        >>. ignored
-        >>. getUserState
-        .>> updateUserState ParserState.popFlags
-        .>>. optList (paramTuple .>> ignored)
-    let classExtends =
-        extends
-        .>>. optList (tupleExpr .>> ignored)
-        .>> ignored
-
     // TODO: Add "data class" which are records
-    classDefRef :=
-        modifier "abstract" Flags.Abstract
-        >>. modifier "inheritable" Flags.Inheritable
-        >>. modifier "mutable" Flags.Mutable
+    let classDef =
+        let primaryCtor =
+            updateUserState ParserState.newFlags
+            >>. accessModifierOpt Flags.Private
+            >>. ignored
+            >>. getUserState
+            .>> updateUserState ParserState.popFlags
+            .>>. optList (paramTuple .>> ignored)
+        let classExtends =
+            extends
+            .>>. optList (tupleExpr .>> ignored)
+            .>> ignored
+
+        modifiers
+            [
+                "abstract", Flags.Abstract
+                "inheritable", Flags.Inheritable
+                "mutable", Flags.Mutable
+            ]
         >>. typeDef "class"
         |> attempt
         .>>. identifierStr
         .>>. genericParams
         .>> ignored
-        .>>. classPrimaryCtor
+        .>>. primaryCtor
         .>>. classExtends
         .>>. implements
         .>> ignored
         .>>. memberBlockInit
             [
                 methodDef
-                classNested
+                nestedTypes
             ]
         <?> "class definition"
         |>> fun ((((((state, name), gparams), (ctorState, ctorParams)), (superclass, baseArgs)), iimpls), (members, body)) ->
@@ -1033,10 +1013,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. memberBlockInit
             [
-                unionDef |>> NestedType
-                interfaceDef |>> NestedType
-                classNested
                 functionDef <?> "function definition"
+                nestedTypes
             ]
         <?> "module definition"
         |>> fun (((state, name), gparams), (members, body)) ->
@@ -1046,6 +1024,15 @@ let parser: Parser<CompilationUnit, ParserState> =
               InitBody = body
               Interfaces = []
               Members = members }
+
+    nestedTypesRef :=
+        [
+            classDef <?> "nested class"
+            interfaceDef <?> "nested interface"
+            moduleDef <?> "nested module"
+        ]
+        |> choice
+        |>> NestedType
 
     ignored
     >>. optList
@@ -1078,7 +1065,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                  classDef
                  interfaceDef
                  moduleDef
-                 unionDef
              ]
          .>> ignored
          |> many1)

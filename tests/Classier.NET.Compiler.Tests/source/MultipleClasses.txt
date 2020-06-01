@@ -26,6 +26,14 @@ public interface Interface1 {
 public class Class3 implements Interface1 {
   private class Nested {
     var parent: Class3;
+
+    internal module EvenMoreNested {
+      internal interface MuchMoreNested {
+        public class TheNested {
+          let hello = "hello";
+        }
+      }
+    }
   }
 }
 

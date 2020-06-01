@@ -40,13 +40,7 @@ public module Math {
                                     
                                             }
 
-    //public data class MyRecord (item1: string, item2: int, item3: Some.Fancy.Item);
-
-    public union MyDUnion {
-        Case1,
-        Case2: long,
-        Case3: system.reflection.Assembly,
-    }
+    public data class MyRecord (item1: string, item2: int, item3: Some.Fancy.Item);
 
     internal aUnionTest (pickOne: string | int | null) {
         // These are statements
