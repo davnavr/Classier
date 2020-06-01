@@ -1,4 +1,4 @@
-﻿namespace Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler.Parsing
 
 [<System.Flags>]
 type Flags =

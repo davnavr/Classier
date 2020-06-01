@@ -1,4 +1,4 @@
-﻿namespace Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler.Parsing
 
 open System.Collections.Immutable
 

@@ -3,7 +3,8 @@
 open System
 open FParsec
 open Classier.NET.Compiler
-open Classier.NET.Compiler.ParserState
+open Classier.NET.Compiler.Parsing
+open Classier.NET.Compiler.Parsing.ParserState
 
 [<Flags>]
 type NumType =
@@ -575,6 +576,13 @@ let parser: Parser<CompilationUnit, ParserState> =
     typeNameRef :=
         choiceL
             [
+                PrimitiveType.Names
+                |> Seq.map (fun pair ->
+                    skipString (pair.Value)
+                    >>. preturn (pair.Key))
+                |> choice
+                |>> Primitive
+
                 sepBy1
                     identifierFull
                     (pchar '|' |> separator |> attempt)

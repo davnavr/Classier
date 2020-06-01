@@ -1,16 +1,41 @@
-﻿namespace Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler.Parsing
 
 open System
+open System.Collections.Generic
+open System.Collections.Immutable
 
 [<RequireQualifiedAccess>]
 type PrimitiveType =
     | Boolean
+    | Decimal
+    | Double
+    | Float
+    | Int32
+    | Int64
+    | Null
+    | UInt32
+    | UInt64
     | Unit
+
+    static member Names =
+        [
+            Boolean, "boolean"
+            Decimal, "decimal"
+            Double, "double"
+            Float, "float"
+            Int32, "int"
+            Int64, "long"
+            Null, "null"
+            UInt32, "uint"
+            UInt64, "ulong"
+        ]
+        |> Seq.map KeyValuePair
+        |> ImmutableSortedDictionary.CreateRange
 
     override this.ToString() =
         match this with
-        | Boolean -> "boolean"
         | Unit -> "()"
+        | _ -> PrimitiveType.Names.Item this
 
 type TypeName =
     | FuncType of

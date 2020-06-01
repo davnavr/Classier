@@ -3,6 +3,7 @@
     using System;
     using System.IO;
     using System.Text;
+    using Classier.NET.Compiler.Parsing;
     using FParsec;
     using Microsoft.FSharp.Core;
     using static Classier.NET.Compiler.Parsing.Grammar;
