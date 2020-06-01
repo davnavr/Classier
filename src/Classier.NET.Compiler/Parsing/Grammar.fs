@@ -551,10 +551,14 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> lambdaOperator
         |> attempt
         .>> ignored
-        .>>. expression
+        .>>. choice
+            [
+                expression |>> (Return >> List.singleton)
+                statementBlock
+            ]
         .>> ignored
         .>> semicolon
-        |>> (fun (patterns, expr) -> { Body = [ Return expr ]; Patterns = patterns })
+        |>> (fun (patterns, body) -> { Body = body; Patterns = patterns })
         .>> ignored
         |> many1
         |> block
@@ -594,9 +598,9 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. opt
             (ignored
             >>. lambdaOperator
-            |> attempt
             >>. ignored
-            >>. typeName)
+            >>. typeName
+            |> attempt)
         |>> fun (tname, funcRet) ->
             match funcRet with
             | Some _ -> FuncType {| ParamType = tname; ReturnType = funcRet.Value |}
@@ -980,10 +984,15 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. classExtends
         .>>. implements
         .>> ignored
-        .>>. memberBlockInit
+        .>>. choice
             [
-                methodDef
-                nestedTypes
+                [
+                    methodDef
+                    nestedTypes
+                ]
+                |> memberBlockInit
+
+                semicolon >>. preturn ([], [])
             ]
         <?> "class definition"
         |>> fun ((((((state, name), gparams), (ctorState, ctorParams)), (superclass, baseArgs)), iimpls), (members, body)) ->
