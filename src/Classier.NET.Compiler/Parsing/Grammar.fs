@@ -569,6 +569,16 @@ let parser: Parser<CompilationUnit, ParserState> =
                 <?> "tuple";
             ]
             "type name"
+        .>>. opt
+            (ignored
+            >>. lambdaOperator
+            |> attempt
+            >>. ignored
+            >>. typeName)
+        |>> fun (tname, funcRet) ->
+            match funcRet with
+            | Some _ -> FuncType {| ParamType = tname; ReturnType = funcRet.Value |}
+            | None -> tname
 
     identifierRef :=
         identifierStr

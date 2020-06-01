@@ -11,7 +11,7 @@ public class MyException1 extends System.Exception {
             doSomething();
         }
         catch {
-            e: System.ArgumentException => System.Console.WriteLine(e);
+            (e: System.ArgumentException) => System.Console.WriteLine(e);
             _ => printfn("this is the default handler");
         }
         finally {

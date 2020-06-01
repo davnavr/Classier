@@ -13,7 +13,6 @@
         [InlineData("MyAbstractClass1.txt", "java.lang", "java.util")]
         [InlineData("MyException1.txt")]
         [InlineData("MyModule1.txt", "system.reflection.Assembly")]
-        [InlineData("NoAccessModifiers.txt", "System")]
         [Theory]
         public void ParserCorrectlySetsUsings(string name, params string[] usings)
         {
