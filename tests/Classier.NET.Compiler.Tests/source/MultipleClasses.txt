@@ -8,7 +8,7 @@ public class Class1(arg1) {
     thing => 6;
     (one, two) => 7;
     "tester" => {
-      System.out.println("This might not work!");
+      System.out.println("This might \n not \t work!");
       return 55;
     };
     _ => 0;

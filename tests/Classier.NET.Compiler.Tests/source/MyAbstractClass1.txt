@@ -35,7 +35,7 @@ internal abstract class MyAbstractClass1 {
   }
 
   internal doSomethingElse(a: ()) : () {
-      let lambda = (a) => "this is the return" + a;
+      let lambda = (a) => "this is \u7253 the return" + a;
       lambda ("test");
   }
 }

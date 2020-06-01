@@ -306,9 +306,22 @@ let parser: Parser<CompilationUnit, ParserState> =
             FuncCall {| Arguments = args; Target = target |}
         let assignment t target value = t { Target = target; Value = value }
 
-        let strChar = manySatisfy (fun c -> c <> '\\' && c <> '"')
-        // TODO: Check that the correct character is used when parsing escape sequences, and allow stuff like \n or \r.
-        let strEscaped = skipString "\\u" >>. parray 4 hex |>> String
+        let strChar = manySatisfy (fun c -> c <> '\\' && c <> '"' && c <> '\n')
+        let strEscaped =
+            skipChar '\\'
+            |> attempt
+            >>. choice
+                [
+                    skipChar 'n' >>. preturn '\n'
+                    skipChar 'r' >>. preturn '\r'
+                    skipChar 't' >>. preturn '\t'
+
+                    skipChar 'u'
+                    |> attempt
+                    >>. parray 4 hex
+                    |>> (fun chars -> Convert.ToUInt32(String chars, 16) |> char)
+                ]
+            |>> string
 
         [
             "equals", "==", 38, Associativity.Left
