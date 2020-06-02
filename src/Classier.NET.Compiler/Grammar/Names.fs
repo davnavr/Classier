@@ -80,6 +80,8 @@ and GenericParam =
       RequiredInterfaces: TypeName list
       Variance: GenericVariance }
 
+    override this.ToString() = this.Name
+
 module Identifier =
     let ofString name = { Name = name; Generics = [] }
 

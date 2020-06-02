@@ -1,5 +1,7 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 {
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
     using System.Linq;
     using System.Text;
     using Microsoft.FSharp.Collections;
@@ -20,7 +22,7 @@
             using var stream = new EmbeddedSourceFile(name).GetStream();
 
             // Act
-            var result = new SuccessResult(parser, stream, name, Encoding.UTF8).Result;
+            var result = new SuccessResult(compilationUnit, stream, name, Encoding.UTF8).Result;
 
             // Assert
             Assert.Equal(usings, result.Usings.Select(names => string.Join('.', names)));
@@ -36,7 +38,7 @@
             using var stream = new EmbeddedSourceFile(name).GetStream();
 
             // Act
-            var result = new SuccessResult(parser, stream, name, Encoding.UTF8).Result;
+            var result = new SuccessResult(compilationUnit, stream, name, Encoding.UTF8).Result;
 
             // Assert
             Assert.Equal(namespaceName, result.Namespace);
@@ -52,27 +54,36 @@
             using var stream = new EmbeddedSourceFile(name).GetStream();
 
             // Act
-            var error = (ParserResult<CompilationUnit, ParserState>.Failure)runParserOnStream(parser, ParserStateModule.defaultState, name, stream, Encoding.UTF8);
+            var error = (ParserResult<CompilationUnit, ParserState>.Failure)runParserOnStream(compilationUnit, ParserStateModule.defaultState, name, stream, Encoding.UTF8);
 
             // Assert
             Assert.Contains(errorSubstring, error.Item1);
         }
 
-        [InlineData("MyAbstractClass1.txt", "this.is.my.space")]
+        [InlineData("MyException1.txt", new string[0])]
+        [InlineData("MultipleClasses.txt", new[] { "test" })]
+        [InlineData("MyAbstractClass1.txt", new[] { "this", "is", "my", "space" })]
         [Theory]
-        public void ParserIncludesNamespaceInSymbolTable(string file, string expectedNamespace)
+        public void ParserIncludesNamespacesInSymbolTable(string file, string[] namespaceNames)
         {
             // Arrange
             using var stream = new EmbeddedSourceFile(file).GetStream();
+            var expectedNamespaces = namespaceNames
+                .Aggregate(
+                    ImmutableList.Create<FSharpList<string>>(),
+                    (list, name) =>
+                    {
+                        return list.Add(
+                            ListModule.Append(
+                                list.IsEmpty ? ListModule.Empty<string>() : list[list.Count - 1],
+                                ListModule.Singleton(name)));
+                    });
 
             // Act
-            var namespaces = new SuccessResult(parser, stream, file, Encoding.UTF8).State.Symbols.Namespaces;
+            var namespaces = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Namespaces;
 
             // Assert
-            Assert.True(
-                namespaces.ContainsKey(
-                    ListModule.OfArray(
-                        expectedNamespace.Split('.'))));
+            Assert.Equal(namespaces.Keys, expectedNamespaces);
         }
     }
 }

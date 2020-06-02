@@ -13,6 +13,7 @@
     <Compile Include="Grammar\Names.fs" />
     <Compile Include="Grammar\Flags.fs" />
     <Compile Include="Grammar\Content.fs" />
+    <Compile Include="Grammar\CompilationUnit.fs" />
     <Compile Include="Grammar\Symbol.fs" />
     <Compile Include="Grammar\ResolvedSymbol.fs" />
     <Compile Include="Grammar\SymbolTable.fs" />

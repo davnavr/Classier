@@ -1,4 +1,6 @@
 
+namespace test;
+
 public class Class1(arg1) {
   printfn(arg1.toString());
 

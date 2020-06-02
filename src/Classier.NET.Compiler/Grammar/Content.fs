@@ -104,3 +104,5 @@ and MemberDef =
 and Definition =
     { Flags: Flags
       Name: Identifier }
+
+    override this.ToString() = this.Name.ToString()

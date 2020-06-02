@@ -5,12 +5,7 @@ open FParsec
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.ParserState
 
-type CompilationUnit =
-    { TypeDefs: TypeDef list
-      Namespace: string list
-      Usings: Identifier list list }
-
-let parser: Parser<CompilationUnit, ParserState> =
+let compilationUnit: Parser<CompilationUnit, ParserState> =
     let colon = skipChar ':'
     let comma = skipChar ','
     let dquotes = skipChar '\"' <?> "quotation mark"
