@@ -28,6 +28,7 @@
 
         [InlineData("MyClass1.txt", new string[0])]
         [InlineData("MyGenericClass1.txt", new[] { "some", "name", "collections" })]
+        [InlineData("NoAccessModifiers.txt", new[] { "My", "Awesome", "Project" })]
         [Theory]
         public void ParserCorrectlySetsNamespace(string name, string[] namespaceName)
         {
@@ -41,11 +42,11 @@
             Assert.Equal(namespaceName, result.Namespace);
         }
 
-        [InlineData("MissingBrackets1.txt", "closing bracket", 9, 1)]
-        [InlineData("NoCatchOrFinally.txt", "at least one catch", 6, 6)]
-        [InlineData("AbstractSealedMethod.txt", "not allowed on abstract methods", 3, 26)]
+        [InlineData("MissingBrackets1.txt", "closing bracket")]
+        [InlineData("NoCatchOrFinally.txt", "at least one catch")]
+        [InlineData("AbstractSealedMethod.txt", "not allowed on abstract methods")]
         [Theory]
-        public void ParserHasPredictedError(string name, string errorSubstring, long line, long column)
+        public void ParserHasPredictedError(string name, string errorSubstring)
         {
             // Arrange
             using var stream = new EmbeddedSourceFile(name).GetStream();
@@ -55,8 +56,6 @@
 
             // Assert
             Assert.Contains(errorSubstring, error.Item1);
-            Assert.Equal(line, error.Item2.Position.Line);
-            Assert.Equal(column, error.Item2.Position.Column);
         }
 
         [InlineData("MyAbstractClass1.txt", "this.is.my.space")]

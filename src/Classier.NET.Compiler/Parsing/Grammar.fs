@@ -217,8 +217,8 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. choice
             [
                 choiceL modifiers "access modifier"
+                |> attempt
                 >>. p
-                //|> attempt
 
                 updateUserState (setFlags Flags.Public)
                 >>. p
@@ -935,28 +935,19 @@ let parser: Parser<CompilationUnit, ParserState> =
                 "override", Flags.Override
                 "virtual", Flags.Virtual
             ]
-        //>>. getUserState
-        //>>= (fun state ->
-        //    let flags = currentFlags state
-        //    let implFlags = flags &&& Flags.MethodImplMask
-
-        //    if (flags.HasFlag Flags.Abstract) && (implFlags > Flags.None) then
-        //        sprintf "Modifiers %s not allowed on abstract methods" (implFlags.ToString().ToLower()) |> fail
-        //    elif implFlags.HasFlag(Flags.Sealed ||| Flags.Virtual) then
-        //        fail "Virtual methods cannot be sealed"
-        //    else preturn ())
-        >>. functionDef
-        //|>> Method
-        <??> "method definition"
-        >>= fun f ->
-            let flags = f.FuncDef.Value.Flags
+        >>. getUserState
+        >>= (fun state ->
+            let flags = currentFlags state
             let implFlags = flags &&& Flags.MethodImplMask
 
             if (flags.HasFlag Flags.Abstract) && (implFlags > Flags.None) then
                 sprintf "Modifiers %s not allowed on abstract methods" (implFlags.ToString().ToLower()) |> fail
             elif implFlags.HasFlag(Flags.Sealed ||| Flags.Virtual) then
                 fail "Virtual methods cannot be sealed"
-            else preturn (Method f)
+            else preturn ())
+        >>. functionDef
+        |>> Method
+        <?> "method definition"
 
     let typeDef word =
         skipString word
@@ -991,12 +982,11 @@ let parser: Parser<CompilationUnit, ParserState> =
     let memberBlockInit members =
         blockChoice
             [
+                attempt statement
+
                 choice members
                 |> memberDef Flags.Private
-                |> attempt
                 |>> LocalMember
-
-                statement
             ]
         |>> fun st ->
             let members =
