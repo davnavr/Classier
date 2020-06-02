@@ -13,6 +13,7 @@ type PrimitiveType =
     | Int32
     | Int64
     | Null
+    | String
     | UInt32
     | UInt64
     | Unit
@@ -26,6 +27,7 @@ type PrimitiveType =
             Int32, "int"
             Int64, "long"
             Null, "null"
+            //String, "string"
             UInt32, "uint"
             UInt64, "ulong"
         ]

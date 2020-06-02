@@ -24,6 +24,7 @@ type NumLiteral =
 
 type Expression =
     | AnonFunc of Function
+    | BoolLit of bool
     | CtorCall of
         {| Arguments: Expression list
            Type: TypeName |}
@@ -416,6 +417,14 @@ let parser: Parser<CompilationUnit, ParserState> =
                                Type = Option.defaultValue Inferred ctype |});
 
                     tryBlock |>> TryExpr <?> "try expression"
+                    
+                    [
+                        skipString "true" >>. preturn true
+                        skipString "false" >>. preturn false
+                    ]
+                    |> choice
+                    |>> BoolLit
+                    <?> "boolean literal"
 
                     identifier |>> IdentifierRef;
 
@@ -594,7 +603,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. sepBy expression (separator comma)
         .>> rparen
 
-    typeNameRef :=
+    let simpleTypeName =
         choiceL
             [
                 PrimitiveType.Names
@@ -604,13 +613,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                 |> choice
                 |>> Primitive
 
-                sepBy1
-                    identifierFull
-                    (pchar '|' |> separator |> attempt)
-                |>> fun tlist ->
-                    match tlist with
-                    | [ one ] -> one
-                    | _ -> Union tlist
+                identifierFull
 
                 skipChar '_'
                 >>. preturn Inferred;
@@ -625,16 +628,25 @@ let parser: Parser<CompilationUnit, ParserState> =
                 | items -> Tuple items
             ]
             "type name"
+
+    typeNameRef :=
+        sepBy1
+            simpleTypeName
+            (pchar '|' |> separator |> attempt)
+        |>> (fun tlist ->
+            match tlist with
+            | [ one ] -> one
+            | _ -> Union tlist)
         .>>. opt
             (ignored
             >>. lambdaOperator
             >>. ignored
             >>. typeName
             |> attempt)
-        |>> fun (tname, funcRet) ->
-            match funcRet with
-            | Some _ -> FuncType {| ParamType = tname; ReturnType = funcRet.Value |}
-            | None -> tname
+        |>> fun (paramsType, retType) ->
+            match retType with
+            | Some _ -> FuncType {| ParamType = paramsType; ReturnType = retType.Value |}
+            | None -> paramsType
 
     identifierRef :=
         identifierStr
