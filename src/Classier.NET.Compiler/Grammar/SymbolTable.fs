@@ -10,11 +10,14 @@ type UnknownSymbol =
 
     // TODO: Symbol table should only be filled with classes, modules, interfaces, methods, functions, etc. & should ignore local vars.
 type SymbolTable =
-    { Namespaces: ImmutableSortedDictionary<string list, ResolvedSymbol list> }
+    { Namespaces: ImmutableSortedDictionary<string list, ImmutableSortedSet<ResolvedSymbol>>
+      Types: ImmutableSortedSet<TypeHeader>
+      (*Symbols: ImmutableSortedSet<ResolvedSymbol>*) }
 
 module SymbolTable =
     let empty =
-        { Namespaces = ImmutableSortedDictionary.Empty }
+        { Namespaces = ImmutableSortedDictionary.Empty
+          Types = ImmutableSortedSet.Empty }
 
     let addNamespace ns table =
         let namespaces, _ =
@@ -25,8 +28,7 @@ module SymbolTable =
                     let newDict =
                         if nsDict.ContainsKey(next)
                         then nsDict
-                        else nsDict.Add(next, List.empty)
+                        else nsDict.Add(next, ImmutableSortedSet.Empty)
                     (newDict, next))
                 (table.Namespaces, List.empty)
-
         { table with Namespaces = namespaces }

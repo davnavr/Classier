@@ -83,7 +83,22 @@
             var namespaces = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Namespaces;
 
             // Assert
-            Assert.Equal(namespaces.Keys, expectedNamespaces);
+            Assert.Equal(expectedNamespaces, namespaces.Keys);
+        }
+
+        [InlineData("MultipleClasses.txt", "test", new[] { "Class1", "Class2" })]
+        [Theory]
+        public void ParserAddsTypesToSymbolTable(string file, string namespaceName, string[] typeNames)
+        {
+            // Arrange
+            using var stream = new EmbeddedSourceFile(file).GetStream();
+            var expectedNamespace = ListModule.OfArray(namespaceName.Split('.'));
+
+            // Act
+            var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Namespaces[expectedNamespace];
+
+            // Assert
+            Assert.Equal(typeNames, types.Select(s => ((Symbol.Type)s.Symbol).Item.Definition.Name.Name));
         }
     }
 }

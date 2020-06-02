@@ -5,7 +5,7 @@ open FParsec
 [<RequireQualifiedAccess>]
 type Symbol =
     | Namespace of string list
-    | Type of TypeHeader
+    | Type of TypeDef
 
 type SymbolOrigin =
     /// Indicates that the symbol originated from some other source, such as a *.dll file.
