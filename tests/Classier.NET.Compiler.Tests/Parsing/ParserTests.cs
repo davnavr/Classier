@@ -43,6 +43,7 @@
 
         [InlineData("MissingBrackets1.txt", "closing bracket", 9, 1)]
         [InlineData("NoCatchOrFinally.txt", "at least one catch", 6, 6)]
+        [InlineData("AbstractSealedMethod.txt", "not allowed on abstract methods", 3, 26)]
         [Theory]
         public void ParserHasPredictedError(string name, string errorSubstring, long line, long column)
         {

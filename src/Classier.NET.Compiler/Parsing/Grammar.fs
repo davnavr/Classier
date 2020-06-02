@@ -638,7 +638,7 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     ifStatementRef :=
         skipString "if"
-        >>. ignored
+        >>. ignored1OrSep
         >>. expressionInParens
         .>> ignored
         .>>. statementBlock
@@ -896,7 +896,10 @@ let parser: Parser<CompilationUnit, ParserState> =
             "function body"
 
     let functionDef =
-        modifier "inline" Flags.Inline
+        modifiers
+            [
+                "inline", Flags.Inline
+            ]
         >>. getUserState
         .>>. identifierStr
         .>> ignored
@@ -916,7 +919,23 @@ let parser: Parser<CompilationUnit, ParserState> =
                   ReturnType = retType }
 
     let methodDef =
-        modifier "abstract" Flags.Abstract
+        modifiers
+            [
+                "abstract", Flags.Abstract
+                "sealed", Flags.Sealed
+                "override", Flags.Override
+                "virtual", Flags.Virtual
+            ]
+        >>. getUserState
+        >>= (fun state ->
+            let flags = currentFlags state
+            let implFlags = flags &&& Flags.MethodImplMask
+
+            if (flags.HasFlag Flags.Abstract) && (implFlags > Flags.None) then
+                sprintf "Modifiers %s not allowed on abstract methods" (implFlags.ToString().ToLower()) |> fail
+            elif implFlags.HasFlag(Flags.Sealed ||| Flags.Virtual) then
+                fail "Virtual methods cannot be sealed"
+            else preturn ())
         >>. functionDef
         <?> "method definition"
 

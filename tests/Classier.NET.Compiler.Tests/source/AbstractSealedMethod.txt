@@ -1,0 +1,6 @@
+
+public class HasAnError {
+  public abstract sealed badMethod (args) {
+    return "I should parse incorrectly!";
+  }
+}
