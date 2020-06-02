@@ -1,19 +1,4 @@
-﻿<!--
-  Copyright (c) 2020 David Navarro
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
--->
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AssemblyName>$(Product).Compiler</AssemblyName>
@@ -22,12 +7,20 @@
     <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
 
+  <!-- Source files -->
   <ItemGroup>
-    <Compile Include="Matching.fs" />
-    <Compile Include="Lexing.fs" />
-    <Compile Include="Parsing.fs" />
-    <Compile Include="Grammar.fs" />
+    <Compile Include="Parsing\Names.fs" />
+    <Compile Include="Parsing\Flags.fs" />
+    <Compile Include="Parsing\SymbolTable.fs" />
+    <Compile Include="Parsing\ParserState.fs" />
+    <Compile Include="Parsing\Definition.fs" />
+    <Compile Include="Parsing\Grammar.fs" />
     <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <!-- References -->
+  <ItemGroup>
+    <PackageReference Include="FParsec" Version="1.1.1" />
   </ItemGroup>
 
 </Project>

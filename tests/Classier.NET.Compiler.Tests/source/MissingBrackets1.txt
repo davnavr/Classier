@@ -1,0 +1,8 @@
+
+namespace i.am.error;
+
+public module Fancy {
+  public def missingThing () {
+    return 12345;
+  
+}

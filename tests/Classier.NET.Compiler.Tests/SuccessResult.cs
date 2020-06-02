@@ -1,50 +1,43 @@
-﻿/*
- * Copyright (c) 2020 David Navarro
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-namespace Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler
 {
     using System;
-    using static Classier.NET.Compiler.Matching;
+    using System.IO;
+    using System.Text;
+    using Classier.NET.Compiler.Parsing;
+    using FParsec;
+    using Microsoft.FSharp.Core;
+    using static Classier.NET.Compiler.Parsing.Grammar;
+    using static FParsec.CharParsers;
 
     /// <summary>
-    /// Wraps a <see cref="MatchResult{Match, Result}"/> value, and assumes it is a <see cref="MatchResult{Match, Result}.Success"/>.
+    /// Wraps a parser result and assumes it is a success.
     /// </summary>
-    /// <typeparam name="TMatch">The type of the items in the sequence.</typeparam>
-    /// <typeparam name="TResult">The type of the item produced from a successful match.</typeparam>
-    public sealed class SuccessResult<TMatch, TResult>
+    public sealed class SuccessResult
     {
-        private readonly MatchResult<TMatch, TResult> result;
+        private readonly ParserResult<CompilationUnit, ParserState> result;
 
-        public SuccessResult(MatchFunc<TMatch, TResult> func, Item<TMatch> item)
+        public SuccessResult(Func<ParserResult<CompilationUnit, ParserState>> resultEvaluator)
         {
-            this.result = evaluateMatch(func, item);
+            this.result = resultEvaluator();
         }
 
-        public Item<TMatch> Item => this.CastSuccess().Item2;
-
-        public TResult Result => this.CastSuccess().Item1;
-
-        private MatchResult<TMatch, TResult>.Success CastSuccess()
+        public SuccessResult(FSharpFunc<CharStream<ParserState>, Reply<CompilationUnit>> parser, Stream stream, string streamName, Encoding encoding)
+            : this(() => runParserOnStream(parser, ParserStateModule.defaultState, streamName, stream, encoding))
         {
-            if (this.result is MatchResult<TMatch, TResult>.Failure failure)
-            {
-                throw new InvalidOperationException($"Unexpected failure for ({failure.Item1}). {failure.Item2}");
-            }
+        }
 
-            return (MatchResult<TMatch, TResult>.Success)this.result;
+        public CompilationUnit Result => this.CastResult().Item1;
+
+        public ParserState State => this.CastResult().Item2;
+
+        private ParserResult<CompilationUnit, ParserState>.Success CastResult()
+        {
+            return this.result switch
+            {
+                ParserResult<CompilationUnit, ParserState>.Success success => success,
+                ParserResult<CompilationUnit, ParserState>.Failure failure => throw new InvalidCastException(failure.Item2.ToString()),
+                _ => throw new InvalidOperationException($"Unknown result type {this.result.GetType()}."),
+            };
         }
     }
 }
