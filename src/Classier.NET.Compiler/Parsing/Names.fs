@@ -59,19 +59,32 @@ type TypeName =
         | Union options -> String.Join(" | ", options)
 and Identifier =
     { Name: string
-      GenericArgs: GenericArg list }
+      Generics: Generic list }
 
     override this.ToString() =
-        match this.GenericArgs with
+        match this.Generics with
         | [] -> this.Name
         | _ ->
-            let gargs = String.Join(", ", this.GenericArgs)
+            let gargs = String.Join(", ", this.Generics)
             sprintf "%s<%s>" this.Name gargs
-and GenericArg = TypeName
+and Generic =
+    | GenericArg of TypeName
+    | GenericParam of GenericParam
+and GenericVariance =
+    | NoVariance
+    | Covariant
+    | Contravariant
+and GenericParam =
+    { Name: string
+      RequiredSuperClass: Identifier list
+      RequiredInterfaces: TypeName list
+      Variance: GenericVariance }
 
 module Identifier =
+    let ofString name = { Name = name; Generics = [] }
+
     let ofStrings names =
         names
         |> List.map (fun name ->
             { Name = name
-              GenericArgs = [] })
+              Generics = [] })

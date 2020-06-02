@@ -2,25 +2,8 @@
 
 open System
 open FParsec
-open Classier.NET.Compiler
 open Classier.NET.Compiler.Parsing
 open Classier.NET.Compiler.Parsing.ParserState
-
-[<Flags>]
-type NumType =
-    | Decimal = 0uy
-    | Double = 1uy
-    | Float = 2uy
-    | Signed = 0uy
-    | Unsigned = 4uy
-    | Integer = 8uy
-    | Long = 16uy
-
-type NumLiteral =
-    { Base: byte
-      FracPart: char list
-      IntPart: char list
-      Type: NumType }
 
 type Expression =
     | AnonFunc of Function
@@ -86,19 +69,9 @@ and Variable =
 and Param =
     { Name: string
       Type: TypeName }
-and GenericVariance =
-    | NoVariance
-    | Covariant
-    | Contravariant
-and GenericParam =
-    { Name: string
-      RequiredSuperClass: Identifier list
-      RequiredInterfaces: TypeName list
-      Variance: GenericVariance }
 and Function =
     { Body: Statement list
       FuncDef: Definition option
-      GenericParams: GenericParam list
       Parameters: Param list list
       ReturnType: TypeName }
 and ClassHeader =
@@ -106,13 +79,10 @@ and ClassHeader =
       SuperClass: Identifier list }
 and TypeHeader =
     | Class of ClassHeader
-    | DUnion
     | Interface
     | Module
-    | Record
 and TypeDef =
     { Definition: Definition
-      GenericParams: GenericParam list
       Header: TypeHeader
       InitBody: Statement list
       Interfaces: TypeName list
@@ -136,7 +106,6 @@ and MemberDef =
            Value: Expression option |}
     | Method of Function
     | NestedType of TypeDef
-    | DUnionCase of string * TypeName option
 
 type CompilationUnit =
     { TypeDefs: TypeDef list
@@ -158,6 +127,8 @@ let parser: Parser<CompilationUnit, ParserState> =
     let semicolon = skipChar ';' <?> "semicolon"
     let underscore = skipChar '_' <?> "underscore"
     let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
+
+    let position: Parser<Position, _> = fun stream -> Reply(stream.Position)
 
     let optList p = opt p |>> Option.defaultValue []
 
@@ -312,7 +283,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         let exprParser = expr.ExpressionParser <?> "expression"
 
         let functionCall targetExpr args name =
-            let target = MemberAccess (targetExpr, { Name = name; GenericArgs = List.empty })
+            let target = MemberAccess (targetExpr, Identifier.ofString name)
             FuncCall {| Arguments = args; Target = target |}
         let assignment t target value = t { Target = target; Value = value }
 
@@ -382,7 +353,6 @@ let parser: Parser<CompilationUnit, ParserState> =
                     |>> fun (parameters, retVal) ->
                         { Body = [ Return retVal ]
                           FuncDef = None
-                          GenericParams = []
                           Parameters = [ parameters ]
                           ReturnType = Inferred }
                         |> AnonFunc
@@ -655,7 +625,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. genericArgs
         |>> fun (name, gparams) ->
             { Name = name
-              GenericArgs = gparams }
+              Generics = List.map GenericArg gparams }
 
     ifStatementRef :=
         skipString "if"
@@ -749,11 +719,7 @@ let parser: Parser<CompilationUnit, ParserState> =
                                     .>>. (statementBlock <?> "local function body")
                                     |>> fun ((parameters, retType), body) ->
                                         { Body = body 
-                                          FuncDef =
-                                            { Name = name
-                                              Flags = currentFlags state }
-                                            |> Some
-                                          GenericParams = []
+                                          FuncDef = Some (Definition.ofState name state)
                                           Parameters = parameters
                                           ReturnType = retType }
                                         |> AnonFunc
@@ -935,8 +901,11 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>>. functionBody
         |>> fun (((((state, name), gparams), fparams), retType), body) ->
             { Body = body
-              FuncDef = Some (Definition.ofState name state)
-              GenericParams = gparams
+              FuncDef =
+                { Name = name
+                  Generics = List.map GenericParam gparams }
+                |> Definition.ofIdentifier state
+                |> Some
               Parameters = fparams
               ReturnType = retType }
 
@@ -983,8 +952,10 @@ let parser: Parser<CompilationUnit, ParserState> =
                 |> (choice >> memberDef Flags.Internal)
             ]
         |>> (fun ((((state, name), gparams), iimpls), members) ->
-            { Definition = Definition.ofState name state
-              GenericParams = gparams
+            { Definition =
+                { Name = name
+                  Generics = List.map GenericParam gparams }
+                |> Definition.ofIdentifier state
               Header = Interface
               InitBody = []
               Interfaces = iimpls
@@ -1016,6 +987,7 @@ let parser: Parser<CompilationUnit, ParserState> =
             members, body
 
     let classDef =
+        
         let primaryCtor =
             optList (paramTuple .>> ignored)
             .>>. getUserState
@@ -1073,12 +1045,11 @@ let parser: Parser<CompilationUnit, ParserState> =
             let recordMembers () =
                 ctorParams
                 |> List.map (fun p ->
-                    { Body = [ { Name = p.Name; GenericArgs = [] } |> IdentifierRef |> Return ]
+                    { Body = [ Identifier.ofString p.Name |> IdentifierRef |> Return ]
                       FuncDef =
                         { Flags = Flags.Public
-                          Name = p.Name }
+                          Name = Identifier.ofString p.Name }
                         |> Some
-                      GenericParams = []
                       Parameters = []
                       ReturnType = p.Type }
                     |> Function)
@@ -1087,16 +1058,17 @@ let parser: Parser<CompilationUnit, ParserState> =
                         { Body = []
                           FuncDef =
                             { Flags = Flags.Public ||| Flags.Override
-                              Name = "equals" }
+                              Name = Identifier.ofString "equals" }
                             |> Some
-                          GenericParams = []
                           Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
                           ReturnType = Primitive PrimitiveType.Boolean }
                         |> Function
                     ]
 
-            { Definition = Definition.ofState name state
-              GenericParams = gparams
+            { Definition =
+                { Name = name
+                  Generics = List.map GenericParam gparams }
+                |> Definition.ofIdentifier state
               Header = Class
                 { PrimaryCtor = primaryCtor
                   SuperClass = superclass }
@@ -1117,10 +1089,13 @@ let parser: Parser<CompilationUnit, ParserState> =
                 functionDef |>> Function <?> "function definition"
                 nestedTypes
             ]
+        .>> updateUserState popParent
         <?> "module definition"
         |>> fun (((state, name), gparams), (members, body)) ->
-            { Definition = Definition.ofState name state
-              GenericParams = gparams
+            { Definition =
+                { Name = name
+                  Generics = List.map GenericParam gparams }
+                |> Definition.ofIdentifier state
               Header = Module
               InitBody = body
               Interfaces = []
@@ -1141,9 +1116,10 @@ let parser: Parser<CompilationUnit, ParserState> =
         >>. ignored1
         |> attempt
         >>. sepBy1 identifierStr (separator period)
-        >>= (fun names ->
+        .>>. position
+        >>= (fun (names, pos) ->
             updateSymbols (SymbolTable.addNamespace names)
-            >> pushParent (Identifier.ofStrings names)
+            >> pushParent (ResolvedSymbol.ofNamespace names pos)
             |> updateUserState
             >>. preturn names)
         .>> ignored

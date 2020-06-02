@@ -2,9 +2,11 @@
 
 type Definition =
     { Flags: Flags
-      Name: string }
+      Name: Identifier }
 
 module Definition =
-    let ofState name state =
+    let ofIdentifier state identifier =
         { Flags = ParserState.currentFlags state
-          Name = name }
+          Name = identifier }
+    // TODO: Switch parameters.
+    let ofState name state = ofIdentifier state (Identifier.ofString name)

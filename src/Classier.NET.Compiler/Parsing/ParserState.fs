@@ -4,7 +4,7 @@ open System.Collections.Immutable
 
 type ParserState =
     { Flags: ImmutableStack<Flags>
-      Parents: ImmutableStack<Identifier list>
+      Parents: ImmutableStack<ResolvedSymbol>
       Symbols: SymbolTable }
 
 module ParserState =
@@ -20,8 +20,8 @@ module ParserState =
 
     let currentParent state =
         if state.Parents.IsEmpty
-        then List.empty
-        else state.Parents.Peek()
+        then None
+        else Some (state.Parents.Peek())
 
     let visibilityFlags state = currentFlags state &&& Flags.VisibilityMask
 
@@ -41,6 +41,11 @@ module ParserState =
         state
         |> popFlags
         |> pushFlags newFlags
+
+    let popParent state =
+        if state.Parents.IsEmpty
+        then state
+        else { state with Parents = state.Parents.Pop() }
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
 
