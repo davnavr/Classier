@@ -27,7 +27,7 @@ type PrimitiveType =
             Int32, "int"
             Int64, "long"
             Null, "null"
-            //String, "string"
+            String, "string"
             UInt32, "uint"
             UInt64, "ulong"
         ]

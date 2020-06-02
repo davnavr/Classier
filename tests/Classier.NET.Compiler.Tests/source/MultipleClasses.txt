@@ -42,6 +42,8 @@ public class Class3 implements Interface1 {
     internal module EvenMoreNested {
       internal interface MuchMoreNested {
         public class TheNested {
+          let fancyStuff = (add (5) >> multiply (5)) (5);
+
           let hello = "hello";
         }
       }

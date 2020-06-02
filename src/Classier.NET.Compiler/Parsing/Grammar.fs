@@ -31,6 +31,7 @@ type Expression =
     | FuncCall of
         {| Arguments: Expression list list
            Target: Expression |}
+    | FuncComp of Expression * Expression
     | IdentifierRef of Identifier
     | IfExpr of If
     | MatchExpr of Match
@@ -352,7 +353,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         |> Seq.cast<Operator<_,_,_>>
         |> Seq.append
             [
-                InfixOperator<_,_,_>(">>", ignored, 18, Associativity.Left, fun f g -> invalidOp "Composition operator is not implemented");
+                InfixOperator<_,_,_>(">>", ignored, 18, Associativity.Left, fun f g -> FuncComp (f, g));
                 InfixOperator<_,_,_>("|>", ignored, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
                 PrefixOperator<_,_,_>("!", ignored, 32, true, fun exp -> functionCall exp [] "not");
                 PrefixOperator<_,_,_>("-", ignored, 60, true, fun exp -> functionCall exp [] "negate");
