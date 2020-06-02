@@ -1,4 +1,4 @@
-﻿namespace Classier.NET.Compiler.Parsing
+﻿namespace Classier.NET.Compiler.Grammar
 
 type ResolvedSymbol =
     { Origin: SymbolOrigin

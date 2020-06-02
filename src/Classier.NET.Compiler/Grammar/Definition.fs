@@ -1,9 +1,6 @@
-﻿namespace Classier.NET.Compiler.Parsing
+﻿namespace Classier.NET.Compiler.Grammar
 
-type Definition =
-    { Flags: Flags
-      Name: Identifier }
-
+[<CompilationRepresentationAttribute(CompilationRepresentationFlags.ModuleSuffix)>]
 module Definition =
     let ofIdentifier state identifier =
         { Flags = ParserState.currentFlags state

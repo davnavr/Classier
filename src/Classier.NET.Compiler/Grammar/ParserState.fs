@@ -1,4 +1,4 @@
-﻿namespace Classier.NET.Compiler.Parsing
+﻿namespace Classier.NET.Compiler.Grammar
 
 open System.Collections.Immutable
 
@@ -25,7 +25,7 @@ module ParserState =
 
     let visibilityFlags state = currentFlags state &&& Flags.VisibilityMask
 
-    let pushFlags flags state = { state with Flags = state.Flags.Push(flags) }
+    let pushFlags flags state: ParserState = { state with Flags = state.Flags.Push(flags) }
 
     let newFlags state = pushFlags Flags.None state
 
@@ -49,5 +49,5 @@ module ParserState =
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
 
-    let clearAllParents state = { state with Parents = ImmutableStack.Empty }
-    let clearAllFlags state = { state with Flags = ImmutableStack.Empty }
+    let clearAllParents state: ParserState = { state with Parents = ImmutableStack.Empty }
+    let clearAllFlags state: ParserState = { state with Flags = ImmutableStack.Empty }

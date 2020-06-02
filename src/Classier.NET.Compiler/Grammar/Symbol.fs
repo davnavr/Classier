@@ -1,11 +1,11 @@
-﻿namespace Classier.NET.Compiler.Parsing
+﻿namespace Classier.NET.Compiler.Grammar
 
 open FParsec
 
 [<RequireQualifiedAccess>]
 type Symbol =
     | Namespace of string list
-    | Type of Grammar.TypeHeader
+    | Type of TypeHeader
 
 type SymbolOrigin =
     /// Indicates that the symbol originated from some other source, such as a *.dll file.

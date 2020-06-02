@@ -9,15 +9,16 @@
 
   <!-- Source files -->
   <ItemGroup>
-    <Compile Include="Parsing\Numeric.fs" />
-    <Compile Include="Parsing\Names.fs" />
-    <Compile Include="Parsing\Flags.fs" />
-    <Compile Include="Parsing\Definition.fs" />
-    <Compile Include="Parsing\Symbol.fs" />
-    <Compile Include="Parsing\ResolvedSymbol.fs" />
-    <Compile Include="Parsing\SymbolTable.fs" />
-    <Compile Include="Parsing\ParserState.fs" />
-    <Compile Include="Parsing\Grammar.fs" />
+    <Compile Include="Grammar\Numeric.fs" />
+    <Compile Include="Grammar\Names.fs" />
+    <Compile Include="Grammar\Flags.fs" />
+    <Compile Include="Grammar\Content.fs" />
+    <Compile Include="Grammar\Symbol.fs" />
+    <Compile Include="Grammar\ResolvedSymbol.fs" />
+    <Compile Include="Grammar\SymbolTable.fs" />
+    <Compile Include="Grammar\ParserState.fs" />
+    <Compile Include="Grammar\Definition.fs" />
+    <Compile Include="Grammar\Parser.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
