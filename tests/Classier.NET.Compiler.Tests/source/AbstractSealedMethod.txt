@@ -1,6 +1,6 @@
 
 public class HasAnError {
-  public abstract sealed badMethod (args) {
+  public abstract sealed def badMethod (args) {
     return "I should parse incorrectly!";
   }
 }

@@ -22,9 +22,9 @@ internal abstract class MyAbstractClass1 {
             no
         };
 
-  public abstract noBody (iUsedToKnow);
+  public abstract def noBody (iUsedToKnow);
 
-  private inline doesSomething () {
+  private inline def doesSomething () {
     let myCurriedResult = this.noBody (45.6) (blah);
 
     if (iExist) {
@@ -34,7 +34,7 @@ internal abstract class MyAbstractClass1 {
     tester.doThingsWith(this) // implicit return here.
   }
 
-  internal doSomethingElse(a: ()) : () {
+  internal def doSomethingElse(a: ()) : () {
       let lambda = (a) => "this is \u7253 the return" + a;
       lambda ("test");
   }

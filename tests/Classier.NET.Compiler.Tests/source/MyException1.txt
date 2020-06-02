@@ -2,11 +2,11 @@
 public class MyException1 extends System.Exception {
     let myField = throw "test" /* please work */;
 
-    public doSomething () {
+    public def doSomething () {
         throw new MyException1();
     }
 
-    public somethingElse (one, two, three, four, five) {
+    public def somethingElse (one, two, three, four, five) {
         try {
             doSomething();
         }
@@ -23,7 +23,7 @@ public class MyException1 extends System.Exception {
         }
     }
 
-    public two (three) {
+    public def two (three) {
       try {
         somethingElse (three, three, three, this, three);
       }

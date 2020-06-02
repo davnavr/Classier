@@ -7,7 +7,7 @@ public class MyClass1 {
     let myField: int = 42;
 
     // Optional type annotation for return type
-    public TheTest (myParam: FileInfo)
+    public def TheTest (myParam: FileInfo)
     {
         while (thisWorks) {
             42 * 2;
@@ -16,7 +16,7 @@ public class MyClass1 {
         84;
     }
 
-    public ExplicitTest (p1: int) (p2: int): int
+    public def ExplicitTest (p1: int) (p2: int): int
     {
         /* A fancier comment */
         var someProceduralCode = p1;
@@ -24,7 +24,7 @@ public class MyClass1 {
         return (myField) / 42;
     }
 
-    public implicitTest (p1, p2)
+    public def implicitTest (p1, p2)
     {
         let myLocal = (1 + 2) / 3;
         Console.WriteLine();
@@ -34,5 +34,5 @@ public class MyClass1 {
         1 + 2 // An implicit return value
     }
 
-    public yes (no) (um) => no.add/* caramel sauce */(4722);
+    public def yes (no) (um) => no.add/* caramel sauce */(4722);
 }

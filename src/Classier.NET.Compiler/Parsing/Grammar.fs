@@ -132,6 +132,7 @@ and MemberDef =
            PropDef: Definition
            Set: Function option
            Value: Expression option |}
+    | Method of Function
     | NestedType of TypeDef
     | DUnionCase of string * TypeName option
 
@@ -143,7 +144,7 @@ type CompilationUnit =
 let parser: Parser<CompilationUnit, ParserState> =
     let colon = skipChar ':'
     let comma = skipChar ','
-    let dquotes = skipChar '\"'
+    let dquotes = skipChar '\"' <?> "quotation mark"
     let gtsign = skipChar '>'
     let lcurlybracket = skipChar '{' <?> "opening bracket"
     let lparen = skipChar '(' <?> "opening parenthesis"
@@ -194,9 +195,8 @@ let parser: Parser<CompilationUnit, ParserState> =
                 ignored1
                 followedBy lparen
             ]
-    
-    let defaultAccess = updateUserState (setFlags Flags.Public)
-    let accessModifier lowest =
+
+    let memberDef lowestAccess p =
         let modifiers =
             [
                 "public", Flags.Public
@@ -204,19 +204,26 @@ let parser: Parser<CompilationUnit, ParserState> =
                 "protected", Flags.Protected
                 "private", Flags.Private
             ]
-            |> Seq.filter (fun (_, vis) -> vis <= lowest)
             |> Seq.map (fun (str, vis) ->
-                skipString str
-                |> attempt
-                .>> updateUserState (setFlags vis))
+                if vis <= lowestAccess then
+                    skipString str
+                    .>> ignored1OrSep
+                    |> attempt
+                    .>> updateUserState (setFlags vis)
+                else
+                    sprintf "An access modifier of %s is not valid here" (vis.ToString().ToLower()) |> fail)
 
-        choice modifiers <?> "access modifier"
-    let accessModifierOpt lowest =
-        choice
+        updateUserState newFlags
+        >>. choice
             [
-                accessModifier lowest
-                defaultAccess
+                choiceL modifiers "access modifier"
+                >>. p
+                //|> attempt
+
+                updateUserState (setFlags Flags.Public)
+                >>. p
             ]
+        .>> updateUserState popFlags
 
     let typeAnnotation =
         ignored
@@ -252,6 +259,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> rcurlybracket
     let blockChoice p =
         choice p
+        |> attempt
         .>> ignored
         |> many
         |> block
@@ -901,6 +909,8 @@ let parser: Parser<CompilationUnit, ParserState> =
                 "inline", Flags.Inline
             ]
         >>. getUserState
+        .>> skipString "def"
+        .>> ignored1
         .>>. identifierStr
         .>> ignored
         .>>. genericParams
@@ -911,12 +921,11 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. functionBody
         |>> fun (((((state, name), gparams), fparams), retType), body) ->
-            Function
-                { Body = body
-                  FuncDef = Some (Definition.ofState name state)
-                  GenericParams = gparams
-                  Parameters = fparams
-                  ReturnType = retType }
+            { Body = body
+              FuncDef = Some (Definition.ofState name state)
+              GenericParams = gparams
+              Parameters = fparams
+              ReturnType = retType }
 
     let methodDef =
         modifiers
@@ -926,18 +935,28 @@ let parser: Parser<CompilationUnit, ParserState> =
                 "override", Flags.Override
                 "virtual", Flags.Virtual
             ]
-        >>. getUserState
-        >>= (fun state ->
-            let flags = currentFlags state
+        //>>. getUserState
+        //>>= (fun state ->
+        //    let flags = currentFlags state
+        //    let implFlags = flags &&& Flags.MethodImplMask
+
+        //    if (flags.HasFlag Flags.Abstract) && (implFlags > Flags.None) then
+        //        sprintf "Modifiers %s not allowed on abstract methods" (implFlags.ToString().ToLower()) |> fail
+        //    elif implFlags.HasFlag(Flags.Sealed ||| Flags.Virtual) then
+        //        fail "Virtual methods cannot be sealed"
+        //    else preturn ())
+        >>. functionDef
+        //|>> Method
+        <??> "method definition"
+        >>= fun f ->
+            let flags = f.FuncDef.Value.Flags
             let implFlags = flags &&& Flags.MethodImplMask
 
             if (flags.HasFlag Flags.Abstract) && (implFlags > Flags.None) then
                 sprintf "Modifiers %s not allowed on abstract methods" (implFlags.ToString().ToLower()) |> fail
             elif implFlags.HasFlag(Flags.Sealed ||| Flags.Virtual) then
                 fail "Virtual methods cannot be sealed"
-            else preturn ())
-        >>. functionDef
-        <?> "method definition"
+            else preturn (Method f)
 
     let typeDef word =
         skipString word
@@ -953,16 +972,11 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. blockChoice
             [
-                updateUserState newFlags
-                >>. accessModifier Flags.Internal
-                >>. ignored1
-                |> attempt
-                >>. choice
-                    [
-                        methodDef
-                        nestedTypes
-                    ]
-                .>> updateUserState popFlags
+                [
+                    methodDef
+                    nestedTypes
+                ]
+                |> (choice >> memberDef Flags.Internal)
             ]
         |>> (fun ((((state, name), gparams), iimpls), members) ->
             { Definition = Definition.ofState name state
@@ -977,12 +991,9 @@ let parser: Parser<CompilationUnit, ParserState> =
     let memberBlockInit members =
         blockChoice
             [
-                updateUserState newFlags
-                >>. accessModifier Flags.Private
-                >>. ignored1
+                choice members
+                |> memberDef Flags.Private
                 |> attempt
-                >>. choice members
-                .>> updateUserState popFlags
                 |>> LocalMember
 
                 statement
@@ -1003,12 +1014,9 @@ let parser: Parser<CompilationUnit, ParserState> =
 
     let classDef =
         let primaryCtor =
-            updateUserState newFlags
-            >>. accessModifierOpt Flags.Private
-            >>. ignored
-            >>. getUserState
-            .>> updateUserState popFlags
-            .>>. optList (paramTuple .>> ignored)
+            optList (paramTuple .>> ignored)
+            .>>. getUserState
+            |> memberDef Flags.Private
         let classExtends =
             extends
             .>>. optList (tupleExpr .>> ignored)
@@ -1048,8 +1056,8 @@ let parser: Parser<CompilationUnit, ParserState> =
 
                 semicolon >>. preturn ([], [])
             ]
-        <?> "class definition"
-        |>> fun (((((((isRecord, state), name), gparams), (ctorState, ctorParams)), (superclass, baseArgs)), iimpls), (members, body)) ->
+        <??> "class definition"
+        |>> fun (((((((isRecord, state), name), gparams), (ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
             let primaryCtor =
                 let ctor flags =
                     { BaseCall = SuperCall baseArgs
@@ -1103,7 +1111,7 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. memberBlockInit
             [
-                functionDef <?> "function definition"
+                functionDef |>> Function <?> "function definition"
                 nestedTypes
             ]
         <?> "module definition"
@@ -1148,18 +1156,14 @@ let parser: Parser<CompilationUnit, ParserState> =
         .>> semicolon
         <?> "use statement"
         .>> ignored)
-    .>>. (updateUserState newFlags
-         >>. accessModifier Flags.Internal
-         >>. ignored1
-         |> attempt
-         >>. choice
+    .>>. (choice
              [
                  classDef
                  interfaceDef
                  moduleDef
              ]
+         |> (memberDef Flags.Internal >> attempt)
          .>> ignored
-         .>> updateUserState popFlags
          |> many1)
     .>> eof
     .>> updateUserState (clearAllFlags >> clearAllParents)

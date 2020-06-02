@@ -18,7 +18,7 @@ public module Math {
 
     let PI: decimal = 3.14159265m;
 
-    private myFancyFunction () {
+    private def myFancyFunction () {
         this.badFormatting().doThisFancyThing (this) (oh, no);
 
         let myLocalFunc (a) {
@@ -30,7 +30,7 @@ public module Math {
                (5 + 6 / (7 * 8));
     }
 
-    protected badFormatting ()
+    protected def badFormatting ()
                                                 ()
 
                                     (thing: some.really.really.long.name.space.name.MyClass)
@@ -43,12 +43,12 @@ public module Math {
     public data class MyRecord (item1: string, item2: int, item3: Some.Fancy.Item);
 
     public data class RecordWithMembers (item4: boolean) {
-        public myOtherMember () {
+        public def myOtherMember () {
           return item4;
         }
     }
 
-    internal aUnionTest (pickOne: string | int | null) {
+    internal def aUnionTest (pickOne: string | int | null) {
         // These are statements
         if (Math.badFormatting.thisWillNotCompileButIsSyntacticallyCorrect()) {
           
@@ -65,7 +65,7 @@ public module Math {
         testValue
     }
 
-    public functionTest (f: int => int) {
-        f(5)
+    public def functionTest (f: int => int) {
+        f(555)
     }
 }

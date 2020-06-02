@@ -2,7 +2,7 @@
 namespace i.am.error;
 
 public module Fancy {
-  public missingThing () {
+  public def missingThing () {
     return 12345;
   
 }

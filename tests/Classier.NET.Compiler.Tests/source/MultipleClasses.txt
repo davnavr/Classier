@@ -14,7 +14,7 @@ public class Class1(arg1) {
     _ => 0;
   }
 
-  public virtual myVirtMethod () {
+  public virtual def myVirtMethod () {
     0
   }
 }
@@ -25,13 +25,13 @@ public class Class1(arg1) {
 public class Class2(arg2, arg3) extends Class1(arg2) {
   let thing = 5;
 
-  public override myVirtMethod () {
+  public override def myVirtMethod () {
     1
   }
 }
 
 public interface Interface1 {
-  public doAThing (thing: theThing): anotherThing;
+  public def doAThing (thing: theThing): anotherThing;
 }
 
 /// Or maybe this style is better?
@@ -50,7 +50,7 @@ public class Class3 implements Interface1 {
 }
 
 public class Class4(arg4) extends Class2(arg4 + 5) implements Interface1 {
-  public sealed override myVirtMethod() => 2;
+  public sealed override def myVirtMethod() => 2;
 }
 
 public class Class5 extends Class3 {

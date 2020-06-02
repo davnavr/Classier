@@ -1,6 +1,6 @@
 
 public module MyModule {
-  public myFunc () {
+  public def myFunc () {
     try {
         throw new system.InvalidOperationException();
     }
