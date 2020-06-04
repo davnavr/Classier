@@ -968,7 +968,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                         |> Function
                     ]
 
-            let def =
+            let classDef =
                 { Definition = def
                   Header = Class
                     { PrimaryCtor = primaryCtor
@@ -980,7 +980,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     then members @ recordMembers()
                     else members }
 
-            preturn def
+
+            preturn classDef
 
     let moduleDef =
         typeDef "module"

@@ -3,21 +3,16 @@
 open System.Collections.Immutable
 open FParsec
 
-type UnknownSymbol =
-    { Name: Identifier
-      Origin: SymbolOrigin
-      PossibleParents: ResolvedSymbol list }
-
-    // TODO: Symbol table should only be filled with classes, modules, interfaces, methods, functions, etc. & should ignore local vars.
+// TODO: Symbol table should only be filled with classes, modules, interfaces, methods, functions, etc. & should ignore local vars.
 type SymbolTable =
     { Namespaces: ImmutableSortedDictionary<string list, ImmutableSortedSet<ResolvedSymbol>>
-      Types: ImmutableSortedSet<TypeDef>
+      Types: ImmutableSortedDictionary<Definition, TypeDef>
       (*Symbols: ImmutableSortedSet<ResolvedSymbol>*) }
 
 module SymbolTable =
     let empty =
         { Namespaces = ImmutableSortedDictionary.Empty
-          Types = ImmutableSortedSet.Empty }
+          Types = ImmutableSortedDictionary.Empty }
 
     let addNamespace ns table =
         let namespaces, _ =
@@ -34,6 +29,7 @@ module SymbolTable =
         { table with Namespaces = namespaces }
 
     let addType typeDef table =
-        if table.Types.Contains(typeDef)
+        let def = typeDef.Definition
+        if table.Types.ContainsKey(def)
         then None
-        else Some { table with Types = table.Types.Add(typeDef) }
+        else Some { table with Types = table.Types.Add(def, typeDef) }
