@@ -766,12 +766,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> optList
         <?> "generic parameters"
     let genericDefinition =
-        tuple4
-            identifierStr
-            getUserState
-            genericParams
-            position
-        |>> (fun (name, state, gparams, pos) -> // TODO: Definition should include position information.
+        identifierStr
+        .>> ignored
+        .>>. genericParams
+        .>>. getUserState
+        .>>. position
+        |>> (fun (((name, gparams), state), pos) -> // TODO: Definition should include position information.
             { Name = name
               Generics = List.map GenericParam gparams }
             |> Definition.ofIdentifier state)
@@ -791,25 +791,18 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             [
                 "inline", Flags.Inline
             ]
-        >>. getUserState
-        .>> skipString "def"
-        .>> ignored1
-        .>>. identifierStr
-        .>> ignored
-        .>>. genericParams
+        >>. skipString "def"
+        >>. ignored1
+        >>. genericDefinition
         .>> ignored
         .>>. paramTupleList
         |> attempt
         .>>. typeAnnotationOpt
         .>> ignored
         .>>. functionBody
-        |>> fun (((((state, name), gparams), fparams), retType), body) ->
+        |>> fun ((((def, p), fparams), retType), body) ->
             { Body = body
-              FuncDef =
-                { Name = name
-                  Generics = List.map GenericParam gparams }
-                |> Definition.ofIdentifier state
-                |> Some
+              FuncDef = Some def
               Parameters = fparams
               ReturnType = retType }
 
@@ -839,12 +832,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         skipString word
         >>. ignored1
         |> attempt
-        >>. getUserState // TODO: User state is not needed here.
 
     let interfaceDef =
         typeDef "interface"
-        .>>. identifierStr
-        .>>. genericParams
+        >>. genericDefinition
         .>>. implements
         .>> ignored
         .>>. blockChoice
@@ -855,11 +846,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> (choice >> memberDef Flags.Internal)
             ]
-        |>> (fun ((((state, name), gparams), iimpls), members) ->
-            { Definition =
-                { Name = name
-                  Generics = List.map GenericParam gparams }
-                |> Definition.ofIdentifier state
+        |>> (fun (((def, p), iimpls), members) ->
+            { Definition = def
               Header = Interface
               InitBody = []
               Interfaces = iimpls
@@ -985,8 +973,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let moduleDef =
         typeDef "module"
-        .>>. identifierStr
-        .>>. genericParams
+        >>. identifierStr
+        .>>. getUserState
+        .>>. position
+        .>>. enterParentInc
         .>> ignored
         .>>. memberBlockInit
             [
@@ -995,10 +985,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>> updateUserState popParent
         <?> "module definition"
-        |>> fun (((state, name), gparams), (members, body)) ->
+        |>> fun ((((name, state), pos), p), (members, body)) ->
             { Definition =
                 { Name = name
-                  Generics = List.map GenericParam gparams }
+                  Generics = [] }
                 |> Definition.ofIdentifier state
               Header = Module
               InitBody = body
