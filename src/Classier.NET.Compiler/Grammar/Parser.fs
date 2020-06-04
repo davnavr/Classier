@@ -588,10 +588,11 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 >>. ignored1OrSep
                 |> attempt
                 >>. updateUserState newFlags
-                >>. pattern
+                >>. position
+                .>>. pattern
                 .>> ignored
                 .>>. getUserState
-                >>= (fun (p, state) ->
+                >>= (fun ((pos, p), state) ->
                     let value =
                         equalsExpression
                         |> attempt
@@ -612,7 +613,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                                     .>>. (statementBlock <?> "local function body")
                                     |>> fun ((parameters, retType), body) ->
                                         { Body = body 
-                                          FuncDef = Some (Definition.ofState name state)
+                                          FuncDef = Some (Definition.ofState state pos name)
                                           Parameters = parameters
                                           ReturnType = retType }
                                         |> AnonFunc
@@ -766,15 +767,15 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> optList
         <?> "generic parameters"
     let genericDefinition =
-        identifierStr
+        position
+        .>>. identifierStr
         .>> ignored
         .>>. genericParams
         .>>. getUserState
-        .>>. position
-        |>> (fun (((name, gparams), state), pos) -> // TODO: Definition should include position information.
+        |>> (fun (((pos, name), gparams), state) ->
             { Name = name
               Generics = List.map GenericParam gparams }
-            |> Definition.ofIdentifier state)
+            |> Definition.ofIdentifier state pos)
         .>>. enterParentInc
 
     let functionBody =
@@ -880,8 +881,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let classDef =
         let classCtor =
-            optList (paramTuple .>> ignored)
-            .>>. getUserState
+            tuple3
+                (position)
+                (optList (paramTuple .>> ignored))
+                (getUserState)
             |> memberDef Flags.Private
         let classExtends =
             extends
@@ -903,7 +906,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
                 preturn false
             ]
-        .>>. typeDef "class"
+        .>> typeDef "class"
         |> attempt
         .>>. genericDefinition
         .>> ignored
@@ -923,7 +926,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>> updateUserState popParent
         <??> "class definition"
-        >>= fun ((((((isRecord, _), (def, p)), (ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
+        >>= fun (((((isRecord, (def, par)), (ctorPos, ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
             let primaryCtor =
                 let ctor flags =
                     { BaseCall = SuperCall baseArgs
@@ -939,7 +942,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     { Body = [ Identifier.ofString p.Name |> IdentifierRef |> Return ]
                       FuncDef =
                         { Flags = Flags.Public
-                          Name = Identifier.ofString p.Name }
+                          Name = Identifier.ofString p.Name
+                          Position = ctorPos }
                         |> Some
                       Parameters = []
                       ReturnType = p.Type }
@@ -949,7 +953,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                         { Body = []
                           FuncDef =
                             { Flags = Flags.Public ||| Flags.Override
-                              Name = Identifier.ofString "equals" }
+                              Name = Identifier.ofString "equals"
+                              Position = ctorPos }
                             |> Some
                           Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
                           ReturnType = Primitive PrimitiveType.Boolean }
@@ -973,9 +978,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let moduleDef =
         typeDef "module"
-        >>. identifierStr
+        >>. position
+        .>>. identifierStr
         .>>. getUserState
-        .>>. position
         .>>. enterParentInc
         .>> ignored
         .>>. memberBlockInit
@@ -985,11 +990,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>> updateUserState popParent
         <?> "module definition"
-        |>> fun ((((name, state), pos), p), (members, body)) ->
+        |>> fun ((((pos, name), state), p), (members, body)) ->
             { Definition =
-                { Name = name
-                  Generics = [] }
-                |> Definition.ofIdentifier state
+                Identifier.ofString name
+                |> Definition.ofIdentifier state pos
               Header = Module
               InitBody = body
               Interfaces = []
@@ -1014,7 +1018,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>= (fun (names, pos) ->
             SymbolTable.addNamespace names
             |> updateSymbols
-            >> pushParent (ResolvedSymbol.ofNamespace names pos |> ParentSymbol.Resolved)
+            >> pushParent (ResolvedSymbol.ofNamespace names pos)
             |> updateUserState
             >>. preturn names)
         .>> ignored

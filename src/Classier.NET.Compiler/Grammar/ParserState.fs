@@ -2,15 +2,9 @@
 
 open FParsec
 
-[<RequireQualifiedAccess>]
-type ParentSymbol =
-    | Incomplete of Lazy<ParentSymbol>
-    | Resolved of ResolvedSymbol
-    | Unknown
-
 type ParserState =
     { Flags: Flags list
-      Parents: ParentSymbol list
+      Parents: ResolvedSymbol list
       Symbols: SymbolTable }
 
 module ParserState =
@@ -56,9 +50,8 @@ module ParserState =
     let clearAllFlags state: ParserState = { state with Flags = List.empty }
 
     let enterParentInc =
-        let parent = ref ParentSymbol.Unknown
-        lazy(parent.Value)
-        |> ParentSymbol.Incomplete
+        let p = (fun () -> invalidOp "Ensure the proper parent is set in this reference cell.") |> ref
+        p.Value()
         |> pushParent
         |> updateUserState
-        >>. preturn parent
+        >>. preturn p

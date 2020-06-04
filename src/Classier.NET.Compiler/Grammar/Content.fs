@@ -103,6 +103,7 @@ and MemberDef =
     | NestedType of TypeDef
 and Definition =
     { Flags: Flags
-      Name: Identifier }
+      Name: Identifier
+      Position: FParsec.Position }
 
     override this.ToString() = this.Name.ToString()

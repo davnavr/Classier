@@ -2,8 +2,9 @@
 
 [<CompilationRepresentationAttribute(CompilationRepresentationFlags.ModuleSuffix)>]
 module Definition =
-    let ofIdentifier state identifier =
+    let ofIdentifier state pos identifier =
         { Flags = ParserState.currentFlags state
-          Name = identifier }
-    // TODO: Switch parameters.
-    let ofState name state = ofIdentifier state (Identifier.ofString name)
+          Name = identifier
+          Position = pos }
+
+    let ofState state pos name = ofIdentifier state pos (Identifier.ofString name)
