@@ -7,7 +7,7 @@ open FParsec
 type SymbolTable =
     { Namespaces: ImmutableSortedDictionary<string list, ImmutableSortedSet<ResolvedSymbol>>
       Types: ImmutableSortedDictionary<Definition, TypeDef>
-      (*Symbols: ImmutableSortedSet<ResolvedSymbol>*) }
+      (*Symbols: something *) }
 
 module SymbolTable =
     let empty =

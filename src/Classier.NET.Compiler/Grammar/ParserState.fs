@@ -50,8 +50,11 @@ module ParserState =
     let clearAllFlags state: ParserState = { state with Flags = List.empty }
 
     let enterParentInc =
-        let p = (fun () -> invalidOp "Ensure the proper parent is set in this reference cell.") |> ref
-        p.Value()
-        |> pushParent
-        |> updateUserState
-        >>. preturn p
+        let p = (fun parents -> invalidOp "Ensure the proper parent is set in this reference cell before retrieving the current parent.") |> ref
+
+        getUserState
+        >>= fun state ->
+            p.Value state.Parents
+            |> pushParent
+            |> updateUserState
+            >>. preturn p

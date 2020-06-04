@@ -766,16 +766,18 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> gtsign
         |> optList
         <?> "generic parameters"
-    let genericDefinition =
-        position
-        .>>. identifierStr
+    let genericIdentifier =
+        identifierStr
         .>> ignored
         .>>. genericParams
-        .>>. getUserState
-        |>> (fun (((pos, name), gparams), state) ->
+        |>> fun (name, gparams) ->
             { Name = name
               Generics = List.map GenericParam gparams }
-            |> Definition.ofIdentifier state pos)
+    let genericDefinition =
+        position
+        .>>. genericIdentifier
+        .>>. getUserState
+        |>> (fun ((pos, id), state) -> Definition.ofIdentifier state pos id)
         .>>. enterParentInc
 
     let functionBody =
@@ -794,16 +796,18 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         >>. skipString "def"
         >>. ignored1
-        >>. genericDefinition
+        >>. position
+        .>>. genericIdentifier
+        .>>. getUserState
         .>> ignored
         .>>. paramTupleList
         |> attempt
         .>>. typeAnnotationOpt
         .>> ignored
         .>>. functionBody
-        |>> fun ((((def, p), fparams), retType), body) ->
+        |>> fun (((((pos, id), state), fparams), retType), body) ->
             { Body = body
-              FuncDef = Some def
+              FuncDef = Some (Definition.ofIdentifier state pos id)
               Parameters = fparams
               ReturnType = retType }
 
@@ -847,13 +851,16 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> (choice >> memberDef Flags.Internal)
             ]
-        |>> (fun (((def, p), iimpls), members) ->
-            { Definition = def
-              Header = Interface
-              InitBody = []
-              Interfaces = iimpls
-              Members = members })
         <?> "interface definition"
+        |>> fun (((def, this), iimpls), members) ->
+            let idef =
+                { Definition = def
+                  Header = Interface
+                  InitBody = []
+                  Interfaces = iimpls
+                  Members = members }
+            this := ResolvedSymbol.ofType idef
+            idef
 
     /// Allows both members and statements.
     let memberBlockInit members =
@@ -926,7 +933,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>> updateUserState popParent
         <??> "class definition"
-        >>= fun (((((isRecord, (def, par)), (ctorPos, ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
+        |>> fun (((((isRecord, (def, this)), (ctorPos, ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
             let primaryCtor =
                 let ctor flags =
                     { BaseCall = SuperCall baseArgs
@@ -961,7 +968,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                         |> Function
                     ]
 
-            let classDef =
+            let cdef =
                 { Definition = def
                   Header = Class
                     { PrimaryCtor = primaryCtor
@@ -972,9 +979,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     if isRecord
                     then members @ recordMembers()
                     else members }
-
-
-            preturn classDef
+            this := ResolvedSymbol.ofType cdef
+            cdef
 
     let moduleDef =
         typeDef "module"
@@ -990,14 +996,17 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>> updateUserState popParent
         <?> "module definition"
-        |>> fun ((((pos, name), state), p), (members, body)) ->
-            { Definition =
-                Identifier.ofString name
-                |> Definition.ofIdentifier state pos
-              Header = Module
-              InitBody = body
-              Interfaces = []
-              Members = members }
+        |>> fun ((((pos, name), state), this), (members, body)) ->
+            let mdef =
+                { Definition =
+                    Identifier.ofString name
+                    |> Definition.ofIdentifier state pos
+                  Header = Module
+                  InitBody = body
+                  Interfaces = []
+                  Members = members }
+            this := ResolvedSymbol.ofType mdef
+            mdef
 
     nestedTypesRef :=
         [
