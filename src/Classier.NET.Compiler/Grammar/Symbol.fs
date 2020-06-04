@@ -4,7 +4,6 @@ open FParsec
 
 [<RequireQualifiedAccess>]
 type Symbol =
-    | Incomplete of Lazy<Symbol>
     | Namespace of string list
     | Type of TypeDef
 

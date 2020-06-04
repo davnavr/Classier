@@ -857,7 +857,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                   InitBody = []
                   Interfaces = iimpls
                   Members = members }
-            this := (fun () -> Symbol.Type idef)
+            this := ResolvedSymbol.ofType idef
             idef
 
     /// Allows both members and statements.
@@ -931,7 +931,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>> updateUserState popParent
         <??> "class definition"
-        |>> fun (((((isRecord, (def, this)), (ctorPos, ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
+        >>= fun (((((isRecord, (def, this)), (ctorPos, ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
             let primaryCtor =
                 let ctor flags =
                     { BaseCall = SuperCall baseArgs
@@ -977,8 +977,11 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     if isRecord
                     then members @ recordMembers()
                     else members }
-            this := (fun () -> Symbol.Type cdef)
-            cdef
+            this := ResolvedSymbol.ofType cdef
+            SymbolTable.addSymbol (ResolvedSymbol.ofType cdef []) // NOTE: This is temporary.
+            |> updateSymbols
+            |> updateUserState
+            >>. preturn cdef
 
     let moduleDef =
         typeDef "module"
@@ -1003,7 +1006,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                   InitBody = body
                   Interfaces = []
                   Members = members }
-            this := (fun () -> Symbol.Type mdef)
+            this := ResolvedSymbol.ofType mdef
             mdef
 
     nestedTypesRef :=
@@ -1025,7 +1028,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>= (fun (names, pos) ->
             SymbolTable.addNamespace names
             |> updateSymbols
-            >> pushParent (ResolvedSymbol.ofNamespace names pos)
+            >> pushParent (lazy(ResolvedSymbol.ofNamespace names pos))
             |> updateUserState
             >>. preturn names)
         .>> ignored

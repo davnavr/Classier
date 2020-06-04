@@ -4,7 +4,7 @@ open FParsec
 
 type ParserState =
     { Flags: Flags list
-      Parents: ResolvedSymbol list
+      Parents: Lazy<ResolvedSymbol> list
       Symbols: SymbolTable }
 
 module ParserState =
@@ -52,17 +52,14 @@ module ParserState =
     let clearAllFlags state: ParserState = { state with Flags = List.empty }
 
     let enterParentInc =
-        let symbol = (fun () -> invalidOp "Ensure the proper parent symbol is set in this reference cell.") |> ref
-
-        position
-        .>>. getUserState
-        >>= fun (pos, state) ->
-            { Origin = SourceCode pos
-              Parents = state.Parents
-              Symbol =
-                symbol.Value
-                |> Lazy.Create
-                |> Symbol.Incomplete }
+        let symbol = ref (fun _ -> invalidOp "Ensure the proper parent symbol is set in this reference cell.")
+        getUserState
+        >>= fun (state) ->
+            (fun () ->
+                state.Parents
+                |> List.map (fun parent -> parent.Value)
+                |> symbol.Value)
+            |> Lazy.Create
             |> pushParent
             |> updateUserState
             >>. preturn symbol

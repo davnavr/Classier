@@ -86,7 +86,7 @@
             Assert.Equal(expectedNamespaces, namespaces.Keys);
         }
 
-        [InlineData("MultipleClasses.txt", "test", new[] { "Class1", "Class2" /*, "Interface1", "Class3", */ })]
+        [InlineData("MultipleClasses.txt", "test", new[] { "Class1", "Class2", "Interface1", "Class3", "Nested", "EvenMoreNested", "MuchMoreNested", "TheNested", "Class4", "Class5", "Class6" })]
         [Theory]
         public void ParserAddsTypesToSymbolTable(string file, string namespaceName, string[] typeNames)
         {
@@ -95,10 +95,11 @@
             var expectedNamespace = ListModule.OfArray(namespaceName.Split('.'));
 
             // Act
-            var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Namespaces[expectedNamespace];
+            var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Types;
+            //// TODO: Write another test that checks that classes were added to the namespace dictionary.
 
             // Assert
-            Assert.Equal(typeNames, types.Select(s => ((Symbol.Type)s.Symbol).Item.Definition.Name.Name));
+            Assert.Equal(typeNames, types.Keys.Select(def => def.Name.Name));
         }
     }
 }

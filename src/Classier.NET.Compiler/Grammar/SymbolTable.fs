@@ -32,4 +32,12 @@ module SymbolTable =
         let def = typeDef.Definition
         if table.Types.ContainsKey(def)
         then None
-        else Some { table with Types = table.Types.Add(def, typeDef) }
+        else
+            // TODO: Figure out how to add the type to its namespace in the dictionary.
+            let withType = { table with Types = table.Types.Add(def, typeDef) }
+            Some withType
+
+    let addSymbol symbol table =
+        match symbol.Symbol with
+        | Symbol.Namespace names -> addNamespace names table
+        | Symbol.Type typeDef -> (addType typeDef table).Value
