@@ -13,6 +13,8 @@ module ParserState =
           Parents = List.empty
           Symbols = SymbolTable.empty }
 
+    let position: Parser<Position, _> = fun stream -> Reply(stream.Position)
+
     let currentFlags state =
         state.Flags
         |> List.tryHead
@@ -50,11 +52,17 @@ module ParserState =
     let clearAllFlags state: ParserState = { state with Flags = List.empty }
 
     let enterParentInc =
-        let p = (fun parents -> invalidOp "Ensure the proper parent is set in this reference cell before retrieving the current parent.") |> ref
+        let symbol = (fun () -> invalidOp "Ensure the proper parent symbol is set in this reference cell.") |> ref
 
-        getUserState
-        >>= fun state ->
-            p.Value state.Parents
+        position
+        .>>. getUserState
+        >>= fun (pos, state) ->
+            { Origin = SourceCode pos
+              Parents = state.Parents
+              Symbol =
+                symbol.Value
+                |> Lazy.Create
+                |> Symbol.Incomplete }
             |> pushParent
             |> updateUserState
-            >>. preturn p
+            >>. preturn symbol

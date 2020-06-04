@@ -21,8 +21,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let underscore = skipChar '_' <?> "underscore"
     let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
-    let position: Parser<Position, _> = fun stream -> Reply(stream.Position)
-
     let optList p = opt p |>> Option.defaultValue []
 
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
@@ -859,7 +857,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                   InitBody = []
                   Interfaces = iimpls
                   Members = members }
-            this := ResolvedSymbol.ofType idef
+            this := (fun () -> Symbol.Type idef)
             idef
 
     /// Allows both members and statements.
@@ -979,7 +977,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     if isRecord
                     then members @ recordMembers()
                     else members }
-            this := ResolvedSymbol.ofType cdef
+            this := (fun () -> Symbol.Type cdef)
             cdef
 
     let moduleDef =
@@ -1005,7 +1003,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                   InitBody = body
                   Interfaces = []
                   Members = members }
-            this := ResolvedSymbol.ofType mdef
+            this := (fun () -> Symbol.Type mdef)
             mdef
 
     nestedTypesRef :=
