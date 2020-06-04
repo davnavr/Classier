@@ -765,6 +765,17 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> gtsign
         |> optList
         <?> "generic parameters"
+    let genericDefinition =
+        tuple4
+            identifierStr
+            getUserState
+            genericParams
+            position
+        |>> (fun (name, state, gparams, pos) -> // TODO: Definition should include position information.
+            { Name = name
+              Generics = List.map GenericParam gparams }
+            |> Definition.ofIdentifier state)
+        .>>. enterParentInc
 
     let functionBody =
         choiceL
@@ -828,7 +839,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         skipString word
         >>. ignored1
         |> attempt
-        >>. getUserState
+        >>. getUserState // TODO: User state is not needed here.
 
     let interfaceDef =
         typeDef "interface"
@@ -880,8 +891,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             members, body
 
     let classDef =
-        
-        let primaryCtor =
+        let classCtor =
             optList (paramTuple .>> ignored)
             .>>. getUserState
             |> memberDef Flags.Private
@@ -907,10 +917,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>>. typeDef "class"
         |> attempt
-        .>>. identifierStr
-        .>>. genericParams
+        .>>. genericDefinition
         .>> ignored
-        .>>. primaryCtor
+        .>>. classCtor
         .>>. classExtends
         .>>. implements
         .>> ignored
@@ -924,8 +933,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
                 semicolon >>. preturn ([], [])
             ]
+        .>> updateUserState popParent
         <??> "class definition"
-        |>> fun (((((((isRecord, state), name), gparams), (ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
+        >>= fun ((((((isRecord, _), (def, p)), (ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
             let primaryCtor =
                 let ctor flags =
                     { BaseCall = SuperCall baseArgs
@@ -958,19 +968,19 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                         |> Function
                     ]
 
-            { Definition =
-                { Name = name
-                  Generics = List.map GenericParam gparams }
-                |> Definition.ofIdentifier state
-              Header = Class
-                { PrimaryCtor = primaryCtor
-                  SuperClass = superclass }
-              InitBody = body
-              Interfaces = iimpls
-              Members =
-                if isRecord
-                then members @ recordMembers()
-                else members }
+            let def =
+                { Definition = def
+                  Header = Class
+                    { PrimaryCtor = primaryCtor
+                      SuperClass = superclass }
+                  InitBody = body
+                  Interfaces = iimpls
+                  Members =
+                    if isRecord
+                    then members @ recordMembers()
+                    else members }
+
+            preturn def
 
     let moduleDef =
         typeDef "module"
@@ -1011,8 +1021,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>. sepBy1 identifierStr (separator period)
         .>>. position
         >>= (fun (names, pos) ->
-            updateSymbols (SymbolTable.addNamespace names)
-            >> pushParent (ResolvedSymbol.ofNamespace names pos)
+            SymbolTable.addNamespace names
+            |> updateSymbols
+            >> pushParent (ResolvedSymbol.ofNamespace names pos |> ParentSymbol.Resolved)
             |> updateUserState
             >>. preturn names)
         .>> ignored

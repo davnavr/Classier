@@ -1,12 +1,14 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
+open System.Collections.Immutable
+
 type ResolvedSymbol =
     { Origin: SymbolOrigin
-      Parent: ResolvedSymbol list
+      Parents: ImmutableStack<ResolvedSymbol>
       Symbol: Symbol }
 
 module ResolvedSymbol =
     let ofNamespace names pos =
         { Origin = SourceCode pos
-          Parent = []
+          Parents = ImmutableStack.Empty // TODO: This should be set to the parent namespace.
           Symbol = Symbol.Namespace names }

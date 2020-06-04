@@ -1,10 +1,17 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
 open System.Collections.Immutable
+open FParsec
 
-type ParserState =
+[<RequireQualifiedAccess>]
+type ParentSymbol =
+    | Incomplete of Lazy<ParentSymbol>
+    | Resolved of ResolvedSymbol
+    | Unknown
+
+type ParserState = // TODO: The F# list is slightly faster than ImmutableStack and should replace it.
     { Flags: ImmutableStack<Flags>
-      Parents: ImmutableStack<ResolvedSymbol>
+      Parents: ImmutableStack<ParentSymbol>
       Symbols: SymbolTable }
 
 module ParserState =
@@ -29,7 +36,7 @@ module ParserState =
 
     let newFlags state = pushFlags Flags.None state
 
-    let pushParent parent state = { state with Parents = state.Parents.Push(parent) }
+    let pushParent parent state: ParserState = { state with Parents = state.Parents.Push(parent) }
 
     let popFlags state =
         if state.Flags.IsEmpty
@@ -51,3 +58,11 @@ module ParserState =
 
     let clearAllParents state: ParserState = { state with Parents = ImmutableStack.Empty }
     let clearAllFlags state: ParserState = { state with Flags = ImmutableStack.Empty }
+
+    let enterParentInc =
+        let parent = ref ParentSymbol.Unknown
+        lazy(parent.Value)
+        |> ParentSymbol.Incomplete
+        |> pushParent
+        |> updateUserState
+        >>. preturn parent

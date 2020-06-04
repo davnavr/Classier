@@ -86,7 +86,7 @@
             Assert.Equal(expectedNamespaces, namespaces.Keys);
         }
 
-        [InlineData("MultipleClasses.txt", "test", new[] { "Class1", "Class2" })]
+        [InlineData("MultipleClasses.txt", "test", new[] { "Class1", "Class2" /*, "Interface1", "Class3", */ })]
         [Theory]
         public void ParserAddsTypesToSymbolTable(string file, string namespaceName, string[] typeNames)
         {
