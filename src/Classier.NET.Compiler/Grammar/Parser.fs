@@ -920,7 +920,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                             ]
                           FuncDef =
                             { Flags = Flags.Public
-                              Name = Identifier.ofString param.Name
+                              Identifier = Identifier.ofString param.Name
                               Position = pos }
                             |> Some
                           Parameters = []
@@ -931,7 +931,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                             { Body = []
                               FuncDef =
                                 { Flags = Flags.Public ||| Flags.Override
-                                  Name = Identifier.ofString "equals"
+                                  Identifier = Identifier.ofString "equals"
                                   Position = pos }
                                 |> Some
                               Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
@@ -1040,7 +1040,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>> updateUserState clearAllFlags
     >>= fun ((ns, uses), defs) ->
         GlobalsTable.addNamespace ns
-        // TODO: Add the defs to the global symbol table.
+        >> GlobalsTable.addTypes
+            (Seq.map (GlobalTypeSymbol.ofTypeDef ns) defs)
+            ns
         |> updateSymbols
         |> updateUserState
         >>%

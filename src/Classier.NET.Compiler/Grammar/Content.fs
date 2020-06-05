@@ -1,5 +1,12 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
+type Definition =
+    { Flags: Flags
+      Identifier: Identifier
+      Position: FParsec.Position }
+
+    override this.ToString() = this.Identifier.ToString()
+
 type Expression =
     | AnonFunc of Function
     | BoolLit of bool
@@ -92,7 +99,6 @@ and ConstructorBase =
     | SuperCall of Expression list
 and MemberDef =
     | Ctor of Constructor
-    | Field of Variable
     | Function of Function
     | Property of 
         {| Get: Function option
@@ -101,9 +107,3 @@ and MemberDef =
            Value: Expression option |}
     | Method of Function
     | NestedType of TypeDef
-and Definition =
-    { Flags: Flags
-      Name: Identifier
-      Position: FParsec.Position }
-
-    override this.ToString() = this.Name.ToString()

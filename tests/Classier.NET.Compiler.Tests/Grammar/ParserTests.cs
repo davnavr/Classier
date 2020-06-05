@@ -69,22 +69,12 @@
         {
             // Arrange
             using var stream = new EmbeddedSourceFile(file).GetStream();
-            var expectedNamespaces = namespaceNames
-                .Aggregate(
-                    ImmutableList.Create<FSharpList<string>>(),
-                    (list, name) =>
-                    {
-                        return list.Add(
-                            ListModule.Append(
-                                list.IsEmpty ? ListModule.Empty<string>() : list[list.Count - 1],
-                                ListModule.Singleton(name)));
-                    });
 
             // Act
             var namespaces = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Namespaces;
 
             // Assert
-            Assert.Equal(expectedNamespaces, namespaces.Keys);
+            Assert.NotNull(namespaces[ListModule.OfArray(namespaceNames)]);
         }
 
         [InlineData("MultipleClasses.txt", "test", new[] { "Class1", "Class2", "Interface1", "Class3", "Class4", "Class5", "Class6" })]
@@ -96,10 +86,10 @@
             var expectedNamespace = ListModule.OfArray(namespaceName.Split('.'));
 
             // Act
-            var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8);
+            var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Namespaces[expectedNamespace];
 
             // Assert
-            throw new NotImplementedException();
+            Assert.Equal(typeNames, types.Select(type => GlobalType.getName(type.Type)));
         }
     }
 }
