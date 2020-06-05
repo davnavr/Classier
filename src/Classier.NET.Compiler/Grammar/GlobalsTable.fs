@@ -1,15 +1,15 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
 open System.Collections.Immutable
-open FParsec
 
-// TODO: Symbol table should only be filled with classes, modules, interfaces, methods, functions, etc. & should ignore local vars.
-type SymbolTable =
-    { Namespaces: ImmutableSortedDictionary<string list, ImmutableSortedSet<ResolvedSymbol>>
+/// Stores the namespaces and types declared in compilation units.
+type GlobalsTable =
+    { Namespaces: ImmutableSortedDictionary<string list, ImmutableSortedSet<GlobalSymbol>>
+      // TODO: Fix, nested types with different parents but the same name might not work here.
       Types: ImmutableSortedDictionary<Definition, TypeDef>
       (*Symbols: something *) }
 
-module SymbolTable =
+module GlobalsTable =
     let empty =
         { Namespaces = ImmutableSortedDictionary.Empty
           Types = ImmutableSortedDictionary.Empty }
@@ -29,15 +29,4 @@ module SymbolTable =
         { table with Namespaces = namespaces }
 
     let addType typeDef table =
-        let def = typeDef.Definition
-        if table.Types.ContainsKey(def)
-        then None
-        else
-            // TODO: Figure out how to add the type to its namespace in the dictionary.
-            let withType = { table with Types = table.Types.Add(def, typeDef) }
-            Some withType
-
-    let addSymbol symbol table =
-        match symbol.Symbol with
-        | Symbol.Namespace names -> addNamespace names table
-        | Symbol.Type typeDef -> (addType typeDef table).Value
+        invalidOp "not implemented"

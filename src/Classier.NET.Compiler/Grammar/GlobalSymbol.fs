@@ -1,13 +1,11 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
-open System.Collections.Immutable
-
-type ResolvedSymbol =
+type GlobalSymbol =
     { Origin: SymbolOrigin
-      Parents: ResolvedSymbol list
+      Parents: GlobalSymbol list
       Symbol: Symbol }
 
-module ResolvedSymbol =
+module GlobalSymbol =
     let ofNamespace names pos =
         { Origin = SourceCode pos
           Parents = List.empty

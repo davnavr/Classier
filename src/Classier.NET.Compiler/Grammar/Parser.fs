@@ -21,6 +21,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let underscore = skipChar '_' <?> "underscore"
     let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
+    let position: Parser<Position, _> = fun stream -> Reply(stream.Position)
+
     let optList p = opt p |>> Option.defaultValue []
 
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
@@ -184,9 +186,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             |> attempt
             >>. choice
                 [
-                    skipChar 'n' >>. preturn '\n'
-                    skipChar 'r' >>. preturn '\r'
-                    skipChar 't' >>. preturn '\t'
+                    skipChar 'n' >>% '\n'
+                    skipChar 'r' >>% '\r'
+                    skipChar 't' >>% '\t'
 
                     skipChar 'u'
                     |> attempt
@@ -281,8 +283,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     tryBlock |>> TryExpr <?> "try expression"
                     
                     [
-                        skipString "true" >>. preturn true
-                        skipString "false" >>. preturn false
+                        skipString "true" >>% true
+                        skipString "false" >>% false
                     ]
                     |> choice
                     |>> BoolLit
@@ -293,12 +295,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     pchar '0'
                     >>. choice
                         [
-                            anyOf [ 'b'; 'B' ] >>. preturn [ '0'; '1'; ];
-                            anyOf [ 'x'; 'X' ] >>. preturn (decimalChars @ [ 'a'..'z' ] @ [ 'A'..'Z' ]);
+                            anyOf [ 'b'; 'B' ] >>% [ '0'; '1'; ];
+                            anyOf [ 'x'; 'X' ] >>% (decimalChars @ [ 'a'..'z' ] @ [ 'A'..'Z' ]);
                         ]
                     |> attempt
-                    <|> preturn decimalChars
-                    <|> (pchar '.' >>. preturn [])
+                    <|>% decimalChars
+                    <|> (pchar '.' >>% [])
                     >>= (fun chars ->
                         let digits c =
                             attempt (anyOf c) .>> (skipMany (pchar '_') <?> "digit separator") |> many1
@@ -317,7 +319,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                         >>= fun (idigits, fdigits) ->
                             let suffixes pairs none =
                                 pairs
-                                |> Seq.map (fun (s, f) -> pstringCI s >>. preturn f)
+                                |> Seq.map (fun (s, f) -> pstringCI s >>% f)
                                 |> choice
                                 |> opt
                                 |>> Option.defaultValue none
@@ -383,7 +385,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 memberAccess <|> funcCall
                 .>> ignored
                 |> many1
-                <|> preturn []
+                <|>% []
                 |>> Seq.fold
                     (fun prev next -> next prev)
                     target
@@ -436,7 +438,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 underscore
                 >>. ignored
                 |> attempt
-                >>. preturn Default
+                >>% Default
                 <?> "default pattern"
             ]
             |> choice
@@ -469,16 +471,13 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         choiceL
             [
                 PrimitiveType.Names
-                |> Seq.map (fun pair ->
-                    skipString (pair.Value)
-                    >>. preturn (pair.Key))
+                |> Seq.map (fun pair -> skipString (pair.Value) >>% pair.Key)
                 |> choice
                 |>> Primitive
 
                 identifierFull
 
-                skipChar '_'
-                >>. preturn Inferred;
+                skipChar '_' >>% Inferred
 
                 between
                     lparen
@@ -561,9 +560,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     statementRef :=
         choiceL
             [
-                semicolon
-                >>. preturn Empty
-                <?> "empty statement";
+                semicolon >>% Empty <?> "empty statement"
                 
                 skipString "var"
                 >>. ignored1OrSep
@@ -660,7 +657,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
                         ignored
                         >>. semicolon
-                        >>. preturn None
+                        >>% None
                     ]
                 |> attempt
                 |>> Throw
@@ -677,11 +674,11 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 .>>. choice
                     [
                         followedBy rcurlybracket
-                        >>. preturn Return
+                        >>% Return
                         <?> "implicit return"
 
                         semicolon
-                        >>. preturn IgnoredExpr
+                        >>% IgnoredExpr
                         <?> "ignored expression"
                     ]
                 |>> fun (expr, statement) -> statement expr
@@ -738,12 +735,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     skipString "in"
                     >>. ignored1
                     |> attempt
-                    >>. preturn Contravariant;
+                    >>% Contravariant;
 
                     skipString "out"
                     >>. ignored1
                     |> attempt
-                    >>. preturn Covariant;
+                    >>% Covariant;
 
                     preturn NoVariance;
                 ]
@@ -776,14 +773,13 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>>. genericIdentifier
         .>>. getUserState
         |>> (fun ((pos, id), state) -> Definition.ofIdentifier state pos id)
-        .>>. enterParentInc
 
     let functionBody =
         choiceL
             [
                 statementBlock
                 lambdaBody
-                semicolon >>. preturn []
+                semicolon >>% []
             ]
             "function body"
 
@@ -850,15 +846,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 |> (choice >> memberDef Flags.Internal)
             ]
         <?> "interface definition"
-        |>> fun (((def, this), iimpls), members) ->
-            let idef =
-                { Definition = def
-                  Header = Interface
-                  InitBody = []
-                  Interfaces = iimpls
-                  Members = members }
-            this := ResolvedSymbol.ofType idef
-            idef
+        |>> fun ((def, iimpls), members) ->
+            { Definition = def
+              Header = Interface
+              InitBody = []
+              Interfaces = iimpls
+              Members = members }
 
     /// Allows both members and statements.
     let memberBlockInit members =
@@ -907,7 +900,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 skipString "data"
                 >>. ignored1
                 |> attempt
-                >>. preturn true
+                >>% true
 
                 preturn false
             ]
@@ -927,11 +920,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> memberBlockInit
 
-                semicolon >>. preturn ([], [])
+                semicolon >>% ([], [])
             ]
-        .>> updateUserState popParent
         <??> "class definition"
-        >>= fun (((((isRecord, (def, this)), (ctorPos, ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
+        |>> fun (((((isRecord, def), (ctorPos, ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
             let primaryCtor =
                 let ctor flags =
                     { BaseCall = SuperCall baseArgs
@@ -966,48 +958,39 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                         |> Function
                     ]
 
-            let cdef =
-                { Definition = def
-                  Header = Class
-                    { PrimaryCtor = primaryCtor
-                      SuperClass = superclass }
-                  InitBody = body
-                  Interfaces = iimpls
-                  Members =
-                    if isRecord
-                    then members @ recordMembers()
-                    else members }
-            this := ResolvedSymbol.ofType cdef
-            SymbolTable.addSymbol (ResolvedSymbol.ofType cdef []) // NOTE: This is temporary.
-            |> updateSymbols
-            |> updateUserState
-            >>. preturn cdef
+            { Definition = def
+              Header = Class
+                { PrimaryCtor = primaryCtor
+                  SuperClass = superclass }
+              InitBody = body
+              Interfaces = iimpls
+              Members =
+                if isRecord
+                then members @ recordMembers()
+                else members }
+
+    // TODO: Instead of adding to the symbol table every time a class, module, etc. is parsed, instead add all once the entire compilation unit is parsed.
 
     let moduleDef =
         typeDef "module"
         >>. position
         .>>. identifierStr
         .>>. getUserState
-        .>>. enterParentInc
         .>> ignored
         .>>. memberBlockInit
             [
                 functionDef |>> Function <?> "function definition"
                 nestedTypes
             ]
-        .>> updateUserState popParent
         <?> "module definition"
-        |>> fun ((((pos, name), state), this), (members, body)) ->
-            let mdef =
-                { Definition =
-                    Identifier.ofString name
-                    |> Definition.ofIdentifier state pos
-                  Header = Module
-                  InitBody = body
-                  Interfaces = []
-                  Members = members }
-            this := ResolvedSymbol.ofType mdef
-            mdef
+        |>> fun (((pos, name), state), (members, body)) ->
+            { Definition =
+                Identifier.ofString name
+                |> Definition.ofIdentifier state pos
+              Header = Module
+              InitBody = body
+              Interfaces = []
+              Members = members }
 
     nestedTypesRef :=
         [
@@ -1024,16 +1007,14 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>. ignored1
         |> attempt
         >>. sepBy1 identifierStr (separator period)
-        .>>. position
-        >>= (fun (names, pos) ->
-            SymbolTable.addNamespace names
-            |> updateSymbols
-            >> pushParent (lazy(ResolvedSymbol.ofNamespace names pos))
-            |> updateUserState
-            >>. preturn names)
         .>> ignored
         .>> semicolon
-        <?> "namespace declaration")
+        <?> "namespace declaration"
+        >>= fun names ->
+            GlobalsTable.addNamespace names
+            |> updateSymbols
+            |> updateUserState
+            >>% names)
     .>> ignored
     .>>. many
         (skipString "use"
@@ -1054,8 +1035,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
          .>> ignored
          |> many1)
     .>> eof
-    .>> updateUserState (clearAllFlags >> clearAllParents)
-    |>> fun ((ns, uses), defs) ->
-        { TypeDefs = defs
+    .>> updateUserState clearAllFlags
+    >>= fun ((ns, uses), defs) ->
+        GlobalsTable.addNamespace ns
+        |> updateSymbols
+        |> updateUserState
+        >>%
+        { Definitions = defs
           Namespace = ns
           Usings = uses }
