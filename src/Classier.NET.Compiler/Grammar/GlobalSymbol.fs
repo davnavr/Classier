@@ -14,3 +14,4 @@ module GlobalSymbol =
         { Origin = SourceCode typeDef.Definition.Position
           Parents = parents
           Symbol = Symbol.Type typeDef }
+    let getParent symbol: GlobalSymbol = symbol.Parents.Head

@@ -4,7 +4,7 @@ open FParsec
 
 [<RequireQualifiedAccess>]
 type Symbol =
-    | Namespace of string list
+    | Namespace of string
     | Type of TypeDef
 
 type SymbolOrigin =

@@ -5,15 +5,12 @@ open System.Collections.Immutable
 /// Stores the namespaces and types declared in compilation units.
 type GlobalsTable =
     { Namespaces: ImmutableSortedDictionary<string list, ImmutableSortedSet<GlobalSymbol>>
-      // TODO: Fix, nested types with different parents but the same name might not work here.
-      Types: ImmutableSortedDictionary<Definition, TypeDef>
       (*Symbols: something *) }
 
 module GlobalsTable =
-    let empty =
-        { Namespaces = ImmutableSortedDictionary.Empty
-          Types = ImmutableSortedDictionary.Empty }
+    let empty = { Namespaces = ImmutableSortedDictionary.Empty }
 
+    /// Adds a namespace to the symbol table.
     let addNamespace ns table =
         let namespaces, _ =
             ns
@@ -28,5 +25,8 @@ module GlobalsTable =
                 (table.Namespaces, List.empty)
         { table with Namespaces = namespaces }
 
-    let addType typeDef table =
-        invalidOp "not implemented"
+    let addType typeDef ns table =
+        let withNs = addNamespace ns table
+        let currentTypes = withNs.Namespaces.Item ns
+        // TODO: Figure out how to get the GlobalSymbol objects representing the parent namespace.
+        { withNs with Namespaces = withNs.Namespaces.SetItem(ns, currentTypes.Add(GlobalSymbol.ofType typeDef [])) }

@@ -879,11 +879,19 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let classDef =
         let classCtor =
-            tuple3
-                (position)
-                (optList (paramTuple .>> ignored))
-                (getUserState)
+            optList (paramTuple .>> ignored)
+            .>>. getUserState
             |> memberDef Flags.Private
+            |>> fun (ctorParams, state) ->
+                let flags =
+                    match ctorParams with
+                    | [] -> Flags.Public
+                    | _ -> currentFlags state
+                fun body baseArgs ->
+                    { BaseCall = SuperCall baseArgs
+                      Body = body
+                      CtorFlags = flags
+                      Parameters = ctorParams }
         let classExtends =
             extends
             .>>. optList (tupleExpr .>> ignored)
@@ -900,9 +908,38 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 skipString "data"
                 >>. ignored1
                 |> attempt
-                >>% true
+                // Append the record members
+                >>% (fun (parameters: Param list) pos ->
+                    parameters
+                    |> List.map (fun param ->
+                        { Body =
+                            [
+                                Identifier.ofString param.Name
+                                |> IdentifierRef
+                                |> Return
+                            ]
+                          FuncDef =
+                            { Flags = Flags.Public
+                              Name = Identifier.ofString param.Name
+                              Position = pos }
+                            |> Some
+                          Parameters = []
+                          ReturnType = param.Type }
+                        |> Function)
+                    |> List.append
+                        [
+                            { Body = []
+                              FuncDef =
+                                { Flags = Flags.Public ||| Flags.Override
+                                  Name = Identifier.ofString "equals"
+                                  Position = pos }
+                                |> Some
+                              Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
+                              ReturnType = Primitive PrimitiveType.Boolean }
+                            |> Function
+                        ])
 
-                preturn false
+                preturn (fun _ _ -> [])
             ]
         .>> typeDef "class"
         |> attempt
@@ -923,41 +960,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 semicolon >>% ([], [])
             ]
         <??> "class definition"
-        |>> fun (((((isRecord, def), (ctorPos, ctorParams, ctorState)), (superclass, baseArgs)), iimpls), (members, body)) ->
-            let primaryCtor =
-                let ctor flags =
-                    { BaseCall = SuperCall baseArgs
-                      Body = body
-                      CtorFlags = flags
-                      Parameters = ctorParams }
-                match ctorParams with
-                | [] -> ctor Flags.Public
-                | _ -> ctor (currentFlags ctorState)
-            let recordMembers () =
-                ctorParams
-                |> List.map (fun p ->
-                    { Body = [ Identifier.ofString p.Name |> IdentifierRef |> Return ]
-                      FuncDef =
-                        { Flags = Flags.Public
-                          Name = Identifier.ofString p.Name
-                          Position = ctorPos }
-                        |> Some
-                      Parameters = []
-                      ReturnType = p.Type }
-                    |> Function)
-                |> List.append
-                    [
-                        { Body = []
-                          FuncDef =
-                            { Flags = Flags.Public ||| Flags.Override
-                              Name = Identifier.ofString "equals"
-                              Position = ctorPos }
-                            |> Some
-                          Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
-                          ReturnType = Primitive PrimitiveType.Boolean }
-                        |> Function
-                    ]
-
+        |>> fun (((((recordMembers, def), ctor), (superclass, baseArgs)), iimpls), (members, body)) ->
+            let primaryCtor = ctor body baseArgs
             { Definition = def
               Header = Class
                 { PrimaryCtor = primaryCtor
@@ -965,11 +969,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
               InitBody = body
               Interfaces = iimpls
               Members =
-                if isRecord
-                then members @ recordMembers()
-                else members }
-
-    // TODO: Instead of adding to the symbol table every time a class, module, etc. is parsed, instead add all once the entire compilation unit is parsed.
+                match recordMembers primaryCtor.Parameters def.Position with
+                | [] -> members
+                | others -> members @ others }
 
     let moduleDef =
         typeDef "module"
@@ -1038,6 +1040,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>> updateUserState clearAllFlags
     >>= fun ((ns, uses), defs) ->
         GlobalsTable.addNamespace ns
+        // TODO: Add the defs to the global symbol table.
         |> updateSymbols
         |> updateUserState
         >>%
