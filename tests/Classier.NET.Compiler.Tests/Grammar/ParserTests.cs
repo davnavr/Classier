@@ -78,18 +78,21 @@
         }
 
         [InlineData("MultipleClasses.txt", "test", new[] { "Class1", "Class2", "Interface1", "Class3", "Class4", "Class5", "Class6" })]
+        [InlineData("MyGenericClass1.txt", "some.name.collections", new[] { "MutableList<T>" })]
         [Theory]
         public void ParserAddsTypesToSymbolTable(string file, string namespaceName, string[] typeNames)
         {
             // Arrange
             using var stream = new EmbeddedSourceFile(file).GetStream();
-            var expectedNamespace = ListModule.OfArray(namespaceName.Split('.'));
 
             // Act
-            var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Namespaces[expectedNamespace];
+            var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols
+                .Namespaces[ListModule.OfArray(namespaceName.Split('.'))]
+                .Select(type => GlobalType.getName(type.Type))
+                .ToImmutableSortedSet();
 
             // Assert
-            Assert.Equal(typeNames, types.Select(type => GlobalType.getName(type.Type)));
+            Assert.True(types.IsSupersetOf(typeNames), $"The type set is missing {string.Join(", ", types.Except(typeNames))}");
         }
     }
 }

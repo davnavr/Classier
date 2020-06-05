@@ -65,11 +65,16 @@ and Identifier =
         match this.Generics with
         | [] -> this.Name
         | _ ->
-            let gargs = String.Join(", ", this.Generics)
-            sprintf "%s<%s>" this.Name gargs
+            String.Join(", ", this.Generics)
+            |> sprintf "%s<%s>" this.Name
 and Generic =
     | GenericArg of TypeName
     | GenericParam of GenericParam
+
+    override this.ToString() =
+        match this with
+        | GenericArg name -> name.ToString()
+        | GenericParam param -> param.ToString()
 and GenericVariance =
     | NoVariance
     | Covariant
