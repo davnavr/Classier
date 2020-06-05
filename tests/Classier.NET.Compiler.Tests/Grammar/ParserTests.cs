@@ -1,7 +1,5 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 {
-    using System;
-    using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.Linq;
     using System.Text;
@@ -77,17 +75,19 @@
             Assert.NotNull(namespaces[ListModule.OfArray(namespaceNames)]);
         }
 
-        [InlineData("MultipleClasses.txt", "test", new[] { "Class1", "Class2", "Interface1", "Class3", "Class4", "Class5", "Class6" })]
-        [InlineData("MyGenericClass1.txt", "some.name.collections", new[] { "MutableList<T>" })]
+        [InlineData("MultipleClasses.txt", new[] { "test" }, new[] { "Class1", "Class2", "Interface1", "Class3", "Class4", "Class5", "Class6" })]
+        [InlineData("MyException1.txt", new string[0], new[] { "MyException1" })]
+        [InlineData("MyGenericClass1.txt", new[] { "some", "name", "collections" }, new[] { "MutableList<T>" })]
+        [InlineData("MyModule1.txt", new[] { "blah", "blah", "blah" }, new[] { "Math" })]
         [Theory]
-        public void ParserAddsTypesToSymbolTable(string file, string namespaceName, string[] typeNames)
+        public void ParserAddsTypesToSymbolTable(string file, string[] namespaceNames, string[] typeNames)
         {
             // Arrange
             using var stream = new EmbeddedSourceFile(file).GetStream();
 
             // Act
             var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols
-                .Namespaces[ListModule.OfArray(namespaceName.Split('.'))]
+                .Namespaces[ListModule.OfArray(namespaceNames)]
                 .Select(type => GlobalType.getName(type.Type))
                 .ToImmutableSortedSet();
 
