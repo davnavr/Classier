@@ -69,10 +69,13 @@
             using var stream = new EmbeddedSourceFile(file).GetStream();
 
             // Act
-            var namespaces = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols.Namespaces;
+            var namespaces = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols;
 
             // Assert
-            Assert.NotNull(namespaces[ListModule.OfArray(namespaceNames)]);
+            Assert.NotEmpty(
+                GlobalsTableModule.getTypes(
+                    ListModule.OfArray(namespaceNames),
+                    namespaces));
         }
 
         [InlineData("MultipleClasses.txt", new[] { "test" }, new[] { "Class1", "Class2", "Interface1", "Class3", "Class4", "Class5", "Class6" })]
@@ -86,8 +89,10 @@
             using var stream = new EmbeddedSourceFile(file).GetStream();
 
             // Act
-            var types = new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols
-                .Namespaces[ListModule.OfArray(namespaceNames)]
+            var types =
+                GlobalsTableModule.getTypes(
+                    ListModule.OfArray(namespaceNames),
+                    new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols)
                 .Select(type => GlobalType.getName(type.Type))
                 .ToImmutableSortedSet();
 

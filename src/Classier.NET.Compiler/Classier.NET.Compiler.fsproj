@@ -20,6 +20,7 @@
     <Compile Include="Grammar\ParserState.fs" />
     <Compile Include="Grammar\Definition.fs" />
     <Compile Include="Grammar\Parser.fs" />
+    <Compile Include="SemAnalysis\LocalsTable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

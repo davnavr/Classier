@@ -3,20 +3,23 @@
 open System.Collections.Immutable
 
 /// Stores the namespaces and types declared in compilation units.
-type GlobalsTable =
-    { Namespaces: ImmutableSortedDictionary<string list, ImmutableSortedSet<GlobalTypeSymbol>>
-      (*Symbols: something *) }
+type GlobalsTable = GlobalsTable of ImmutableSortedDictionary<string list, ImmutableSortedSet<GlobalTypeSymbol>>
 
 module GlobalsTable =
-    let empty = { Namespaces = ImmutableSortedDictionary.Empty }
+    let empty = GlobalsTable ImmutableSortedDictionary.Empty
+
+    let getTypes ns (GlobalsTable table) =
+        let mutable types = null
+        table.TryGetValue(ns, &types) |> ignore
+        match types with
+        | null -> ImmutableSortedSet.Empty
+        | _ -> types
+    
+    let addTypes types ns table =
+        let (GlobalsTable namespaces) = table
+        namespaces.SetItem(ns, (getTypes ns table).Union(types))
+        |> GlobalsTable
 
     /// Adds a namespace to the symbol table.
-    let addNamespace ns table =
-        if table.Namespaces.ContainsKey ns
-        then table
-        else { table with Namespaces = table.Namespaces.Add(ns, ImmutableSortedSet.Empty) }
+    let addNamespace ns = addTypes List.empty ns
 
-    let addTypes types ns table =
-        let withNs = addNamespace ns table
-        let currentTypes = withNs.Namespaces.Item ns
-        { withNs with Namespaces = withNs.Namespaces.SetItem(ns, currentTypes.Union(types)) }
