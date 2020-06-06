@@ -470,7 +470,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let simpleTypeName =
         choiceL
             [
-                PrimitiveType.Names
+                PrimitiveType.names
                 |> Seq.map (fun pair -> skipString (pair.Value) >>% pair.Key)
                 |> choice
                 |>> Primitive
@@ -1039,6 +1039,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>> eof
     .>> updateUserState clearAllFlags
     >>= fun ((ns, uses), defs) ->
+        // TODO: Figure out how to fail when a type with a duplicate name is parsed.
         GlobalsTable.addNamespace ns
         >> GlobalsTable.addTypes
             (Seq.map (GlobalTypeSymbol.ofTypeDef ns) defs)

@@ -1,0 +1,10 @@
+
+namespace something.else;
+
+public class BadClass {
+
+}
+
+public class BadClass {
+
+}

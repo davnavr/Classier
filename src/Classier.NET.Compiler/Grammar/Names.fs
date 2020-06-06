@@ -7,29 +7,23 @@ open System.Collections.Immutable
 [<RequireQualifiedAccess>]
 type PrimitiveType =
     | Boolean
-    | Decimal
-    | Double
-    | Float
-    | Int32
-    | Int64
     | Null
+    | Numeric of NumType
     | String
-    | UInt32
-    | UInt64
     | Unit
 
-    static member Names =
+    static member names =
         [
             Boolean, "boolean"
-            Decimal, "decimal"
-            Double, "double"
-            Float, "float"
-            Int32, "int"
-            Int64, "long"
             Null, "null"
+            Numeric NumType.Decimal, "decimal"
+            Numeric NumType.Double, "double"
+            Numeric NumType.Float, "float"
+            Numeric NumType.Integer, "int"
+            Numeric NumType.Long, "long"
+            Numeric (NumType.Integer ||| NumType.Unsigned), "uint"
+            Numeric (NumType.Long ||| NumType.Unsigned), "ulong"
             String, "string"
-            UInt32, "uint"
-            UInt64, "ulong"
         ]
         |> Seq.map KeyValuePair
         |> ImmutableSortedDictionary.CreateRange
@@ -37,7 +31,7 @@ type PrimitiveType =
     override this.ToString() =
         match this with
         | Unit -> "()"
-        | _ -> PrimitiveType.Names.Item this
+        | _ -> PrimitiveType.names.Item this
 
 type TypeName =
     | FuncType of

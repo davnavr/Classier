@@ -43,9 +43,10 @@
             Assert.Equal(namespaceName, result.Namespace);
         }
 
+        [InlineData("AbstractSealedMethod.txt", "not allowed on abstract methods")]
+        [InlineData("DuplicateType.txt", "already exists")]
         [InlineData("MissingBrackets1.txt", "closing bracket")]
         [InlineData("NoCatchOrFinally.txt", "at least one catch")]
-        [InlineData("AbstractSealedMethod.txt", "not allowed on abstract methods")]
         [Theory]
         public void ParserHasPredictedError(string name, string errorSubstring)
         {

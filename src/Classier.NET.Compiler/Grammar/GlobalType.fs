@@ -3,7 +3,7 @@
 [<RequireQualifiedAccess>]
 type GlobalType =
     | DefinedType of TypeDef
-    | ExternType of unit
+    | ExternType of ExternType
 
     static member getName gtype =
         match gtype with

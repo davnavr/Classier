@@ -2,9 +2,9 @@
 
 [<System.Flags>]
 type NumType =
-    | Decimal = 0uy
-    | Double = 1uy
-    | Float = 2uy
+    | Decimal = 1uy
+    | Double = 2uy
+    | Float = 3uy
     | Signed = 0uy
     | Unsigned = 4uy
     | Integer = 8uy

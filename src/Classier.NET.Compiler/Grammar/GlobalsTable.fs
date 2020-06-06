@@ -16,10 +16,10 @@ module GlobalsTable =
         | _ -> types
     
     let addTypes types ns table =
+        // TODO: Fix, duplicate types are IGNORED meaning they won't be seen by the semantic analyzer.
         let (GlobalsTable namespaces) = table
         namespaces.SetItem(ns, (getTypes ns table).Union(types))
         |> GlobalsTable
 
     /// Adds a namespace to the symbol table.
     let addNamespace ns = addTypes List.empty ns
-

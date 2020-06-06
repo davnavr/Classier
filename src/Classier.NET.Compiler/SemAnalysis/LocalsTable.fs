@@ -13,3 +13,9 @@ module LocalsTable =
     let empty = LocalsTable List.empty
 
     let enterScope (LocalsTable table) = ImmutableList.Empty :: table |> LocalsTable
+
+    let exitScope (LocalsTable table) =
+        match table with
+        | [] -> List.empty
+        | _ -> table.Tail
+        |> LocalsTable
