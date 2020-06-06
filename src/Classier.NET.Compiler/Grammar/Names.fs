@@ -51,7 +51,9 @@ type TypeName =
         | Primitive p -> p.ToString()
         | Tuple types -> sprintf "(%s)" (String.Join(", ", types))
         | Union options -> String.Join(" | ", options)
-and Identifier =
+and [<StructuralComparison>]
+    [<StructuralEquality>]
+    Identifier =
     { Name: string
       Generics: Generic list }
 

@@ -1,14 +1,19 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
-[<RequireQualifiedAccess>]
+open System
+open Classier.NET.Compiler
+
+[<StructuralEquality>]
+[<NoComparison>]
 type GlobalType =
     | DefinedType of TypeDef
     | ExternType of ExternType
 
-    static member getName gtype =
+module GlobalType =
+    let getName gtype =
         match gtype with
-        | GlobalType.DefinedType tdef -> tdef.Definition.Identifier.ToString()
-        | _ -> invalidOp "not implemented"
+        | DefinedType tdef -> tdef.Definition.Identifier
+        | ExternType etype -> etype.TypeName
 
 type GlobalTypeSymbol =
     { Namespace: string list
@@ -16,4 +21,4 @@ type GlobalTypeSymbol =
 
     static member ofTypeDef ns typeDef =
         { Namespace = ns
-          Type = GlobalType.DefinedType typeDef }
+          Type = DefinedType typeDef }

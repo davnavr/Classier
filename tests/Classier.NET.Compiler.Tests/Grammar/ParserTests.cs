@@ -94,7 +94,7 @@
                 GlobalsTableModule.getTypes(
                     ListModule.OfArray(namespaceNames),
                     new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols)
-                .Select(type => GlobalType.getName(type.Type))
+                .Select(type => GlobalTypeModule.getName(type.Type).ToString())
                 .ToImmutableSortedSet();
 
             // Assert

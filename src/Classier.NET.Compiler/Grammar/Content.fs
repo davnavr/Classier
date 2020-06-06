@@ -100,10 +100,5 @@ and ConstructorBase =
 and MemberDef =
     | Ctor of Constructor
     | Function of Function
-    | Property of 
-        {| Get: Function option
-           PropDef: Definition
-           Set: Function option
-           Value: Expression option |}
     | Method of Function
     | NestedType of TypeDef
