@@ -44,7 +44,7 @@
             Assert.Equal(namespaceName, result.Namespace);
         }
 
-        [InlineData("AbstractSealedMethod.txt", "not allowed on abstract methods")]
+        [InlineData("AbstractSealedMethod.txt", "Invalid modifiers")]
         [InlineData("DuplicateType.txt", "already exists")]
         [InlineData("MissingBrackets1.txt", "closing bracket")]
         [InlineData("NoCatchOrFinally.txt", "at least one catch")]
@@ -95,7 +95,7 @@
                 GlobalsTableModule.getTypes(
                     ListModule.OfArray(namespaceNames),
                     new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols)
-                .Select(type => GlobalTypeModule.getName(type.Type).ToString())
+                .Select(type => GlobalType.getName(type.Type).ToString())
                 .ToImmutableSortedSet();
 
             // Assert

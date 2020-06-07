@@ -28,7 +28,7 @@ module GlobalsTable =
             | _ as result -> result
 
         { new System.Collections.Generic.IComparer<GlobalTypeSymbol> with
-              member _.Compare (one, two) =
+              member _.Compare(one, two) =
                   match compare one.Namespace two.Namespace with
                   | 0 -> compareType one.Type two.Type
                   | _ as result -> result }

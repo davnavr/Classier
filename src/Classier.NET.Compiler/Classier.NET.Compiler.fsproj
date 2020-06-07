@@ -19,8 +19,7 @@
     <Compile Include="ParserState.fs" />
     <Compile Include="Definition.fs" />
     <Compile Include="Parser.fs" />
-    <Compile Include="SemAnalysis\LocalsTable.fs" />
-    <Compile Include="SemAnalysis\Analyzers.fs" />
+    <Compile Include="LocalsTable.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

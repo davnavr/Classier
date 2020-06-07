@@ -3,6 +3,7 @@
 open System
 open FParsec
 open Classier.NET.Compiler.Generic
+open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.ParserState
 open Classier.NET.Compiler.TypeSystem
@@ -26,6 +27,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let position: Parser<Position, _> = fun stream -> Reply(stream.Position)
 
     let optList p = opt p |>> Option.defaultValue []
+
+    let validateFlags f msg =
+        userStateSatisfies (ParserState.currentFlags >> f >> not) <?> msg
 
     let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
     let ifStatement, ifStatementRef = createParserForwardedToRef<If,_>()
@@ -775,6 +779,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>>. genericIdentifier
         .>>. getUserState
         |>> (fun ((pos, id), state) -> Definition.ofIdentifier state pos id)
+    // TODO: Use userStateSatisfies to check when things are valid.
 
     let functionBody =
         choiceL
@@ -815,16 +820,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 "override", Flags.Override
                 "virtual", Flags.Virtual
             ]
-        >>. getUserState
-        >>= (fun state ->
-            let flags = currentFlags state
-            let implFlags = flags &&& Flags.MethodImplMask
-
-            if (flags.HasFlag Flags.Abstract) && (implFlags > Flags.None) then
-                sprintf "Modifiers %s not allowed on abstract methods" (implFlags.ToString().ToLower()) |> fail
-            elif implFlags.HasFlag(Flags.Sealed ||| Flags.Virtual) then
-                fail "Virtual methods cannot be sealed"
-            else preturn ())
+        >>. validateFlags
+                (fun flags -> (flags.HasFlag Flags.Abstract) && (flags &&& Flags.MethodImplMask > Flags.None))
+                "Invalid modifiers on abstract method"
+        >>. validateFlags
+                (fun flags -> (flags &&& Flags.MethodImplMask).HasFlag(Flags.Sealed ||| Flags.Virtual))
+                "Virtual methods cannot be sealed"
         >>. functionDef
         |>> Method
         <?> "method definition"
