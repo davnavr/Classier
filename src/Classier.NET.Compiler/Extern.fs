@@ -1,7 +1,8 @@
-﻿namespace Classier.NET.Compiler
+﻿module Classier.NET.Compiler.Extern
 
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.TypeSystem
 
 type ExternType =
     { Kind: ExternTypeKind

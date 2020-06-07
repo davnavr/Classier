@@ -1,6 +1,7 @@
-﻿namespace Classier.NET.Compiler.Grammar
+﻿namespace Classier.NET.Compiler
 
-[<CompilationRepresentationAttribute(CompilationRepresentationFlags.ModuleSuffix)>]
+open Classier.NET.Compiler.Grammar
+
 module Definition =
     let ofIdentifier state pos identifier =
         { Flags = ParserState.currentFlags state

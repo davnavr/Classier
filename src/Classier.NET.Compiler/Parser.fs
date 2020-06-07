@@ -1,4 +1,4 @@
-﻿module Classier.NET.Compiler.Grammar.Parser
+﻿module Classier.NET.Compiler.Parser
 
 open System
 open FParsec

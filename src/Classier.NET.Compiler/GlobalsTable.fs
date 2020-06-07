@@ -1,8 +1,9 @@
-﻿namespace Classier.NET.Compiler.Grammar
+﻿namespace Classier.NET.Compiler
 
 open System.Collections.Immutable
-open Classier.NET.Compiler
-open Classier.NET.Compiler.Grammar.GlobalType
+open Classier.NET.Compiler.Extern
+open Classier.NET.Compiler.GlobalType
+open Classier.NET.Compiler.Grammar
 
 /// Stores the namespaces and types declared in compilation units.
 type GlobalsTable = GlobalsTable of ImmutableSortedDictionary<string list, ImmutableSortedSet<GlobalTypeSymbol>>

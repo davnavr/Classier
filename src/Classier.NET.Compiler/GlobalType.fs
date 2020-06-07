@@ -1,7 +1,7 @@
-﻿namespace Classier.NET.Compiler.Grammar
+﻿namespace Classier.NET.Compiler
 
-open System
-open Classier.NET.Compiler
+open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.Extern
 
 [<StructuralEquality>]
 [<NoComparison>]

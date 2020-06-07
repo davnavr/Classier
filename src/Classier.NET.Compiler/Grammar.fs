@@ -1,4 +1,45 @@
-﻿namespace Classier.NET.Compiler.Grammar
+﻿module Classier.NET.Compiler.Grammar
+
+type Identifier = Identifier.Identifier<Generic.Generic>
+type TypeName = TypeSystem.TypeName<Generic.Generic>
+
+// TODO: Come up with better way to keep track of data that is not a flag enum.
+[<System.Flags>]
+type Flags =
+    | None = 0u
+    | Public = 1u
+    | Internal = 2u
+    | Protected = 3u
+    | Private = 4u
+    | VisibilityMask = 4u
+    | Abstract = 8u
+    /// Indicates that a class or local variable is mutable.
+    | Mutable = 16u
+    /// Indicates that a class can have a subclass.
+    | Inheritable = 32u
+    | Inline = 64u
+    | Override = 128u
+    /// Indicates that a method can be optionally overriden.
+    | Virtual = 256u
+    /// Indicates that a method cannot be overriden any further.
+    | Sealed = 512u
+    | MethodImplMask = 960u
+
+[<System.Flags>]
+type NumType =
+    | Decimal = 1uy
+    | Double = 2uy
+    | Float = 3uy
+    | Signed = 0uy
+    | Unsigned = 4uy
+    | Integer = 8uy
+    | Long = 16uy
+
+type NumLiteral =
+    { Base: byte
+      FracPart: char list
+      IntPart: char list
+      Type: NumType }
 
 type Definition =
     { Flags: Flags
@@ -102,3 +143,8 @@ and MemberDef =
     | Function of Function
     | Method of Function
     | NestedType of TypeDef
+
+type CompilationUnit =
+    { Definitions: TypeDef list
+      Namespace: string list
+      Usings: Identifier list list }

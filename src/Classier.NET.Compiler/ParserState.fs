@@ -1,9 +1,13 @@
-﻿namespace Classier.NET.Compiler.Grammar
+﻿namespace Classier.NET.Compiler
 
+open Classier.NET.Compiler.Grammar
 open FParsec
 
 type ParserState =
     { Flags: Flags list
+      // TODO: We need to keep track of currently parsed members and parent if we want to raise an error when duplicate things are declared.
+      // Parents: ParentSymbol list
+      // Members: ?
       Symbols: GlobalsTable }
 
 module ParserState =

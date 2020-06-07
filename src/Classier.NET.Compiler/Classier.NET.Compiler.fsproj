@@ -9,18 +9,16 @@
 
   <!-- Source files -->
   <ItemGroup>
-    <Compile Include="Grammar\Numeric.fs" />
-    <Compile Include="Grammar\Flags.fs" />
-    <Compile Include="Grammar\Names.fs" />
-    <Compile Include="Grammar\Content.fs" />
-    <Compile Include="Grammar\CompilationUnit.fs" />
-    <Compile Include="Grammar\Symbol.fs" />
-    <Compile Include="ExternType.fs" />
-    <Compile Include="Grammar\GlobalType.fs" />
-    <Compile Include="Grammar\GlobalsTable.fs" />
-    <Compile Include="Grammar\ParserState.fs" />
-    <Compile Include="Grammar\Definition.fs" />
-    <Compile Include="Grammar\Parser.fs" />
+    <Compile Include="Identifier.fs" />
+    <Compile Include="TypeSystem.fs" />
+    <Compile Include="Generic.fs" />
+    <Compile Include="Grammar.fs" />
+    <Compile Include="Extern.fs" />
+    <Compile Include="GlobalType.fs" />
+    <Compile Include="GlobalsTable.fs" />
+    <Compile Include="ParserState.fs" />
+    <Compile Include="Definition.fs" />
+    <Compile Include="Parser.fs" />
     <Compile Include="SemAnalysis\LocalsTable.fs" />
     <Compile Include="SemAnalysis\Analyzers.fs" />
     <Compile Include="Program.fs" />
