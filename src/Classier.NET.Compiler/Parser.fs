@@ -2,8 +2,10 @@
 
 open System
 open FParsec
+open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.Grammar.ParserState
+open Classier.NET.Compiler.ParserState
+open Classier.NET.Compiler.TypeSystem
 
 let compilationUnit: Parser<CompilationUnit, ParserState> =
     let colon = skipChar ':'
@@ -761,7 +763,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> gtsign
         |> optList
         <?> "generic parameters"
-    let genericIdentifier =
+    let genericIdentifier: Parser<Identifier, _> =
         identifierStr
         .>> ignored
         .>>. genericParams

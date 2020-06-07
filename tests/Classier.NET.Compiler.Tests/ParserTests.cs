@@ -1,11 +1,12 @@
-﻿namespace Classier.NET.Compiler.Grammar
+﻿namespace Classier.NET.Compiler
 {
     using System.Collections.Immutable;
     using System.Linq;
     using System.Text;
     using Microsoft.FSharp.Collections;
     using Xunit;
-    using static Classier.NET.Compiler.Grammar.Parser;
+    using static Classier.NET.Compiler.Grammar;
+    using static Classier.NET.Compiler.Parser;
     using static FParsec.CharParsers;
 
     public class ParserTests
