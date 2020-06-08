@@ -114,7 +114,6 @@ and Param =
       Type: TypeName }
 and Function =
     { Body: Statement list
-      FuncDef: Definition option
       Parameters: Param list list
       ReturnType: TypeName }
 and ClassHeader =
@@ -140,9 +139,37 @@ and ConstructorBase =
     | SuperCall of Expression list
 and MemberDef =
     | Ctor of Constructor
-    | Function of Function
-    | Method of Function
+    | Function of Definition * Function
+    | Method of Definition * Function
     | NestedType of TypeDef
+
+    static member definition mdef =
+        match mdef with
+        | Function (def, _)
+        | Method (def, _) -> Some def
+        | NestedType tdef -> Some tdef.Definition
+        | _ -> None
+
+    static member identifier mdef =
+        MemberDef.definition mdef
+        |> Option.map (fun def -> def.Identifier)
+
+    /// Gets the parameters of the method, function, or constructor.
+    static member paramSets mdef =
+        match mdef with
+        | Ctor ctor -> [ ctor.Parameters ]
+        | Function (_, func)
+        | Method (_, func) -> func.Parameters
+        | _ -> List.empty
+
+    /// Gets the first parameter set of the method or function, or the parameters of the constructor.
+    static member firstParams mdef =
+        match mdef with
+        | Ctor ctor -> ctor.Parameters
+        | Function (_, func)
+        | Method (_, func) when not func.Parameters.IsEmpty ->
+            func.Parameters.Head
+        | _ -> List.empty
 
 type CompilationUnit =
     { Definitions: TypeDef list

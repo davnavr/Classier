@@ -9,7 +9,7 @@ open Classier.NET.Compiler.Grammar
 type GlobalsTable = GlobalsTable of ImmutableSortedDictionary<string list, ImmutableSortedSet<GlobalTypeSymbol>>
 
 module GlobalsTable =
-    let private typeComparer =
+    let private emptySymbols =
         let compareType one two =
             match compare (getName one) (getName two) with
             | 0 ->
@@ -32,6 +32,7 @@ module GlobalsTable =
                   match compare one.Namespace two.Namespace with
                   | 0 -> compareType one.Type two.Type
                   | _ as result -> result }
+        |> ImmutableSortedSet.Empty.WithComparer
 
     let empty = GlobalsTable ImmutableSortedDictionary.Empty
 
@@ -39,14 +40,19 @@ module GlobalsTable =
         let mutable types = null
         table.TryGetValue(ns, &types) |> ignore
         match types with
-        | null -> ImmutableSortedSet.Empty.WithComparer(typeComparer)
+        | null -> emptySymbols
         | _ -> types
     
     let addTypes types ns table =
-        // TODO: Fix, duplicate types are IGNORED meaning they won't be seen by the semantic analyzer.
         let (GlobalsTable namespaces) = table
-        namespaces.SetItem(ns, (getTypes ns table).Union(types))
-        |> GlobalsTable
+        let symbols = getTypes ns table
+        let added = symbols.Union(types)
+
+        if added.Count = symbols.Count
+        then None
+        else namespaces.SetItem(ns, added) |> GlobalsTable |> Some
 
     /// Adds a namespace to the symbol table.
-    let addNamespace ns = addTypes List.empty ns
+    let addNamespace ns table =
+        let (GlobalsTable namespaces) = table
+        namespaces.SetItem(ns, emptySymbols) |> GlobalsTable

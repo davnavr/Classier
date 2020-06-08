@@ -21,11 +21,10 @@ type Local =
 type LocalsTable = LocalsTable of ImmutableSortedSet<Local> list
 
 let private emptyScope =
-    let localComparer =
-        { new IComparer<Local> with
-              member _.Compare(l1, l2) =
-                  l1.Name.CompareTo(l2.Name) }
-    ImmutableSortedSet.Empty.WithComparer(localComparer)
+    { new IComparer<Local> with
+          member _.Compare(l1, l2) =
+              l1.Name.CompareTo(l2.Name) }
+    |> ImmutableSortedSet.Empty.WithComparer
 
 let empty = LocalsTable List.empty
 

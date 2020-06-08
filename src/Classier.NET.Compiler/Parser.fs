@@ -251,7 +251,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     <?> "anonymous function"
                     |>> fun (parameters, retVal) ->
                         { Body = [ Return retVal ]
-                          FuncDef = None
                           Parameters = [ parameters ]
                           ReturnType = Inferred }
                         |> AnonFunc
@@ -614,7 +613,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                                     .>>. (statementBlock <?> "local function body")
                                     |>> fun ((parameters, retType), body) ->
                                         { Body = body 
-                                          FuncDef = Some (Definition.ofState state pos name)
                                           Parameters = parameters
                                           ReturnType = retType }
                                         |> AnonFunc
@@ -807,8 +805,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. functionBody
         |>> fun (((((pos, id), state), fparams), retType), body) ->
+            (Definition.ofIdentifier state pos id),
             { Body = body
-              FuncDef = Some (Definition.ofIdentifier state pos id)
               Parameters = fparams
               ReturnType = retType }
 
@@ -915,31 +913,27 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 >>% (fun (parameters: Param list) pos ->
                     parameters
                     |> List.map (fun param ->
-                        { Body =
-                            [
-                                Identifier.ofString param.Name
-                                |> IdentifierRef
-                                |> Return
-                            ]
-                          FuncDef =
-                            { Flags = Flags.Public
-                              Identifier = Identifier.ofString param.Name
-                              Position = pos }
-                            |> Some
-                          Parameters = []
-                          ReturnType = param.Type }
-                        |> Function)
+                        ({ Flags = Flags.Public
+                           Identifier = Identifier.ofString param.Name
+                           Position = pos },
+                         { Body =
+                             [
+                                 Identifier.ofString param.Name
+                                 |> IdentifierRef
+                                 |> Return
+                             ]
+                           Parameters = []
+                           ReturnType = param.Type })
+                        |> Method)
                     |> List.append
                         [
-                            { Body = []
-                              FuncDef =
-                                { Flags = Flags.Public ||| Flags.Override
-                                  Identifier = Identifier.ofString "equals"
-                                  Position = pos }
-                                |> Some
-                              Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
-                              ReturnType = Primitive PrimitiveType.Boolean }
-                            |> Function
+                            ({ Flags = Flags.Public ||| Flags.Override
+                               Identifier = Identifier.ofString "equals"
+                               Position = pos },
+                             { Body = []
+                               Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
+                               ReturnType = Primitive PrimitiveType.Boolean })
+                            |> Method
                         ])
 
                 preturn (fun _ _ -> [])
@@ -1047,6 +1041,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >> GlobalsTable.addTypes
             (Seq.map (GlobalTypeSymbol.ofTypeDef ns) defs)
             ns
+        >> Option.get
         |> updateSymbols
         |> updateUserState
         >>%
