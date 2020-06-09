@@ -10,7 +10,7 @@ type ParserState =
       Symbols: GlobalsTable }
 
 module ParserState =
-    let private emptyMembers =
+    let emptyMembers =
         { new IComparer<MemberDef> with
               member _.Compare(m1, m2) =
                   let paramCompare =

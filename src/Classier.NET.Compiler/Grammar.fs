@@ -1,6 +1,7 @@
 ﻿module Classier.NET.Compiler.Grammar
 
 open System
+open System.Collections.Immutable
 
 type Identifier = Identifier.Identifier<Generic.Generic>
 type TypeName = TypeSystem.TypeName<Generic.Generic>
@@ -171,7 +172,7 @@ and TypeDef =
     { Header: TypeHeader
       InitBody: Statement list
       Interfaces: TypeName list
-      Members: MemberDef list // TODO: Use an ImmutableSortedSet instead?
+      Members: ImmutableSortedSet<MemberDef>
       TypeDef: Definition }
 and Constructor =
     { BaseCall: ConstructorBase

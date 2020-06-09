@@ -819,14 +819,19 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>>. typeAnnotationOpt
         .>> ignored
         .>>. functionBody
-        |>> fun (((def, fparams), retType), body) ->
-            { FuncDef = def
-              Function =
-                { Body = body
-                  Parameters = fparams
-                  ReturnType = retType }
-              SelfIdentifier = None }
-            |> f
+        >>= fun (((def, fparams), retType), body) ->
+            let func =
+                { FuncDef = def
+                  Function =
+                    { Body = body
+                      Parameters = fparams
+                      ReturnType = retType }
+                  SelfIdentifier = None }
+                |> f
+
+            addMember func
+            |> updateUserState
+            >>% func
 
     let methodDef =
         modifiers
@@ -856,7 +861,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>. genericDefinition
         .>>. implements
         .>> ignored
-        .>>. blockChoice
+        .>> updateUserState newMembers
+        .>> blockChoice
             [
                 [
                     methodDef
@@ -864,17 +870,20 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> (choice >> accessed Flags.Internal)
             ]
+        .>>. getUserState
+        .>> updateUserState popMembers
         <?> "interface definition"
-        |>> fun ((def, iimpls), members) ->
+        |>> fun ((def, iimpls), state) ->
             { TypeDef = def
               Header = Interface
               InitBody = []
               Interfaces = iimpls
-              Members = members }
+              Members = state.Members.Head }
 
     /// Allows both members and statements.
     let memberBlockInit members =
-        blockChoice
+        updateUserState newMembers
+        >>. blockChoice
             [
                 attempt statement
 
@@ -882,19 +891,17 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 |> accessed Flags.Private
                 |>> LocalMember
             ]
-        |>> fun st ->
-            let members =
-                st
-                |> List.choose (function
-                    | LocalMember m -> Some m
-                    | _ -> None)
+        |> attempt
+        .>>. getUserState
+        .>> updateUserState popMembers
+        |>> fun (st, state) ->
             let body =
                 st
                 |> List.choose (fun s ->
                     match s with
                     | LocalMember _ -> None
                     | _ -> Some s)
-            members, body
+            state.Members.Head, body
 
     let classDef =
         let classCtor =
@@ -978,7 +985,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> memberBlockInit
 
-                semicolon >>% ([], [])
+                semicolon >>% (emptyMembers, [])
             ]
         <??> "class definition"
         |>> fun (((((recordMembers, def), ctor), (superclass, baseArgs)), iimpls), (members, body)) ->
@@ -992,7 +999,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
               Members =
                 match recordMembers primaryCtor.Parameters def.Position with
                 | [] -> members
-                | others -> members @ others }
+                | others -> members.Union(others) }
 
     let moduleDef =
         typeDef "module"
@@ -1005,7 +1012,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 functionDef Function <?> "function definition"
                 nestedTypes
             ]
-        <?> "module definition"
+        <??> "module definition"
         |>> fun (((pos, name), state), (members, body)) ->
             { TypeDef =
                 Identifier.ofString name
@@ -1017,7 +1024,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     nestedTypesRef :=
         [
-            classDef <?> "nested class"
+            classDef <??> "nested class"
             interfaceDef <?> "nested interface"
             moduleDef <?> "nested module"
         ]
