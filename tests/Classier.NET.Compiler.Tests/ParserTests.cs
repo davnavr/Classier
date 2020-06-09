@@ -45,6 +45,7 @@
         }
 
         [InlineData("AbstractSealedMethod.txt", "Invalid modifiers")]
+        [InlineData("DuplicateMethod.txt", "myMethod (one) already exists")]
         [InlineData("DuplicateType.txt", "already exists")]
         [InlineData("MissingBrackets1.txt", "closing bracket")]
         [InlineData("NoCatchOrFinally.txt", "at least one catch")]
@@ -61,6 +62,7 @@
             Assert.Contains(errorSubstring, error.Item1);
         }
 
+        [InlineData("MethodOverloading.txt", new string[0])]
         [InlineData("MyException1.txt", new string[0])]
         [InlineData("MultipleClasses.txt", new[] { "test" })]
         [InlineData("MyAbstractClass1.txt", new[] { "this", "is", "my", "space" })]
