@@ -39,8 +39,6 @@ module ParserState =
         |> List.tryHead
         |> Option.defaultValue Flags.None
 
-    let currentMembers state = state.Members.Head
-
     let visibilityFlags state = currentFlags state &&& Flags.VisibilityMask
 
     let pushFlags flags state: ParserState = { state with Flags = flags :: state.Flags }

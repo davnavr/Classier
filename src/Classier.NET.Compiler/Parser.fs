@@ -159,10 +159,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let paramTuple =
         lparen
+        |> attempt
         .>> ignored
         >>. sepBy
                 (identifierStr
                 .>>. typeAnnotationOpt
+                <?> "parameter"
                 |>> fun (name, ptype) ->
                     { Name = name
                       Type = ptype })
@@ -792,14 +794,19 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. paramTupleList
         |> attempt
-        >>= (fun (def, fparams) ->
-            // TODO: Validate the name here.
-            (fun state ->
+        .>>. getUserState
+        >>= fun ((def, fparams), state) ->
+            let containsDup =
                 FunctionDef.placeholder def fparams
                 |> f
-                |> (currentMembers state).Contains)
-            |> userStateSatisfies
-            >>% (def, fparams))
+                |> (state.Members.Head).Contains
+
+            if containsDup then
+                Param.toString fparams
+                |> sprintf "A member with the signature %s %s already exists in the same scope" (string def)
+                |> fail
+            else
+                preturn (def, fparams)
 
     let functionDef f =
         modifiers

@@ -119,6 +119,23 @@ and Variable =
 and Param =
     { Name: string
       Type: TypeName }
+
+    static member toString (paramSet: Param list) =
+        paramSet
+        |> Seq.map string
+        |> String.concat ", "
+        |> sprintf "(%s)"
+
+    static member toString (paramSets: Param list list) =
+        paramSets
+        |> Seq.map (Param.toString)
+        |> String.concat " "
+
+    override this.ToString () =
+        match this.Type with
+        | TypeName.Inferred -> String.Empty
+        | _ -> sprintf " : %s" (string this.Type)
+        |> sprintf "%s%s" this.Name
 and Function =
     { Body: Statement list
       Parameters: Param list list
