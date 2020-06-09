@@ -68,7 +68,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 followedBy lparen
             ]
 
-    let memberDef lowestAccess p =
+    let accessed lowestAccess p =
         let modifiers =
             [
                 "public", Flags.Public
@@ -119,7 +119,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         pairs
         |> Seq.map (fun (name, flag) -> modifier name flag)
         |> Seq.reduce (fun one two -> one >>. two)
-    
+
     let separator p = ignored >>. attempt p .>> ignored
 
     let block p =
@@ -777,7 +777,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>>. genericIdentifier
         .>>. getUserState
         |>> (fun ((pos, id), state) -> Definition.ofIdentifier state pos id)
-    // TODO: Use userStateSatisfies to check when things are valid.
 
     let functionBody =
         choiceL
@@ -788,31 +787,44 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
             "function body"
 
-    let functionDef =
+    let functionHeader f =
+        genericDefinition
+        .>> ignored
+        .>>. paramTupleList
+        |> attempt
+        >>= (fun (def, fparams) ->
+            // TODO: Validate the name here.
+            (fun state ->
+                FunctionDef.placeholder def fparams
+                |> f
+                |> (currentMembers state).Contains)
+            |> userStateSatisfies
+            >>% (def, fparams))
+
+    let functionDef f =
         modifiers
             [
                 "inline", Flags.Inline
             ]
         >>. skipString "def"
         >>. ignored1
-        >>. position
-        .>>. genericIdentifier
-        .>>. getUserState
-        .>> ignored
-        .>>. paramTupleList
-        |> attempt
+        >>. functionHeader f
         .>>. typeAnnotationOpt
         .>> ignored
         .>>. functionBody
-        |>> fun (((((pos, id), state), fparams), retType), body) ->
-            (Definition.ofIdentifier state pos id),
-            { Body = body
-              Parameters = fparams
-              ReturnType = retType }
+        |>> fun (((def, fparams), retType), body) ->
+            { FuncDef = def
+              Function =
+                { Body = body
+                  Parameters = fparams
+                  ReturnType = retType }
+              SelfIdentifier = None }
+            |> f
 
     let methodDef =
         modifiers
             [
+                //"inline", Flags.Inline
                 "abstract", Flags.Abstract
                 "sealed", Flags.Sealed
                 "override", Flags.Override
@@ -824,8 +836,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>. validateFlags
                 (fun flags -> (flags &&& Flags.MethodImplMask).HasFlag(Flags.Sealed ||| Flags.Virtual))
                 "Virtual methods cannot be sealed"
-        >>. functionDef
-        |>> Method
+        >>. functionDef Method
         <?> "method definition"
 
     let typeDef word =
@@ -844,11 +855,11 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     methodDef
                     nestedTypes
                 ]
-                |> (choice >> memberDef Flags.Internal)
+                |> (choice >> accessed Flags.Internal)
             ]
         <?> "interface definition"
         |>> fun ((def, iimpls), members) ->
-            { Definition = def
+            { TypeDef = def
               Header = Interface
               InitBody = []
               Interfaces = iimpls
@@ -861,7 +872,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 attempt statement
 
                 choice members
-                |> memberDef Flags.Private
+                |> accessed Flags.Private
                 |>> LocalMember
             ]
         |>> fun st ->
@@ -882,7 +893,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         let classCtor =
             optList (paramTuple .>> ignored)
             .>>. getUserState
-            |> memberDef Flags.Private
+            |> accessed Flags.Private
             |>> fun (ctorParams, state) ->
                 let flags =
                     match ctorParams with
@@ -913,26 +924,32 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 >>% (fun (parameters: Param list) pos ->
                     parameters
                     |> List.map (fun param ->
-                        ({ Flags = Flags.Public
-                           Identifier = Identifier.ofString param.Name
-                           Position = pos },
-                         { Body =
-                             [
-                                 Identifier.ofString param.Name
-                                 |> IdentifierRef
-                                 |> Return
-                             ]
-                           Parameters = []
-                           ReturnType = param.Type })
+                        { FunctionDef.generatedDef with
+                            FuncDef =
+                              { Flags = Flags.Public
+                                Identifier = Identifier.ofString param.Name
+                                Position = pos }
+                            Function =
+                              { Body =
+                                  [
+                                      Identifier.ofString param.Name
+                                      |> IdentifierRef
+                                      |> Return
+                                  ]
+                                Parameters = []
+                                ReturnType = param.Type } }
                         |> Method)
                     |> List.append
                         [
-                            ({ Flags = Flags.Public ||| Flags.Override
-                               Identifier = Identifier.ofString "equals"
-                               Position = pos },
-                             { Body = []
-                               Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
-                               ReturnType = Primitive PrimitiveType.Boolean })
+                            { FunctionDef.generatedDef with
+                                FuncDef =
+                                  { Flags = Flags.Public
+                                    Identifier = Identifier.ofString "equals"
+                                    Position = pos }
+                                Function =
+                                    { Body = [] // TODO: Create the body here
+                                      Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
+                                      ReturnType = Primitive PrimitiveType.Boolean } }
                             |> Method
                         ])
 
@@ -940,7 +957,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>> typeDef "class"
         |> attempt
-        .>>. genericDefinition
+        .>>. genericDefinition // TODO: Validate the class name here with userStateSatisfies.
         .>> ignored
         .>>. classCtor
         .>>. classExtends
@@ -959,7 +976,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         <??> "class definition"
         |>> fun (((((recordMembers, def), ctor), (superclass, baseArgs)), iimpls), (members, body)) ->
             let primaryCtor = ctor body baseArgs
-            { Definition = def
+            { TypeDef = def
               Header = Class
                 { PrimaryCtor = primaryCtor
                   SuperClass = superclass }
@@ -978,12 +995,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> ignored
         .>>. memberBlockInit
             [
-                functionDef |>> Function <?> "function definition"
+                functionDef Function <?> "function definition"
                 nestedTypes
             ]
         <?> "module definition"
         |>> fun (((pos, name), state), (members, body)) ->
-            { Definition =
+            { TypeDef =
                 Identifier.ofString name
                 |> Definition.ofIdentifier state pos
               Header = Module
@@ -1000,7 +1017,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> choice
         |>> NestedType
 
-    ignored
+    updateUserState newMembers
+    >>. ignored
     >>. optList
         (skipString "namespace"
         >>. ignored1
@@ -1030,7 +1048,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                  interfaceDef
                  moduleDef
              ]
-         |> (memberDef Flags.Internal >> attempt)
+         |> (accessed Flags.Internal >> attempt)
          .>> ignored
          |> many1)
     .>> eof
@@ -1041,7 +1059,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >> GlobalsTable.addTypes
             (Seq.map (GlobalTypeSymbol.ofTypeDef ns) defs)
             ns
-        >> Option.get
         |> updateSymbols
         |> updateUserState
         >>%

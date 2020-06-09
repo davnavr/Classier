@@ -45,12 +45,8 @@ module GlobalsTable =
     
     let addTypes types ns table =
         let (GlobalsTable namespaces) = table
-        let symbols = getTypes ns table
-        let added = symbols.Union(types)
-
-        if added.Count = symbols.Count
-        then None
-        else namespaces.SetItem(ns, added) |> GlobalsTable |> Some
+        let added = (getTypes ns table).Union(types)
+        namespaces.SetItem(ns, added) |> GlobalsTable
 
     /// Adds a namespace to the symbol table.
     let addNamespace ns table =

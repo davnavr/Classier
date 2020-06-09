@@ -19,5 +19,5 @@ type GlobalTypeSymbol =
 
 let getName gtype =
     match gtype with
-    | DefinedType tdef -> tdef.Definition.Identifier
+    | DefinedType tdef -> tdef.TypeDef.Identifier
     | ExternType etype -> etype.TypeName

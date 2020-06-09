@@ -1,10 +1,12 @@
 ﻿module Classier.NET.Compiler.Grammar
 
+open System
+
 type Identifier = Identifier.Identifier<Generic.Generic>
 type TypeName = TypeSystem.TypeName<Generic.Generic>
 
 // TODO: Come up with better way to keep track of data that is not a flag enum.
-[<System.Flags>]
+[<Flags>]
 type Flags =
     | None = 0u
     | Public = 1u
@@ -25,7 +27,7 @@ type Flags =
     | Sealed = 512u
     | MethodImplMask = 960u
 
-[<System.Flags>]
+[<Flags>]
 type NumType =
     | Decimal = 1uy
     | Double = 2uy
@@ -45,6 +47,11 @@ type Definition =
     { Flags: Flags
       Identifier: Identifier
       Position: FParsec.Position }
+
+    static member empty =
+        { Flags = Flags.None
+          Identifier = { Name = String.Empty; Generics = [] }
+          Position = FParsec.Position(String.Empty, 0L, 0L, 0L) }
 
     override this.ToString() = this.Identifier.ToString()
 
@@ -116,6 +123,26 @@ and Function =
     { Body: Statement list
       Parameters: Param list list
       ReturnType: TypeName }
+
+    static member empty =
+        { Body = List.empty
+          Parameters = List.empty
+          ReturnType = TypeName.Inferred }
+and FunctionDef =
+    { Function: Function
+      FuncDef: Definition
+      SelfIdentifier: string option }
+
+    static member generatedDef =
+        { Function = Function.empty
+          FuncDef = Definition.empty
+          SelfIdentifier = Some "&this" }
+
+    static member placeholder def fparams =
+        { Function = { Function.empty with Parameters = fparams }
+          FuncDef = def
+          SelfIdentifier = None }
+
 and ClassHeader =
     { PrimaryCtor: Constructor
       SuperClass: Identifier list }
@@ -124,11 +151,11 @@ and TypeHeader =
     | Interface
     | Module
 and TypeDef =
-    { Definition: Definition
-      Header: TypeHeader
+    { Header: TypeHeader
       InitBody: Statement list
       Interfaces: TypeName list
-      Members: MemberDef list }
+      Members: MemberDef list // TODO: Use an ImmutableSortedSet instead?
+      TypeDef: Definition }
 and Constructor =
     { BaseCall: ConstructorBase
       Body: Statement list
@@ -139,15 +166,15 @@ and ConstructorBase =
     | SuperCall of Expression list
 and MemberDef =
     | Ctor of Constructor
-    | Function of Definition * Function
-    | Method of Definition * Function
+    | Function of FunctionDef
+    | Method of FunctionDef
     | NestedType of TypeDef
 
     static member definition mdef =
         match mdef with
-        | Function (def, _)
-        | Method (def, _) -> Some def
-        | NestedType tdef -> Some tdef.Definition
+        | Function fdef
+        | Method fdef -> Some fdef.FuncDef
+        | NestedType tdef -> Some tdef.TypeDef
         | _ -> None
 
     static member identifier mdef =
@@ -158,18 +185,18 @@ and MemberDef =
     static member paramSets mdef =
         match mdef with
         | Ctor ctor -> [ ctor.Parameters ]
-        | Function (_, func)
-        | Method (_, func) -> func.Parameters
+        | Function fdef
+        | Method fdef -> fdef.Function.Parameters
         | _ -> List.empty
 
     /// Gets the first parameter set of the method or function, or the parameters of the constructor.
     static member firstParams mdef =
         match mdef with
-        | Ctor ctor -> ctor.Parameters
-        | Function (_, func)
-        | Method (_, func) when not func.Parameters.IsEmpty ->
-            func.Parameters.Head
-        | _ -> List.empty
+        | Ctor ctor -> Some ctor.Parameters
+        | Function fdef
+        | Method fdef -> List.tryHead fdef.Function.Parameters
+        | _ -> None
+        |> Option.defaultValue List.empty
 
 type CompilationUnit =
     { Definitions: TypeDef list

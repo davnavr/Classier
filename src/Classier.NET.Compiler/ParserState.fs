@@ -1,4 +1,4 @@
-﻿namespace rec Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler
 
 open System.Collections.Generic
 open System.Collections.Immutable
@@ -19,9 +19,13 @@ module ParserState =
                           (MemberDef.firstParams m2)
                   match paramCompare with
                   | 0 ->
-                      compare
-                          (MemberDef.identifier m1)
-                          (MemberDef.identifier m2)
+                      match (m1, m2) with
+                      | (Function _, Method _) -> -1
+                      | (Method _, Function _) -> 1
+                      | (_, _) ->
+                          compare
+                              (MemberDef.identifier m1)
+                              (MemberDef.identifier m2)
                   | _ -> paramCompare }
         |> ImmutableSortedSet.Empty.WithComparer
 
@@ -34,6 +38,8 @@ module ParserState =
         state.Flags
         |> List.tryHead
         |> Option.defaultValue Flags.None
+
+    let currentMembers state = state.Members.Head
 
     let visibilityFlags state = currentFlags state &&& Flags.VisibilityMask
 
@@ -58,16 +64,11 @@ module ParserState =
         | [] -> state
         | _ -> { state with Members = state.Members.Tail }
 
-    /// Attempts to add a member to the member set.
     let addMember mdef state =
         match state.Members with
-        | [] -> None
+        | [] -> state
         | _ ->
-            let currentMembers = state.Members.Head
-            match currentMembers.Add mdef with
-            | members when members.Count > currentMembers.Count ->
-                Some { state with Members = members :: state.Members.Tail }
-            | _ -> None
+            { state with Members = state.Members.Head.Add(mdef) :: state.Members.Tail }
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
     let clearAllFlags state: ParserState = { state with Flags = List.empty }
