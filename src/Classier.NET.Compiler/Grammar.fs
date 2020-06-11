@@ -186,13 +186,13 @@ and MemberDef =
     | Ctor of Constructor
     | Function of FunctionDef
     | Method of FunctionDef
-    | NestedType of TypeDef
+    | Type of TypeDef
 
     static member definition mdef =
         match mdef with
         | Function fdef
         | Method fdef -> Some fdef.FuncDef
-        | NestedType tdef -> Some tdef.TypeDef
+        | Type tdef -> Some tdef.TypeDef
         | _ -> None
 
     static member identifier mdef =

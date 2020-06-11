@@ -844,7 +844,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         >>. validateFlags
                 (fun flags -> (flags.HasFlag Flags.Abstract) && (flags &&& Flags.MethodImplMask > Flags.None))
-                "Invalid modifiers on abstract method"
+                "Invalid modifier on abstract method"
         >>. validateFlags
                 (fun flags -> (flags &&& Flags.MethodImplMask).HasFlag(Flags.Sealed ||| Flags.Virtual))
                 "Virtual methods cannot be sealed"
@@ -889,7 +889,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
                 choice members
                 |> accessed Flags.Private
-                |>> LocalMember
+                |>> LocalMember // TODO: Move member pushing logic from functionDef and etc. and into here since it is common.
             ]
         |> attempt
         .>>. getUserState
@@ -971,7 +971,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         .>> typeDef "class"
         |> attempt
-        .>>. genericDefinition // TODO: Validate the class name here with userStateSatisfies.
+        .>>. genericDefinition // TODO: Validate the class name here with userStateSatisfies. Nested classes should check the Members stack while top-level classes should check the GlobalsTable.
         .>> ignored
         .>>. classCtor
         .>>. classExtends
@@ -1029,7 +1029,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             moduleDef <?> "nested module"
         ]
         |> choice
-        |>> NestedType
+        |>> Type
 
     updateUserState newMembers
     >>. ignored
