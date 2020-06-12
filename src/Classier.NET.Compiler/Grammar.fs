@@ -4,6 +4,7 @@ open System
 open System.Collections.Immutable
 
 type Identifier = Identifier.Identifier<Generic.Generic>
+type FullIdentifier = Identifier.FullIdentifier<Generic.Generic>
 type TypeName = TypeSystem.TypeName<Generic.Generic>
 
 [<AutoOpen>]
@@ -186,21 +187,22 @@ type Constructor =
       Body: Statement list
       Parameters: Param list }
 
-type ClassHeader =
-    { PrimaryCtor: Constructor
-      SuperClass: Identifier list }
-
-type TypeHeader =
-    | Class of ClassHeader
-    | Interface
-    | Module
-
 type TypeDef<'Member> =
-    { Header: TypeHeader
-      InitBody: Statement list
-      Interfaces: TypeName list
-      Members: ImmutableSortedSet<'Member>
-      TypeDef: Name }
+    | Class of
+        {| ClassName: Name
+           Body: Statement list
+           Interfaces: FullIdentifier list
+           Members: ImmutableList<'Member>
+           PrimaryCtor: Constructor
+           SuperClass: FullIdentifier |}
+    | Interface of
+        {| InterfaceName: Name
+           Members: ImmutableList<'Member>
+           SuperInterfaces: FullIdentifier list |}
+    | Module of
+        {| Body: Statement list
+           ModuleName: Name
+           Members: ImmutableList<'Member> |}
 
 type MemberDef =
     | Ctor of Constructor
@@ -212,7 +214,12 @@ type MemberDef =
         match mdef with
         | Function fdef
         | Method fdef -> Some fdef.FuncDef
-        | Type tdef -> Some tdef.TypeDef
+        | Type tdef ->
+            match tdef with
+            | Class cdef -> cdef.ClassName
+            | Interface idef -> idef.InterfaceName
+            | Module mdef -> mdef.ModuleName
+            |> Some
         | _ -> None
 
     static member identifier mdef =
@@ -241,4 +248,4 @@ type TypeDef = TypeDef<MemberDef>
 type CompilationUnit =
     { Definitions: TypeDef list
       Namespace: string list
-      Usings: Identifier list list }
+      Usings: FullIdentifier list }

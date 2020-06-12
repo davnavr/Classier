@@ -8,9 +8,11 @@ open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.ParserState
 open Classier.NET.Compiler.TypeSystem
 
+let private position: Parser<Position, _> = fun stream -> Reply(stream.Position)
+
 // TODO: Clean up parser and put all the functions in the module.
 let compilationUnit: Parser<CompilationUnit, ParserState> =
-    let colon = skipChar ':'
+    // TODO: Remove these single character parsers if they are only used once
     let comma = skipChar ','
     let dquotes = skipChar '\"' <?> "quotation mark"
     let gtsign = skipChar '>'
@@ -25,7 +27,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let underscore = skipChar '_' <?> "underscore"
     let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
-    let position: Parser<Position, _> = fun stream -> Reply(stream.Position)
 
     let optList p = opt p |>> Option.defaultValue []
 
@@ -100,7 +101,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let typeAnnotation =
         ignored
-        >>. colon
+        >>. skipChar ':'
         |> attempt
         >>. ignored
         >>. typeName

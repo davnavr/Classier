@@ -5,26 +5,46 @@ open System.Collections.Generic
 open System.Collections.Immutable
 open Classier.NET.Compiler.Identifier
 
+[<StructuralEquality>]
+[<NoComparison>]
 [<RequireQualifiedAccess>]
 type PrimitiveType =
     | Boolean
     | Null
-    //| Numeric of NumType
     | String
     | Unit
+    // Integral
+    | Byte
+    | UByte
+    | Short
+    | UShort
+    | Int
+    | UInt
+    | Long
+    | ULong
+    // Floating-point
+    | Decimal
+    | Double
+    | Float
 
     static member names =
         [
             Boolean, "boolean"
             Null, "null"
-            //Numeric NumType.Decimal, "decimal"
-            //Numeric NumType.Double, "double"
-            //Numeric NumType.Float, "float"
-            //Numeric NumType.Integer, "int"
-            //Numeric NumType.Long, "long"
-            //Numeric (NumType.Integer ||| NumType.Unsigned), "uint"
-            //Numeric (NumType.Long ||| NumType.Unsigned), "ulong"
             String, "string"
+
+            Byte, "byte"
+            UByte, "ubyte"
+            Short, "short"
+            UShort, "ushort"
+            Int, "int"
+            UInt, "uint"
+            Long, "long"
+            ULong, "ulong"
+
+            Decimal, "decimal"
+            Double, "double"
+            Float, "float"
         ]
         |> Seq.map KeyValuePair
         |> ImmutableSortedDictionary.CreateRange
@@ -38,7 +58,7 @@ type TypeName<'Generic> =
     | FuncType of
         {| ParamType: TypeName<'Generic>
            ReturnType: TypeName<'Generic> |}
-    | Identifier of Identifier<'Generic> list
+    | Identifier of FullIdentifier<'Generic>
     | Inferred
     | Primitive of PrimitiveType
     | Tuple of TypeName<'Generic> list
