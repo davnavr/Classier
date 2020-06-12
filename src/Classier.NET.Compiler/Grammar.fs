@@ -49,11 +49,6 @@ type Name =
 
     override this.ToString() = this.Identifier.ToString()
 
-type If<'Expr, 'Stat> =
-    { Condition: 'Expr
-      Choice1: 'Stat list
-      Choice2: 'Stat list }
-
 type Param =
     { Name: string
       Type: TypeName }
@@ -75,13 +70,18 @@ type Param =
         | _ -> sprintf " : %s" (string this.Type)
         |> sprintf "%s%s" this.Name
 
+type If<'Expr, 'Stat> =
+    { Condition: 'Expr
+      Choice1: 'Stat list
+      Choice2: 'Stat list }
+
 type Pattern<'Expr> =
     | Constant of 'Expr
     | Default
     | TuplePattern of Param list
     | VarPattern of string * TypeName
 
-and Local<'Expr> =
+type Local<'Expr> =
     | Let of Pattern<'Expr> * 'Expr
     | Var of
         {| Name: string
@@ -101,18 +101,35 @@ type Try<'Expr, 'Stat> =
       Handlers: MatchCase<'Expr, 'Stat> list
       Finally: 'Stat list }
 
-type Function<'Stat> =
-    { Body: 'Stat list
+type Statement<'Expr> =
+    | Empty
+    | IfStatement of If<'Expr, Statement<'Expr>>
+    /// An expression whose result is evaluated then discarded.
+    | IgnoredExpr of 'Expr
+    | LocalVar of Local<'Expr>
+    | MatchStatement of Match<'Expr, Statement<'Expr>>
+    | Return of 'Expr
+    | Throw of 'Expr option
+    | TryStatement of Try<'Expr, Statement<'Expr>>
+    | While of 'Expr * Statement<'Expr> list
+
+type Function<'Expr> =
+    { Body: Statement<'Expr> list
       Parameters: Param list list
       ReturnType: TypeName }
 
-    static member empty: Function<'Stat> =
+    static member empty: Function<'Expr> =
         { Body = List.empty
           Parameters = List.empty
           ReturnType = TypeName.Inferred }
 
+type If<'Expr> = If<'Expr, Statement<'Expr>>
+type MatchCase<'Expr> = MatchCase<'Expr, Statement<'Expr>>
+type Match<'Expr> = Match<'Expr, Statement<'Expr>>
+type Try<'Expr> = Try<'Expr, Statement<'Expr>>
+
 type Expression =
-    | AnonFunc of Function<Statement>
+    | AnonFunc of Function<Expression>
     | BoolLit of bool
     | CtorCall of
         {| Arguments: Expression list
@@ -122,32 +139,27 @@ type Expression =
            Target: Expression |}
     | FuncComp of Expression * Expression
     | IdentifierRef of Identifier
-    | IfExpr of If<Expression, Statement>
-    | MatchExpr of Match<Expression, Statement>
+    | IfExpr of If<Expression>
+    | MatchExpr of Match<Expression>
     | MemberAccess of Expression * Identifier
     | Nested of Expression
     | NumLit of NumericLit
     | StrLit of string
     | ThrowExpr of Expression
-    | TryExpr of Try<Expression, Statement>
+    | TryExpr of Try<Expression>
     | TupleLit of Expression list
     | UnitLit
     | VarAssignment of
         {| Target: Expression
            Value: Expression |}
-and Statement =
-    | Empty
-    | IfStatement of If<Expression, Statement>
-    /// An expression whose result is evaluated then discarded.
-    | IgnoredExpr of Expression
-    | LocalVar of Local<Expression>
-    | MatchStatement of Match<Expression, Statement>
-    | Return of Expression
-    | Throw of Expression option
-    | TryStatement of Try<Expression, Statement>
-    | While of Expression * Statement list
 
-type If = If<Expression, Statement>
+type Statement = Statement<Expression>
+type If = If<Expression>
+type Pattern = Pattern<Expression>
+type Local = Local<Expression>
+type MatchCase = MatchCase<Expression>
+type Match = Match<Expression>
+type Try = Try<Expression>
 type Function = Function<Expression>
 
 type FunctionDef =
