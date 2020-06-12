@@ -10,7 +10,7 @@ type GlobalType =
     | ExternType of ExternType
 
 type GlobalTypeSymbol =
-    { Namespace: string list
+    { Namespace: FullIdentifier option
       Type: GlobalType }
     
     static member ofTypeDef ns typeDef =
@@ -19,5 +19,11 @@ type GlobalTypeSymbol =
 
 let getName gtype =
     match gtype with
-    | DefinedType tdef -> tdef.TypeDef.Identifier
+    | DefinedType tdef ->
+        let typeName =
+            match tdef with
+            | Class cdef -> cdef.ClassName
+            | Interface idef -> idef.InterfaceName
+            | Module mdef -> mdef.ModuleName
+        typeName.Identifier
     | ExternType etype -> etype.TypeName

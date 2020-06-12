@@ -6,7 +6,7 @@ open System.Collections.Immutable
 open Classier.NET.Compiler.Identifier
 
 [<StructuralEquality>]
-[<NoComparison>]
+[<StructuralComparison>]
 [<RequireQualifiedAccess>]
 type PrimitiveType =
     | Boolean
@@ -54,6 +54,8 @@ type PrimitiveType =
         | Unit -> "()"
         | _ -> PrimitiveType.names.Item this
 
+[<StructuralEquality>]
+[<StructuralComparison>]
 type TypeName<'Generic> =
     | FuncType of
         {| ParamType: TypeName<'Generic>

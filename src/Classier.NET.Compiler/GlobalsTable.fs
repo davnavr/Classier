@@ -6,7 +6,7 @@ open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Grammar
 
 /// Stores the namespaces and types declared in compilation units.
-type GlobalsTable = GlobalsTable of ImmutableSortedDictionary<string list, ImmutableSortedSet<GlobalTypeSymbol>>
+type GlobalsTable = GlobalsTable of ImmutableSortedDictionary<FullIdentifier option, ImmutableSortedSet<GlobalTypeSymbol>>
 
 module GlobalsTable =
     let private emptySymbols =
@@ -16,10 +16,10 @@ module GlobalsTable =
                 match (one, two) with
                 | (DefinedType dtype, ExternType etype)
                 | (ExternType etype, DefinedType dtype) ->
-                    match (dtype.Header, etype.Kind) with
-                    | (Module, ExternTypeKind.Module) -> 0
+                    match (dtype, etype.Kind) with
+                    | (Module _, ExternTypeKind.Module) -> 0
                     | (_, ExternTypeKind.Module)
-                    | (Module, _) ->
+                    | (Module _, _) ->
                         match one with
                         | ExternType _ -> 1
                         | _ -> -1
@@ -43,7 +43,7 @@ module GlobalsTable =
         | null -> emptySymbols
         | _ -> types
     
-    let addTypes types ns table =
+    let addTypes types ns table = // TODO: Adding validation stuff here would make things alot easier.
         let (GlobalsTable namespaces) = table
         let added = (getTypes ns table).Union(types)
         namespaces.SetItem(ns, added) |> GlobalsTable

@@ -4,6 +4,8 @@ open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
 [<StructuredFormatDisplay("{Item}")>]
+[<StructuralComparison>]
+[<StructuralEquality>]
 type Generic =
     | GenericArg of TypeName<Generic>
     | GenericParam of GenericParam

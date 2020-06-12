@@ -1,34 +1,24 @@
-﻿namespace rec Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler
 
 open System.Collections.Generic
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.GlobalType
 
-type ParserState = // TODO: We need to keep track of the namespace of the file somehow.
-    { Flags: Flags list
-      Members: ImmutableSortedSet<MemberDef> list // TODO: Replace Members with a validator that uses a closure to keep track of the members in the validator.
-      Validator: ParserState.Validator list
+type ParserState<'Validator> =
+    { Members: ImmutableSortedSet<MemberDef> list
+      Namespace: FullIdentifier option
+      Validator: 'Validator list
       Symbols: GlobalsTable }
 
 module ParserState =
-    type ValidationResult =
-        | ValidationSuccess of ParserState
+    type ValidationResult<'Validator> =
+        | ValidationSuccess of ParserState<'Validator>
         | ValidationError of string
 
-        static member ofBoolean errMsg st cond =
-            match cond with
-            | true -> ValidationSuccess st
-            | false -> errMsg() |> ValidationError
+    type Validator = Validator of (ParserState<Validator> -> MemberDef -> ValidationResult<Validator>)
 
-    type Validator = Validator of (ParserState -> MemberDef -> ValidationResult)
-    
-    let defaultState =
-        { Flags = List.empty
-          Members = List.empty
-          Validator = List.empty
-          Symbols = GlobalsTable.empty }
-
-    let emptyMembers =
+    let private emptyMembers =
         { new IComparer<MemberDef> with
               member _.Compare(m1, m2) =
                   let paramCompare =
@@ -47,66 +37,70 @@ module ParserState =
                   | _ -> paramCompare }
         |> ImmutableSortedSet.Empty.WithComparer
 
-    let currentFlags state =
-        state.Flags
-        |> List.tryHead
-        |> Option.defaultValue Flags.None
-
-    let visibilityFlags state = currentFlags state &&& Flags.VisibilityMask
-
-    let pushFlags flags state: ParserState = { state with Flags = flags :: state.Flags }
-    let newFlags = pushFlags Flags.None
-
-    let popFlags state =
-        match state.Flags with
-        | [] -> state
-        | _ -> { state with Flags = state.Flags.Tail }
-
-    let setFlags flags state =
-        match state.Flags with
-        | [] -> state
-        | _ ->
-            { state with Flags = (currentFlags state ||| flags) :: state.Flags.Tail }
-
-    let newMembers state: ParserState = { state with Members = emptyMembers :: state.Members }
-    
-    let popMembers state =
-        match state.Members with
-        | [] -> state
-        | _ -> { state with Members = state.Members.Tail }
+    let newMembers state = { state with Members = emptyMembers :: state.Members }
 
     let addMember mdef state =
-        match state.Members with
-        | [] -> state
+        let members = state.Members
+        match members with
+        | [] -> None
         | _ ->
-            { state with Members = state.Members.Head.Add(mdef) :: state.Members.Tail }
+            Some { state with Members = members.Head.Add(mdef) :: members.Tail }
+
+    let defaultState =
+        { Members = List.empty
+          Namespace = None
+          Validator = List.empty
+          Symbols = GlobalsTable.empty }
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
-    let clearAllFlags state: ParserState = { state with Flags = List.empty }
 
     /// Validates the names of non-nested types or modules.
     let typeValidator =
-        let magicFunctionToGetNamespace = List.empty
-
         (fun state mdef ->
             match mdef with
             | Type tdef ->
                 let otherTypes =
                     GlobalsTable.getTypes
-                        magicFunctionToGetNamespace
+                        state.Namespace
                         state.Symbols
-                tdef
-                |> GlobalType.GlobalTypeSymbol.ofTypeDef magicFunctionToGetNamespace
-                |> otherTypes.Contains
-                |> not
-                |> ValidationResult.ofBoolean (fun() -> "bad") state
+                let typeSymbol =
+                    GlobalTypeSymbol.ofTypeDef
+                        state.Namespace
+                        tdef
+
+                if otherTypes.Contains typeSymbol then
+                    ValidationError "test"
+                else
+                    match addMember mdef state with
+                    | Some newState ->
+                        newState
+                        |> updateSymbols (GlobalsTable.addTypes [ typeSymbol ] state.Namespace)
+                        |> addMember mdef
+                        |> Option.map ValidationSuccess
+                        |> Option.defaultValue
+                            (MemberDef.name mdef
+                            |> sprintf "The type %A was unexpectedly in the member stack. Ensure that member sets have been properly pushed and popped from the stack"
+                            |> ValidationError)
+                    | None -> ValidationError "The member stack was empty"
             | _ ->
                 mdef
                 |> string
-                |> sprintf "The member %s is not a non-nested type or module."
+                |> sprintf "The member %s is not a non-nested type or module"
                 |> ValidationError)
         |> Validator
 
     let memberValidator() =
-        (fun state mdef -> invalidOp "Not implemented")
+        (fun state mdef ->
+            match List.tryHead state.Members with
+            | Some members ->
+                if members.Contains mdef then
+                    mdef
+                    |> sprintf "The member %A already exists in the scope"
+                    |> ValidationError
+                else
+                    { state with Members = members.Add(mdef) :: state.Members.Tail }
+                    |> ValidationSuccess
+            | None -> ValidationError "The member stack was empty")
         |> Validator
+
+type ParserState = ParserState<ParserState.Validator>
