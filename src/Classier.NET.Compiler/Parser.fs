@@ -890,7 +890,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
                 choice members
                 |> accessed Flags.Private
-                |>> LocalMember // TODO: Move member pushing logic from functionDef and etc. and into here since it is common.
+                |>> LocalMember // TODO: Use Choice<'T1,'T2> to parse either a statement or a member.
             ]
         |> attempt
         .>>. getUserState

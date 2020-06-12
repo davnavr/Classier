@@ -3,22 +3,19 @@
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
+[<StructuredFormatDisplay("{Item}")>]
 type Generic =
     | GenericArg of TypeName<Generic>
     | GenericParam of GenericParam
 
-    override this.ToString() =
-        match this with
-        | GenericArg name -> name.ToString()
-        | GenericParam param -> param.ToString()
+    override this.ToString() = string this
 and GenericVariance =
     | NoVariance
     | Covariant
     | Contravariant
-and GenericParam =
+and [<StructuredFormatDisplay("{Name}")>]
+    GenericParam =
     { Name: string
       RequiredSuperClass: Identifier<Generic> list
       RequiredInterfaces: TypeName<Generic> list
       Variance: GenericVariance }
-
-    override this.ToString() = this.Name

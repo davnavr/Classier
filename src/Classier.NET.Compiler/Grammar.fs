@@ -15,6 +15,7 @@ module Numeric =
         | Hexadecimal
 
     [<RequireQualifiedAccess>]
+    [<StructuredFormatDisplay("{Item}")>]
     type IntegralVal =
         | Byte of int8
         | UByte of uint8
@@ -29,10 +30,13 @@ module Numeric =
     type FPointVal =
         | Float of float
     
-    type NumLiteral =
-        | Integral of
-            {| Base: NumBase
-               Value: IntegralVal |}
+    [<StructuredFormatDisplay("{Value}")>]
+    type IntegralLit =
+        { Base: NumBase
+          Value: IntegralVal }
+
+    type NumericLit =
+        | Integral of IntegralLit
         | FPointVal of FPointVal
 
 type Name =
@@ -45,68 +49,12 @@ type Name =
 
     override this.ToString() = this.Identifier.ToString()
 
-type Expression =
-    | AnonFunc of Function
-    | BoolLit of bool
-    | CtorCall of
-        {| Arguments: Expression list
-           Type: TypeName |}
-    | FuncCall of
-        {| Arguments: Expression list list
-           Target: Expression |}
-    | FuncComp of Expression * Expression
-    | IdentifierRef of Identifier
-    | IfExpr of If
-    | MatchExpr of Match
-    | MemberAccess of Expression * Identifier
-    | Nested of Expression
-    | NumLit of NumLiteral
-    | StrLit of string
-    | ThrowExpr of Expression
-    | TryExpr of Try
-    | TupleLit of Expression list
-    | UnitLit
-    | VarAssignment of Assignment
-and Assignment =
-    { Target: Expression
-      Value: Expression }
-and If =
-    { Condition: Expression
-      Choice1: Statement list
-      Choice2: Statement list }
-and Match =
-    { Against: Expression
-      Cases: MatchCase list }
-and MatchCase =
-    { Body: Statement list
-      Patterns: Pattern list }
-and Pattern =
-    | Constant of Expression
-    | Default
-    | TuplePattern of Param list
-    | VarPattern of string * TypeName
-and Statement =
-    | Empty
-    | IfStatement of If
-    /// An expression whose result is evaluated then discarded.
-    | IgnoredExpr of Expression
-    /// Used in the body of classes and modules.
-    | LocalMember of MemberDef
-    | LocalVar of Variable
-    | MatchStatement of Match
-    | Return of Expression
-    | Throw of Expression option
-    | TryStatement of Try
-    | While of Expression * Statement list
-and Try =
-    { TryBody: Statement list
-      Handlers: MatchCase list
-      Finally: Statement list }
-and Variable =
-    { Pattern: Pattern
-      VarFlags: Flags
-      Value: Expression option }
-and Param =
+type If<'Expr, 'Stat> =
+    { Condition: 'Expr
+      Choice1: 'Stat list
+      Choice2: 'Stat list }
+
+type Param =
     { Name: string
       Type: TypeName }
 
@@ -126,16 +74,83 @@ and Param =
         | TypeName.Inferred -> String.Empty
         | _ -> sprintf " : %s" (string this.Type)
         |> sprintf "%s%s" this.Name
-and Function =
-    { Body: Statement list
+
+type Pattern<'Expr> =
+    | Constant of 'Expr
+    | Default
+    | TuplePattern of Param list
+    | VarPattern of string * TypeName
+
+and Local<'Expr> =
+    | Let of Pattern<'Expr> * 'Expr
+    | Var of
+        {| Name: string
+           Type: TypeName
+           Value: 'Expr option |}
+
+type MatchCase<'Expr, 'Stat> =
+    { Body: 'Stat list
+      Patterns: Pattern<'Expr> list }
+
+type Match<'Expr, 'Stat> =
+    { Against: 'Expr
+      Cases: MatchCase<'Expr, 'Stat> list }
+
+type Try<'Expr, 'Stat> =
+    { TryBody: 'Stat list
+      Handlers: MatchCase<'Expr, 'Stat> list
+      Finally: 'Stat list }
+
+type Function<'Stat> =
+    { Body: 'Stat list
       Parameters: Param list list
       ReturnType: TypeName }
 
-    static member empty =
+    static member empty: Function<'Stat> =
         { Body = List.empty
           Parameters = List.empty
           ReturnType = TypeName.Inferred }
-and FunctionDef =
+
+type Expression =
+    | AnonFunc of Function<Statement>
+    | BoolLit of bool
+    | CtorCall of
+        {| Arguments: Expression list
+           Type: TypeName |}
+    | FuncCall of
+        {| Arguments: Expression list list
+           Target: Expression |}
+    | FuncComp of Expression * Expression
+    | IdentifierRef of Identifier
+    | IfExpr of If<Expression, Statement>
+    | MatchExpr of Match<Expression, Statement>
+    | MemberAccess of Expression * Identifier
+    | Nested of Expression
+    | NumLit of NumericLit
+    | StrLit of string
+    | ThrowExpr of Expression
+    | TryExpr of Try<Expression, Statement>
+    | TupleLit of Expression list
+    | UnitLit
+    | VarAssignment of
+        {| Target: Expression
+           Value: Expression |}
+and Statement =
+    | Empty
+    | IfStatement of If<Expression, Statement>
+    /// An expression whose result is evaluated then discarded.
+    | IgnoredExpr of Expression
+    | LocalVar of Local<Expression>
+    | MatchStatement of Match<Expression, Statement>
+    | Return of Expression
+    | Throw of Expression option
+    | TryStatement of Try<Expression, Statement>
+    | While of Expression * Statement list
+
+type If = If<Expression, Statement>
+type Function = Function<Expression>
+
+type FunctionDef =
     { Function: Function
       FuncDef: Name
       SelfIdentifier: string option }
@@ -150,31 +165,36 @@ and FunctionDef =
           FuncDef = def
           SelfIdentifier = None }
 
-and ClassHeader =
-    { PrimaryCtor: Constructor
-      SuperClass: Identifier list }
-and TypeHeader =
-    | Class of ClassHeader
-    | Interface
-    | Module
-and TypeDef =
-    { Header: TypeHeader
-      InitBody: Statement list
-      Interfaces: TypeName list
-      Members: ImmutableSortedSet<MemberDef>
-      TypeDef: Name }
-and Constructor =
+type ConstructorBase =
+    | SelfCall of Expression list
+    | SuperCall of Expression list
+
+type Constructor =
     { BaseCall: ConstructorBase
       Body: Statement list
       Parameters: Param list }
-and ConstructorBase =
-    | SelfCall of Expression list
-    | SuperCall of Expression list
-and MemberDef =
+
+type ClassHeader =
+    { PrimaryCtor: Constructor
+      SuperClass: Identifier list }
+
+type TypeHeader =
+    | Class of ClassHeader
+    | Interface
+    | Module
+
+type TypeDef<'Member> =
+    { Header: TypeHeader
+      InitBody: Statement list
+      Interfaces: TypeName list
+      Members: ImmutableSortedSet<'Member>
+      TypeDef: Name }
+
+type MemberDef =
     | Ctor of Constructor
     | Function of FunctionDef
     | Method of FunctionDef
-    | Type of TypeDef
+    | Type of TypeDef<MemberDef>
 
     static member name mdef =
         match mdef with
@@ -203,6 +223,8 @@ and MemberDef =
         | Method fdef -> List.tryHead fdef.Function.Parameters
         | _ -> None
         |> Option.defaultValue List.empty
+
+type TypeDef = TypeDef<MemberDef>
 
 type CompilationUnit =
     { Definitions: TypeDef list
