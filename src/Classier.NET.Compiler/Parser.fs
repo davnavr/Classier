@@ -917,7 +917,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 fun body baseArgs ->
                     { BaseCall = SuperCall baseArgs
                       Body = body
-                      CtorFlags = flags
                       Parameters = ctorParams }
         let classExtends =
             extends

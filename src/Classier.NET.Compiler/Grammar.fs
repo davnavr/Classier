@@ -6,52 +6,41 @@ open System.Collections.Immutable
 type Identifier = Identifier.Identifier<Generic.Generic>
 type TypeName = TypeSystem.TypeName<Generic.Generic>
 
-// TODO: Come up with better way to keep track of data that is not a flag enum.
-[<Flags>]
-type Flags =
-    | None = 0u
-    | Public = 1u
-    | Internal = 2u
-    | Protected = 3u
-    | Private = 4u
-    | VisibilityMask = 4u
-    | Abstract = 8u
-    /// Indicates that a class or local variable is mutable.
-    | Mutable = 16u
-    /// Indicates that a class can have a subclass.
-    | Inheritable = 32u
-    | Inline = 64u
-    | Override = 128u
-    /// Indicates that a method can be optionally overriden.
-    | Virtual = 256u
-    /// Indicates that a method cannot be overriden any further.
-    | Sealed = 512u
-    | MethodImplMask = 960u
+[<AutoOpen>]
+module Numeric =
+    [<RequireQualifiedAccess>]
+    type NumBase =
+        | Binary
+        | Decimal
+        | Hexadecimal
 
-[<Flags>]
-type NumType =
-    | Decimal = 1uy
-    | Double = 2uy
-    | Float = 3uy
-    | Signed = 0uy
-    | Unsigned = 4uy
-    | Integer = 8uy
-    | Long = 16uy
+    [<RequireQualifiedAccess>]
+    type IntegralVal =
+        | Byte of int8
+        | UByte of uint8
+        | Short of int16
+        | UShort of uint16
+        | Int of int32
+        | UInt of uint32
+        | Long of int64
+        | ULong of uint64
 
-type NumLiteral =
-    { Base: byte
-      FracPart: char list
-      IntPart: char list
-      Type: NumType }
+    [<RequireQualifiedAccess>]
+    type FPointVal =
+        | Float of float
+    
+    type NumLiteral =
+        | Integral of
+            {| Base: NumBase
+               Value: IntegralVal |}
+        | FPointVal of FPointVal
 
-type Definition = // TODO: Remove this and just use identifier and a new system for modifiers instead.
-    { Flags: Flags
-      Identifier: Identifier
+type Name =
+    { Identifier: Identifier
       Position: FParsec.Position }
 
     static member empty =
-        { Flags = Flags.None
-          Identifier = { Name = String.Empty; Generics = [] }
+        { Identifier = { Name = String.Empty; Generics = [] }
           Position = FParsec.Position(String.Empty, 0L, 0L, 0L) }
 
     override this.ToString() = this.Identifier.ToString()
@@ -148,12 +137,12 @@ and Function =
           ReturnType = TypeName.Inferred }
 and FunctionDef =
     { Function: Function
-      FuncDef: Definition
+      FuncDef: Name
       SelfIdentifier: string option }
 
     static member generatedDef =
         { Function = Function.empty
-          FuncDef = Definition.empty
+          FuncDef = Name.empty
           SelfIdentifier = Some "&this" }
 
     static member placeholder def fparams =
@@ -173,11 +162,10 @@ and TypeDef =
       InitBody: Statement list
       Interfaces: TypeName list
       Members: ImmutableSortedSet<MemberDef>
-      TypeDef: Definition }
+      TypeDef: Name }
 and Constructor =
     { BaseCall: ConstructorBase
       Body: Statement list
-      CtorFlags: Flags
       Parameters: Param list }
 and ConstructorBase =
     | SelfCall of Expression list
@@ -188,7 +176,7 @@ and MemberDef =
     | Method of FunctionDef
     | Type of TypeDef
 
-    static member definition mdef =
+    static member name mdef =
         match mdef with
         | Function fdef
         | Method fdef -> Some fdef.FuncDef
@@ -196,7 +184,7 @@ and MemberDef =
         | _ -> None
 
     static member identifier mdef =
-        MemberDef.definition mdef
+        MemberDef.name mdef
         |> Option.map (fun def -> def.Identifier)
 
     /// Gets the parameters of the method, function, or constructor.
