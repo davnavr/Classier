@@ -8,6 +8,7 @@ open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.ParserState
 open Classier.NET.Compiler.TypeSystem
 
+// TODO: Clean up parser and put all the functions in the module.
 let compilationUnit: Parser<CompilationUnit, ParserState> =
     let colon = skipChar ':'
     let comma = skipChar ','
@@ -844,10 +845,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
         >>. validateFlags
                 (fun flags -> (flags.HasFlag Flags.Abstract) && (flags &&& Flags.MethodImplMask > Flags.None))
-                "Invalid modifier on abstract method"
+                "Valid modifier on abstract method" // TODO: Replace these with explicit calls to fail, since these are not used as proper error messages.
         >>. validateFlags
                 (fun flags -> (flags &&& Flags.MethodImplMask).HasFlag(Flags.Sealed ||| Flags.Virtual))
-                "Virtual methods cannot be sealed"
+                "Unsealed virtual method"
         >>. functionDef Method
         <?> "method definition"
 

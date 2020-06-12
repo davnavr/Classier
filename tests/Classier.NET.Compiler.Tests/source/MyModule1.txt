@@ -68,4 +68,9 @@ public module Math {
     public def functionTest (f: int => int) {
         f(555)
     }
+
+    // Overloading!
+    public def functionTest (f: int => int) (p: int) {
+        f (p)
+    }
 }

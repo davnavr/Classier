@@ -26,13 +26,13 @@ module GlobalsTable =
                     | _ -> 0
                 | _ -> 0
             | _ as result -> result
-
-        { new System.Collections.Generic.IComparer<GlobalTypeSymbol> with
-              member _.Compare(one, two) =
-                  match compare one.Namespace two.Namespace with
-                  | 0 -> compareType one.Type two.Type
-                  | _ as result -> result }
-        |> ImmutableSortedSet.Empty.WithComparer
+        let typeComparer =
+            { new System.Collections.Generic.IComparer<GlobalTypeSymbol> with
+                  member _.Compare(one, two) =
+                      match compare one.Namespace two.Namespace with
+                      | 0 -> compareType one.Type two.Type
+                      | _ as result -> result }
+        ImmutableSortedSet.Empty.WithComparer typeComparer
 
     let empty = GlobalsTable ImmutableSortedDictionary.Empty
 

@@ -12,12 +12,12 @@ type ParserState = // TODO: We need to keep track of the namespace of the file s
 
 module ParserState =
     type ValidationResult =
-        | ValidationSuccess
+        | ValidationSuccess of ParserState
         | ValidationError of string
 
-        static member ofBoolean errMsg cond =
+        static member ofBoolean errMsg st cond =
             match cond with
-            | true -> ValidationSuccess
+            | true -> ValidationSuccess st
             | false -> errMsg() |> ValidationError
 
     type Validator = Validator of (ParserState -> MemberDef -> ValidationResult)
@@ -86,7 +86,7 @@ module ParserState =
 
     /// Validates the names of non-nested types or modules.
     let typeValidator =
-        let magicFunctionToGetNamespace = invalidOp "not working"
+        let magicFunctionToGetNamespace = List.empty
 
         (fun state mdef ->
             match mdef with
@@ -99,7 +99,7 @@ module ParserState =
                 |> GlobalType.GlobalTypeSymbol.ofTypeDef magicFunctionToGetNamespace
                 |> otherTypes.Contains
                 |> not
-                |> ValidationResult.ofBoolean (fun() -> "bad")
+                |> ValidationResult.ofBoolean (fun() -> "bad") state
             | _ ->
                 mdef
                 |> string
@@ -108,6 +108,5 @@ module ParserState =
         |> Validator
 
     let memberValidator() =
-        (fun state mdef ->
-            ValidationSuccess)
+        (fun state mdef -> invalidOp "Not implemented")
         |> Validator

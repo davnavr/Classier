@@ -44,7 +44,7 @@ type NumLiteral =
       IntPart: char list
       Type: NumType }
 
-type Definition =
+type Definition = // TODO: Remove this and just use identifier and a new system for modifiers instead.
     { Flags: Flags
       Identifier: Identifier
       Position: FParsec.Position }
