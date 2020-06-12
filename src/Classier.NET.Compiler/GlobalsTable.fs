@@ -34,6 +34,8 @@ module GlobalsTable =
                       | _ as result -> result }
         ImmutableSortedSet.Empty.WithComparer typeComparer
 
+    // TODO: Add a 'bind' function or whatever it is called.
+
     let empty = GlobalsTable ImmutableSortedDictionary.Empty
 
     let getTypes ns (GlobalsTable table) =
@@ -43,10 +45,14 @@ module GlobalsTable =
         | null -> emptySymbols
         | _ -> types
     
-    let addTypes types ns table = // TODO: Adding validation stuff here would make things alot easier.
-        let (GlobalsTable namespaces) = table
-        let added = (getTypes ns table).Union(types)
-        namespaces.SetItem(ns, added) |> GlobalsTable
+    let addType (tsymbol: GlobalTypeSymbol) globals =
+        let (GlobalsTable table) = globals
+        let ns = tsymbol.Namespace
+
+        globals
+        |> getTypes ns
+        |> SortedSet.add tsymbol
+        |> Option.map (fun types -> table.SetItem(ns, types) |> GlobalsTable)
 
     /// Adds a namespace to the symbol table.
     let addNamespace ns table =

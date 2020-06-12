@@ -9,6 +9,7 @@
 
   <!-- Source files -->
   <ItemGroup>
+    <Compile Include="SortedSet.fs" />
     <Compile Include="CompilerError.fs" />
     <Compile Include="Identifier.fs" />
     <Compile Include="TypeSystem.fs" />
