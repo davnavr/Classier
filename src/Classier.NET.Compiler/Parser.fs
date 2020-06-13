@@ -4,10 +4,12 @@ open System
 open FParsec
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.ParserState
 open Classier.NET.Compiler.TypeSystem
 
 let private position: Parser<Position, _> = fun stream -> Reply(stream.Position)
+
 let private optList p = opt p |>> Option.defaultValue []
 
 // TODO: Remove these single character parsers if they are only used once
@@ -17,23 +19,14 @@ let gtsign = skipChar '>'
 let lcurlybracket = skipChar '{' <?> "opening bracket"
 let lparen = skipChar '(' <?> "opening parenthesis"
 let ltsign = skipChar '<'
-let opequal = skipChar '='
 let period = skipChar '.' <?> "period"
 let rcurlybracket = skipChar '}' <?> "closing bracket"
 let rparen = skipChar ')' <?> "closing parenthesis"
 let semicolon = skipChar ';' <?> "semicolon"
-let underscore = skipChar '_' <?> "underscore"
 let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
-// TODO: Determine if forwarded parsers are needed for each one.
-let identifier, private identifierRef = createParserForwardedToRef<Identifier,_>()
-let ifStatement, private ifStatementRef = createParserForwardedToRef<If,_>()
-let matchStatement, private matchStatementRef = createParserForwardedToRef<Match,_>()
+// TODO: These forwarded parsers are not needed.
 let nestedTypes, private nestedTypesRef = createParserForwardedToRef<MemberDef,_>()
-let tryBlock, private tryBlockRef = createParserForwardedToRef<Try,_>()
-let tupleExpr, private tupleExprRef = createParserForwardedToRef<Expression list,_>()
-let typeName, private typeNameRef = createParserForwardedToRef<TypeName,_>()
-let statement, private statementRef = createParserForwardedToRef<Statement,_>()
 
 let space =
     choice
@@ -90,439 +83,193 @@ let accessModifier lowestAccess =
             preturn Access.Public
         ]
 
-// TODO: Clean up parser and put all the functions in the module.
-let compilationUnit: Parser<CompilationUnit, ParserState> =
-    let typeAnnotation =
-        space
-        >>. skipChar ':'
-        |> attempt
-        >>. space
-        >>. typeName
-        <?> "type annotation"
-    let typeAnnotationOpt =
-        typeAnnotation
-        |> opt
-        |>> Option.defaultValue Inferred
+let typeName, private typeNameRef = createParserForwardedToRef<TypeName,_>()
+let typeAnnotation =
+    space
+    >>. skipChar ':'
+    |> attempt
+    >>. space
+    >>. typeName
+    |> opt
+    |>> Option.defaultValue Inferred
+    <?> "type annotation"
 
-    let modifier name flag =
-        skipString name
-        >>. space1
-        |> attempt
-        >>. updateUserState (setFlags flag)
-        |> optional
-    let modifiers pairs =
-        pairs
-        |> Seq.map (fun (name, flag) -> modifier name flag)
-        |> Seq.reduce (fun one two -> one >>. two)
+let modifiers: Parser<string list, _> = fail "not implemented"
 
-    let separator p = space >>. attempt p .>> space
+let private separator p = space >>. attempt p .>> space
 
-    let block p =
-        lcurlybracket
-        |> attempt
-        >>. space
-        >>. p
-        .>> space
-        .>> rcurlybracket
-    let blockChoice p =
-        choice p
-        |> attempt
-        .>> space
-        |> many
-        |> block
-    let statementBlock = blockChoice [ statement ]
+let block p =
+    lcurlybracket
+    |> attempt
+    >>. space
+    >>. p
+    .>> space
+    .>> rcurlybracket
+let blockChoice p =
+    choice p
+    |> attempt
+    .>> space
+    |> many
+    |> block
 
-    let genericArgs =
-        ltsign
-        >>. sepBy1 typeName (separator comma)
-        |> attempt
-        .>> gtsign
-        |> optList
-        <?> "generic arguments"
+let statement, private statementRef = createParserForwardedToRef<Statement,_>()
+let statementBlock = blockChoice [ statement ]
 
-    let identifierStr =
-        asciiLetter
-        .>>. manyChars (asciiLetter <|> digit)
-        |>> String.Concat
-        <?> "identifier"
-    let identifierList =
-        sepBy1 identifier (separator period |> attempt)
-    let identifierFull =
-        identifierList
-        |>> Identifier
-        <?> "fully qualified identifier"
+let genericArgs =
+    ltsign
+    >>. sepBy1 typeName (separator comma)
+    |> attempt
+    .>> gtsign
+    |> optList
+    <?> "generic arguments"
 
-    let paramTuple =
-        lparen
-        |> attempt
-        .>> space
-        >>. sepBy
-                (identifierStr
-                .>>. typeAnnotationOpt
-                <?> "parameter"
-                |>> fun (name, ptype) ->
-                    { Name = name
-                      Type = ptype })
-                (separator comma)
-        .>> rparen
-        <?> "parameters"
-    let paramTupleList =
-        paramTuple
-        .>> space
-        |> many1
-        <?> "parameter list"
+let identifierStr =
+    let letterOrUnderscore =
+        asciiLetter <|> pchar '_'
+    letterOrUnderscore
+    .>>. manyChars (letterOrUnderscore <|> digit)
+    |>> String.Concat
+let identifier =
+    identifierStr
+    .>> space
+    .>>. genericArgs
+    <?> "identifier"
+    |>> fun (name, gparams) ->
+        { Name = name
+          Generics = List.map GenericArg gparams }
+let identifierFull =
+    sepBy1 identifier (separator period |> attempt)
+    |>> FullIdentifier
+    <?> "fully qualified name"
 
-    let expression =
-        let decimalChars = [ '0'..'9' ]
+let paramTuple =
+    let param =
+        identifierStr
+        .>>. typeAnnotation
+        <?> "parameter"
+        |>> fun (name, ptype) ->
+            { Name = name
+              Type = ptype }
+    lparen
+    |> attempt
+    .>> space
+    >>. sepBy param (separator comma)
+    .>> rparen
+    <?> "parameters"
+let paramTupleList =
+    paramTuple
+    .>> space
+    |> many1
+    <?> "parameter list"
 
-        let expr = OperatorPrecedenceParser<_,_,_>()
-        let exprParser = expr.ExpressionParser <?> "expression"
+let expression, private expressionRef = createParserForwardedToRef<Expression, _>()
+let tupleExpr =
+    lparen
+    |> attempt
+    >>. space
+    >>. sepBy expression (separator comma)
+    .>> rparen
+    <?> "tuple"
+let parenExpr = tupleExpr |>> TupleLit
 
-        let functionCall targetExpr args name =
-            let target = MemberAccess (targetExpr, Identifier.ofString name)
-            FuncCall {| Arguments = args; Target = target |}
-        let assignment t target value = t { Target = target; Value = value }
-
-        let strChar = manySatisfy (fun c -> c <> '\\' && c <> '"' && c <> '\n')
-        let strEscaped =
-            skipChar '\\'
-            |> attempt
-            >>. choice
-                [
-                    skipChar 'n' >>% '\n'
-                    skipChar 'r' >>% '\r'
-                    skipChar 't' >>% '\t'
-
-                    skipChar 'u'
-                    |> attempt
-                    >>. parray 4 hex
-                    |>> (fun chars -> Convert.ToUInt32(String chars, 16) |> char)
-                ]
-            |>> string
-
-        [
-            "equals", "==", 38, Associativity.Left
-
-            // Mathematical operators
-            "add", "+", 40, Associativity.Left
-            "subtract", "-", 40, Associativity.Left
-            "multiply", "*", 50, Associativity.Left
-            "divide", "/", 50, Associativity.Left
-
-            // Boolean operators
-            "or", "||", 34, Associativity.Left
-            "and", "&&", 36, Associativity.Left
-        ]
-        |> Seq.map (fun (name, op, prec, assoc) ->
-            let map expr1 expr2 =
-                functionCall expr1 [ [ expr2 ] ] name
-            InfixOperator<_,_,_>(op, space, prec, assoc, map))
-        |> Seq.cast<Operator<_,_,_>>
-        |> Seq.append
-            [
-                InfixOperator<_,_,_>(">>", space, 18, Associativity.Left, fun f g -> FuncComp (f, g));
-                InfixOperator<_,_,_>("|>", space, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
-                PrefixOperator<_,_,_>("!", space, 32, true, fun exp -> functionCall exp [] "not");
-                PrefixOperator<_,_,_>("-", space, 60, true, fun exp -> functionCall exp [] "negate");
-                InfixOperator<_,_,_>("<-", space, 100, Associativity.Right, assignment VarAssignment);
-            ]
-        |> Seq.iter expr.AddOperator
-
-        expr.TermParser <-
-            choice
-                [
-                    between
-                        dquotes
-                        dquotes
-                        (stringsSepBy strChar strEscaped)
-                    |>> StrLit
-                    <?> "string literal"
-
-                    paramTuple
-                    .>> space
-                    .>> space
-                    .>> lambdaOperator
-                    |> attempt
-                    .>> space
-                    .>>. exprParser
-                    <?> "anonymous function"
-                    |>> fun (parameters, retVal) ->
-                        { Body = [ Return retVal ]
-                          Parameters = [ parameters ]
-                          ReturnType = Inferred }
-                        |> AnonFunc
-
-                    tupleExpr
-                    <?> "tuple"
-                    |>> (fun ex ->
-                        match ex with
-                        | [] -> UnitLit
-                        | [ nested ] -> nested
-                        | _ -> TupleLit ex);
-
-                    ifStatement |>> IfExpr <?> "if expression"
-
-                    matchStatement |>> MatchExpr <?> "match expression"
-
-                    skipString "throw"
-                    >>. space1
-                    |> attempt
-                    >>. exprParser
-                    |>> ThrowExpr
-
-                    skipString "new"
-                    >>. space1
-                    |> attempt
-                    >>. opt identifierFull
-                    .>> space
-                    .>>. (tupleExpr <?> "constructor arguments")
-                    <?> "constructor call"
-                    |>> (fun (ctype, args) ->
-                        CtorCall
-                            {| Arguments = args
-                               Type = Option.defaultValue Inferred ctype |});
-
-                    tryBlock |>> TryExpr <?> "try expression"
-                    
-                    [
-                        skipString "true" >>% true
-                        skipString "false" >>% false
-                    ]
-                    |> choice
-                    |>> BoolLit
-                    <?> "boolean literal"
-
-                    identifier |>> IdentifierRef;
-
-                    pchar '0'
-                    >>. choice
-                        [
-                            anyOf [ 'b'; 'B' ] >>% [ '0'; '1'; ];
-                            anyOf [ 'x'; 'X' ] >>% (decimalChars @ [ 'a'..'z' ] @ [ 'A'..'Z' ]);
-                        ]
-                    |> attempt
-                    <|>% decimalChars
-                    <|> (pchar '.' >>% [])
-                    >>= (fun chars ->
-                        let digits c =
-                            attempt (anyOf c) .>> (skipMany (pchar '_') <?> "digit separator") |> many1
-                        let decimalDigits = digits decimalChars
-
-                        (match chars.Length with
-                            | 0 -> decimalDigits |>> fun digits -> [], digits
-                            | 10 ->
-                                decimalDigits
-                                .>>. opt (pchar '.' |> attempt >>. decimalDigits)
-                                |>> fun (idigits, fdigits) ->
-                                    match fdigits with
-                                    | Some _ -> idigits, fdigits.Value
-                                    | None -> idigits, []
-                            | _ -> digits chars |>> fun digits -> digits, [])
-                        >>= fun (idigits, fdigits) ->
-                            let suffixes pairs none =
-                                pairs
-                                |> Seq.map (fun (s, f) -> pstringCI s >>% f)
-                                |> choice
-                                |> opt
-                                |>> Option.defaultValue none
-                                <?> "numeric suffix"
-
-                            if List.isEmpty fdigits then
-                                suffixes
-                                    [
-                                        "u", NumType.Integer ||| NumType.Unsigned
-                                        "l", NumType.Long
-                                        "ul", NumType.Long ||| NumType.Unsigned
-                                        "lu", NumType.Long ||| NumType.Unsigned
-                                    ]
-                                    NumType.Integer
-                                |>> fun intType ->
-                                    NumLit
-                                        { Base = byte(chars.Length)
-                                          FracPart = []
-                                          IntPart = idigits
-                                          Type = intType }
-                            else
-                                suffixes
-                                    [
-                                        "d", NumType.Double
-                                        "f", NumType.Float
-                                        "m", NumType.Decimal
-                                    ]
-                                    NumType.Double
-                                |>> fun floatType ->
-                                    NumLit
-                                        { Base = byte(10)
-                                          FracPart = fdigits
-                                          IntPart = idigits
-                                          Type = floatType })
-                    <?> "numeric literal";
-                ]
-            .>> space
-            >>= fun target ->
-                let memberAccess =
-                    period
-                    |> attempt
-                    >>. space
-                    >>. identifier
-                    .>> space
-                    <?> "member access"
-                    |> many1
-                    |>> fun members ->
-                        fun t ->
-                            Seq.fold
-                                (fun prev tmember -> MemberAccess (prev, tmember))
-                                t
-                                members
-                let funcCall =
-                    tupleExpr
-                    .>> space
-                    |> many1 <?>
-                    "argument list"
-                    |>> fun args ->
-                        fun t ->
-                            match args with
-                            | [] -> target
-                            | _ -> FuncCall {| Arguments = args; Target = t |}
-                memberAccess <|> funcCall
-                .>> space
-                |> many1
-                <|>% []
-                |>> Seq.fold
-                    (fun prev next -> next prev)
-                    target
-        exprParser
-    let expressionInParens = // NOTE: Tuples might not parse correctly here.
-        lparen
-        |> attempt
-        >>. space
-        >>. expression
-        .>> rparen
-    let equalsExpression =
-        opequal
-        |> attempt
-        >>. space
-        >>. expression
-
-    let lambdaBody =
-        lambdaOperator
-        |> attempt
-        >>. space
-        >>. expression
-        |>> Return
-        |>> List.singleton
-        .>> space
-        .>> semicolon
-
-    let pattern =
-        [
-            identifierStr
-            .>> space
-            .>>. typeAnnotationOpt
-            |>> VarPattern
-            <?> "variable pattern"
-
-            paramTuple
-            |>> TuplePattern
-            <?> "tuple deconstruction"
-        ]
-        |> choice
-
-    let matchCases =
-        let matchPattern =
-            [
-                pattern
-
-                expression
-                |>> Constant
-                <?> "constant pattern"
-
-                underscore
-                >>. space
-                |> attempt
-                >>% Default
-                <?> "default pattern"
-            ]
-            |> choice
-        sepBy1 matchPattern (separator comma |> attempt)
-        .>> space
-        .>> lambdaOperator
-        |> attempt
-        .>> space
-        .>>. choice
-            [
-                expression |>> (Return >> List.singleton)
-                statementBlock
-            ]
-        .>> space
-        .>> semicolon
-        |>> (fun (patterns, body) -> { Body = body; Patterns = patterns })
-        .>> space
-        |> many1
-        |> block
-        <?> "cases"
-
-    tupleExprRef :=
-        lparen
-        |> attempt
-        >>. space
-        >>. sepBy expression (separator comma)
-        .>> rparen
-
-    let simpleTypeName =
-        choiceL
-            [
-                PrimitiveType.names
-                |> Seq.map (fun pair -> skipString (pair.Value) >>% pair.Key)
-                |> choice
-                |>> Primitive
-
-                identifierFull
-
-                skipChar '_' >>% Inferred
-
-                between
-                    lparen
-                    rparen
-                    (sepBy typeName (separator comma))
-                <?> "tuple"
-                |>> function
-                | [] -> Primitive PrimitiveType.Unit
-                | items -> Tuple items
-            ]
-            "type name"
-
-    typeNameRef :=
-        sepBy1
-            simpleTypeName
-            (pchar '|' |> separator |> attempt)
-        |>> (fun tlist ->
-            match tlist with
-            | [ one ] -> one
-            | _ -> Union tlist)
-        .>>. opt
-            (space
-            >>. lambdaOperator
-            >>. space
-            >>. typeName
-            |> attempt)
-        |>> fun (paramsType, retType) ->
-            match retType with
-            | Some _ -> FuncType {| ParamType = paramsType; ReturnType = retType.Value |}
-            | None -> paramsType
-
-    identifierRef :=
+let pattern =
+    [
         identifierStr
         .>> space
-        .>>. genericArgs
-        |>> fun (name, gparams) ->
-            { Name = name
-              Generics = List.map GenericArg gparams }
+        .>>. typeAnnotation
+        |>> VarPattern
+        <?> "variable pattern"
 
+        paramTuple
+        |>> TuplePattern
+        <?> "tuple deconstruction"
+    ]
+    |> choice
+let matchCases =
+    let matchPattern =
+        [
+            pattern
+
+            expression
+            |>> Constant
+            <?> "constant pattern"
+
+            skipChar '_'
+            >>. space
+            |> attempt
+            >>% Default
+            <?> "default pattern"
+        ]
+        |> choice
+    sepBy1 matchPattern (separator comma |> attempt)
+    .>> space
+    .>> lambdaOperator
+    |> attempt
+    .>> space
+    .>>. choice
+        [
+            expression |>> (Return >> List.singleton)
+            statementBlock
+        ]
+    .>> space
+    .>> semicolon
+    |>> (fun (patterns, body) -> { Body = body; Patterns = patterns })
+    .>> space
+    |> many1
+    |> block
+    <?> "cases"
+let matchStatement =
+    skipString "match"
+    >>. space
+    >>. parenExpr
+    .>> space
+    .>>. matchCases
+    |>> fun (against, cases) ->
+        { Against = against
+          Cases = cases }
+
+let tryBlock =
+    skipString "try"
+    >>. space
+    >>. statementBlock
+    |> attempt
+    <?> "try block"
+    .>>. (space
+        >>. skipString "catch"
+        >>. space
+        |> attempt
+        >>. matchCases
+        <?> "catch block"
+        |> optList)
+    .>>.
+        (space
+        >>. skipString "finally"
+        >>. space
+        |> attempt
+        >>. statementBlock
+        <?> "finally block"
+        |> optList)
+    >>= fun ((tryBlock, catchBlock), finallyBlock) ->
+        if List.isEmpty catchBlock && List.isEmpty finallyBlock then
+            fail "Expected at least one catch or finally block."
+        else
+            preturn
+                { TryBody = tryBlock
+                  Handlers = catchBlock
+                  Finally = finallyBlock }
+
+// TODO: For parsers that rely on themselves, try to see if this works instead:
+//let ifStatement =
+//    let inner f =
+//        // Call f inside here
+//    inner inner
+let ifStatement, private ifStatementRef = createParserForwardedToRef<If,_>()
+
+do
     ifStatementRef :=
         skipString "if"
-        >>. ignored1OrSep
-        >>. expressionInParens
+        >>. space1
+        >>. parenExpr
         .>> space
         .>>. statementBlock
         |> attempt
@@ -551,52 +298,82 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
               Choice1 = body
               Choice2 = rest }
 
-    matchStatementRef :=
-        skipString "match"
-        >>. space
-        >>. expressionInParens
-        .>> space
-        .>>. matchCases
-        |>> fun (against, cases) -> { Against = against; Cases = cases }
+do
+    let simpleType =
+        choiceL
+            [
+                PrimitiveType.names
+                |> Seq.map (fun pair -> skipString (pair.Value) >>% pair.Key)
+                |> choice
+                |>> Primitive
 
+                identifierFull |>> Identifier
+
+                skipChar '_' >>% Inferred
+
+                between
+                    lparen
+                    rparen
+                    (sepBy typeName (separator comma))
+                <?> "tuple"
+                |>> function
+                | [] -> Primitive PrimitiveType.Unit
+                | items -> Tuple items
+            ]
+            "type name"
+    typeNameRef :=
+        sepBy1
+            simpleType
+            (pchar '|' |> separator |> attempt)
+        |>> (fun tlist ->
+            match tlist with
+            | [ one ] -> one
+            | _ -> Union tlist)
+        .>>. opt
+            (space
+            >>. lambdaOperator
+            >>. space
+            >>. typeName
+            |> attempt)
+        |>> fun (paramsType, retType) ->
+            match retType with
+            | Some _ -> FuncType {| ParamType = paramsType; ReturnType = retType.Value |}
+            | None -> paramsType
+
+do
+    let equalsExpr =
+        skipChar '='
+        |> attempt
+        >>. space
+        >>. expression
     statementRef :=
         choiceL
             [
                 semicolon >>% Empty <?> "empty statement"
-                
+            
                 skipString "var"
-                >>. ignored1OrSep
+                >>. space1
                 |> attempt
-                >>. updateUserState newFlags
-                >>. updateUserState (setFlags Flags.Mutable)
                 >>. pattern
                 .>> space
-                .>>. opt (equalsExpression .>> space .>> semicolon)
-                .>>. getUserState
-                .>> updateUserState popFlags
-                |>> (fun ((p, value), state) ->
-                    LocalVar
-                        { Pattern = p
-                          VarFlags = currentFlags state
-                          Value = value })
+                .>>. opt (equalsExpr .>> space .>> semicolon)
                 <?> "mutable variable"
+                |>> (Local.Var >> LocalVar)
 
                 skipString "let"
-                >>. ignored1OrSep
+                >>. space1
                 |> attempt
-                >>. updateUserState newFlags
-                >>. position
-                .>>. pattern
+                >>. pattern
                 .>> space
-                .>>. getUserState
-                >>= (fun ((pos, p), state) ->
+                <?> "local variable or function"
+                >>= fun p ->
                     let value =
-                        equalsExpression
+                        equalsExpr
                         |> attempt
                         .>> space
                         .>> semicolon
                     let rest =
-                        (match p with
+                        match p with
                         | VarPattern (name, vtype) ->
                             match vtype with
                             | Inferred ->
@@ -605,7 +382,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
                                     paramTupleList
                                     .>> space
-                                    .>>. typeAnnotationOpt
+                                    .>>. typeAnnotation
                                     .>> space
                                     .>>. (statementBlock <?> "local function body")
                                     |>> fun ((parameters, retType), body) ->
@@ -617,16 +394,13 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                                 |> choice
                                 |> Some
                             | _ -> None
-                        | _ -> None)
+                        | _ -> None
                     rest
                     |> Option.defaultValue value
                     |>> fun value ->
-                        { Pattern = p
-                          VarFlags = currentFlags state
-                          Value = Some value })
-                .>> updateUserState popFlags
-                <?> "local variable or function"
-                |>> LocalVar
+                        (p, value)
+                        |> Local.Let
+                        |> LocalVar
 
                 skipString "while"
                 >>. space
@@ -669,7 +443,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 matchStatement |>> MatchStatement <?> "match statement"
 
                 tryBlock |>> TryStatement <?> "try statement"
-                
+            
                 expression
                 .>> space
                 .>>. choice
@@ -686,33 +460,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             ]
             "statement"
 
-    tryBlockRef :=
-        skipString "try"
-        >>. space
-        >>. statementBlock
-        |> attempt
-        .>>. (space
-            >>. skipString "catch"
-            >>. space
-            |> attempt
-            >>. matchCases
-            |> optList)
-        .>>.
-            (space
-            >>. skipString "finally"
-            >>. space
-            |> attempt
-            >>. statementBlock
-            <?> "finally block"
-            |> optList)
-        >>= fun ((tryBlock, catchBlock), finallyBlock) ->
-            if List.isEmpty catchBlock && List.isEmpty finallyBlock then
-                fail "Expected at least one catch or finally block."
-            else
-                preturn
-                    { TryBody = tryBlock
-                      Handlers = catchBlock
-                      Finally = finallyBlock }
+// TODO: Clean up parser and put all the functions in the module.
+let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let extends =
         skipString "extends"
@@ -779,7 +528,15 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         choiceL
             [
                 statementBlock
-                lambdaBody
+                
+                lambdaOperator
+                |> attempt
+                >>. space
+                >>. expression
+                |>> (Return >> List.singleton)
+                .>> space
+                .>> semicolon
+
                 semicolon >>% []
             ]
             "function body"
@@ -804,14 +561,14 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 preturn (def, fparams)
 
     let functionDef f =
-        modifiers
+        modifiersOLD
             [
                 "inline", Flags.Inline
             ]
         >>. skipString "def"
         >>. space1
         >>. functionHeader f
-        .>>. typeAnnotationOpt
+        .>>. typeAnnotation
         .>> space
         .>>. functionBody
         >>= fun (((def, fparams), retType), body) ->
@@ -829,7 +586,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             >>% func
 
     let methodDef =
-        modifiers
+        modifiersOLD
             [
                 //"inline", Flags.Inline
                 "abstract", Flags.Abstract
@@ -917,7 +674,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             .>>. optList (tupleExpr .>> space)
             .>> space
 
-        modifiers
+        modifiersOLD
             [
                 "abstract", Flags.Abstract
                 "inheritable", Flags.Inheritable

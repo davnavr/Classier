@@ -86,12 +86,10 @@ type Pattern<'Expr> =
     | TuplePattern of Param list
     | VarPattern of string * TypeName
 
+[<RequireQualifiedAccess>]
 type Local<'Expr> =
     | Let of Pattern<'Expr> * 'Expr
-    | Var of
-        {| Name: string
-           Type: TypeName
-           Value: 'Expr option |}
+    | Var of Pattern<'Expr> * 'Expr option
 
 type MatchCase<'Expr, 'Stat> =
     { Body: 'Stat list
