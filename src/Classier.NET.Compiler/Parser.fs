@@ -3,107 +3,100 @@
 open System
 open FParsec
 open Classier.NET.Compiler.Generic
-open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.ParserState
 open Classier.NET.Compiler.TypeSystem
 
 let private position: Parser<Position, _> = fun stream -> Reply(stream.Position)
+let private optList p = opt p |>> Option.defaultValue []
+
+// TODO: Remove these single character parsers if they are only used once
+let comma = skipChar ','
+let dquotes = skipChar '\"' <?> "quotation mark"
+let gtsign = skipChar '>'
+let lcurlybracket = skipChar '{' <?> "opening bracket"
+let lparen = skipChar '(' <?> "opening parenthesis"
+let ltsign = skipChar '<'
+let opequal = skipChar '='
+let period = skipChar '.' <?> "period"
+let rcurlybracket = skipChar '}' <?> "closing bracket"
+let rparen = skipChar ')' <?> "closing parenthesis"
+let semicolon = skipChar ';' <?> "semicolon"
+let underscore = skipChar '_' <?> "underscore"
+let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
+
+// TODO: Determine if forwarded parsers are needed for each one.
+let identifier, private identifierRef = createParserForwardedToRef<Identifier,_>()
+let ifStatement, private ifStatementRef = createParserForwardedToRef<If,_>()
+let matchStatement, private matchStatementRef = createParserForwardedToRef<Match,_>()
+let nestedTypes, private nestedTypesRef = createParserForwardedToRef<MemberDef,_>()
+let tryBlock, private tryBlockRef = createParserForwardedToRef<Try,_>()
+let tupleExpr, private tupleExprRef = createParserForwardedToRef<Expression list,_>()
+let typeName, private typeNameRef = createParserForwardedToRef<TypeName,_>()
+let statement, private statementRef = createParserForwardedToRef<Statement,_>()
+
+let space =
+    choice
+        [
+            anyOf [ ' '; '\t' ]
+            |> skipMany1
+            <?> "whitespace";
+
+            skipNewline;
+
+            pstring "//"
+            |>> ignore
+            .>> restOfLine true
+            <?> "single-line comment";
+
+            skipString "/*"
+            >>. skipCharsTillString "*/" true Int32.MaxValue
+            <?> "multi-line comment";
+        ]
+    |> attempt
+    |> skipMany
+let space1 =
+    choice
+        [
+            notEmpty space
+            followedBy lparen
+        ]
+
+let accessModifier lowestAccess =
+    let modifiers =
+        [
+            "public", Access.Public
+            "internal", Access.Internal
+            "protected", Access.Protected
+            "private", Access.Private
+        ]
+        |> Seq.map (fun (str, vis) ->
+            if vis <= lowestAccess then
+                skipString str
+                .>> space1
+                |> attempt
+                >>% vis
+            else
+                vis
+                |> sprintf "%A access is not valid here"
+                |> fail)
+    choice
+        [
+            choiceL
+                modifiers
+                "access modifier"
+            |> attempt
+
+            preturn Access.Public
+        ]
 
 // TODO: Clean up parser and put all the functions in the module.
 let compilationUnit: Parser<CompilationUnit, ParserState> =
-    // TODO: Remove these single character parsers if they are only used once
-    let comma = skipChar ','
-    let dquotes = skipChar '\"' <?> "quotation mark"
-    let gtsign = skipChar '>'
-    let lcurlybracket = skipChar '{' <?> "opening bracket"
-    let lparen = skipChar '(' <?> "opening parenthesis"
-    let ltsign = skipChar '<'
-    let opequal = skipChar '='
-    let period = skipChar '.' <?> "period"
-    let rcurlybracket = skipChar '}' <?> "closing bracket"
-    let rparen = skipChar ')' <?> "closing parenthesis"
-    let semicolon = skipChar ';' <?> "semicolon"
-    let underscore = skipChar '_' <?> "underscore"
-    let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
-
-
-    let optList p = opt p |>> Option.defaultValue []
-
-    let validateFlags f msg =
-        userStateSatisfies (ParserState.currentFlags >> f >> not) <?> msg
-
-    let identifier, identifierRef = createParserForwardedToRef<Identifier,_>()
-    let ifStatement, ifStatementRef = createParserForwardedToRef<If,_>()
-    let matchStatement, matchStatementRef = createParserForwardedToRef<Match,_>()
-    let nestedTypes, nestedTypesRef = createParserForwardedToRef<MemberDef,_>()
-    let tryBlock, tryBlockRef = createParserForwardedToRef<Try,_>()
-    let tupleExpr, tupleExprRef = createParserForwardedToRef<Expression list,_>()
-    let typeName, typeNameRef = createParserForwardedToRef<TypeName,_>()
-    let statement, statementRef = createParserForwardedToRef<Statement,_>()
-
-    let ignored =
-        choice
-            [
-                anyOf [ ' '; '\t' ]
-                |> skipMany1
-                <?> "whitespace";
-
-                skipNewline;
-
-                pstring "//"
-                |>> ignore
-                .>> restOfLine true
-                <?> "single-line comment";
-
-                skipString "/*"
-                >>. skipCharsTillString "*/" true Int32.MaxValue
-                <?> "multi-line comment";
-            ]
-        |> attempt
-        |> skipMany
-    let ignored1 = notEmpty ignored
-    let ignored1OrSep =
-        choice
-            [
-                ignored1
-                followedBy lparen
-            ]
-
-    let accessed lowestAccess p =
-        let modifiers =
-            [
-                "public", Flags.Public
-                "internal", Flags.Internal
-                "protected", Flags.Protected
-                "private", Flags.Private
-            ]
-            |> Seq.map (fun (str, vis) ->
-                if vis <= lowestAccess then
-                    skipString str
-                    .>> ignored1OrSep
-                    |> attempt
-                    .>> updateUserState (setFlags vis)
-                else
-                    sprintf "An access modifier of %s is not valid here" (vis.ToString().ToLower()) |> fail)
-
-        updateUserState newFlags
-        >>. choice
-            [
-                choiceL modifiers "access modifier"
-                |> attempt
-                >>. p
-
-                updateUserState (setFlags Flags.Public)
-                >>. p
-            ]
-        .>> updateUserState popFlags
-
     let typeAnnotation =
-        ignored
+        space
         >>. skipChar ':'
         |> attempt
-        >>. ignored
+        >>. space
         >>. typeName
         <?> "type annotation"
     let typeAnnotationOpt =
@@ -113,7 +106,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let modifier name flag =
         skipString name
-        >>. ignored1
+        >>. space1
         |> attempt
         >>. updateUserState (setFlags flag)
         |> optional
@@ -122,19 +115,19 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> Seq.map (fun (name, flag) -> modifier name flag)
         |> Seq.reduce (fun one two -> one >>. two)
 
-    let separator p = ignored >>. attempt p .>> ignored
+    let separator p = space >>. attempt p .>> space
 
     let block p =
         lcurlybracket
         |> attempt
-        >>. ignored
+        >>. space
         >>. p
-        .>> ignored
+        .>> space
         .>> rcurlybracket
     let blockChoice p =
         choice p
         |> attempt
-        .>> ignored
+        .>> space
         |> many
         |> block
     let statementBlock = blockChoice [ statement ]
@@ -162,7 +155,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let paramTuple =
         lparen
         |> attempt
-        .>> ignored
+        .>> space
         >>. sepBy
                 (identifierStr
                 .>>. typeAnnotationOpt
@@ -175,7 +168,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         <?> "parameters"
     let paramTupleList =
         paramTuple
-        .>> ignored
+        .>> space
         |> many1
         <?> "parameter list"
 
@@ -223,15 +216,15 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> Seq.map (fun (name, op, prec, assoc) ->
             let map expr1 expr2 =
                 functionCall expr1 [ [ expr2 ] ] name
-            InfixOperator<_,_,_>(op, ignored, prec, assoc, map))
+            InfixOperator<_,_,_>(op, space, prec, assoc, map))
         |> Seq.cast<Operator<_,_,_>>
         |> Seq.append
             [
-                InfixOperator<_,_,_>(">>", ignored, 18, Associativity.Left, fun f g -> FuncComp (f, g));
-                InfixOperator<_,_,_>("|>", ignored, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
-                PrefixOperator<_,_,_>("!", ignored, 32, true, fun exp -> functionCall exp [] "not");
-                PrefixOperator<_,_,_>("-", ignored, 60, true, fun exp -> functionCall exp [] "negate");
-                InfixOperator<_,_,_>("<-", ignored, 100, Associativity.Right, assignment VarAssignment);
+                InfixOperator<_,_,_>(">>", space, 18, Associativity.Left, fun f g -> FuncComp (f, g));
+                InfixOperator<_,_,_>("|>", space, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ [ args ] ]; Target = f |});
+                PrefixOperator<_,_,_>("!", space, 32, true, fun exp -> functionCall exp [] "not");
+                PrefixOperator<_,_,_>("-", space, 60, true, fun exp -> functionCall exp [] "negate");
+                InfixOperator<_,_,_>("<-", space, 100, Associativity.Right, assignment VarAssignment);
             ]
         |> Seq.iter expr.AddOperator
 
@@ -246,11 +239,11 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     <?> "string literal"
 
                     paramTuple
-                    .>> ignored
-                    .>> ignored
+                    .>> space
+                    .>> space
                     .>> lambdaOperator
                     |> attempt
-                    .>> ignored
+                    .>> space
                     .>>. exprParser
                     <?> "anonymous function"
                     |>> fun (parameters, retVal) ->
@@ -272,16 +265,16 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     matchStatement |>> MatchExpr <?> "match expression"
 
                     skipString "throw"
-                    >>. ignored1
+                    >>. space1
                     |> attempt
                     >>. exprParser
                     |>> ThrowExpr
 
                     skipString "new"
-                    >>. ignored1
+                    >>. space1
                     |> attempt
                     >>. opt identifierFull
-                    .>> ignored
+                    .>> space
                     .>>. (tupleExpr <?> "constructor arguments")
                     <?> "constructor call"
                     |>> (fun (ctype, args) ->
@@ -365,14 +358,14 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                                           Type = floatType })
                     <?> "numeric literal";
                 ]
-            .>> ignored
+            .>> space
             >>= fun target ->
                 let memberAccess =
                     period
                     |> attempt
-                    >>. ignored
+                    >>. space
                     >>. identifier
-                    .>> ignored
+                    .>> space
                     <?> "member access"
                     |> many1
                     |>> fun members ->
@@ -383,7 +376,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                                 members
                 let funcCall =
                     tupleExpr
-                    .>> ignored
+                    .>> space
                     |> many1 <?>
                     "argument list"
                     |>> fun args ->
@@ -392,7 +385,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                             | [] -> target
                             | _ -> FuncCall {| Arguments = args; Target = t |}
                 memberAccess <|> funcCall
-                .>> ignored
+                .>> space
                 |> many1
                 <|>% []
                 |>> Seq.fold
@@ -402,29 +395,29 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let expressionInParens = // NOTE: Tuples might not parse correctly here.
         lparen
         |> attempt
-        >>. ignored
+        >>. space
         >>. expression
         .>> rparen
     let equalsExpression =
         opequal
         |> attempt
-        >>. ignored
+        >>. space
         >>. expression
 
     let lambdaBody =
         lambdaOperator
         |> attempt
-        >>. ignored
+        >>. space
         >>. expression
         |>> Return
         |>> List.singleton
-        .>> ignored
+        .>> space
         .>> semicolon
 
     let pattern =
         [
             identifierStr
-            .>> ignored
+            .>> space
             .>>. typeAnnotationOpt
             |>> VarPattern
             <?> "variable pattern"
@@ -445,26 +438,26 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 <?> "constant pattern"
 
                 underscore
-                >>. ignored
+                >>. space
                 |> attempt
                 >>% Default
                 <?> "default pattern"
             ]
             |> choice
         sepBy1 matchPattern (separator comma |> attempt)
-        .>> ignored
+        .>> space
         .>> lambdaOperator
         |> attempt
-        .>> ignored
+        .>> space
         .>>. choice
             [
                 expression |>> (Return >> List.singleton)
                 statementBlock
             ]
-        .>> ignored
+        .>> space
         .>> semicolon
         |>> (fun (patterns, body) -> { Body = body; Patterns = patterns })
-        .>> ignored
+        .>> space
         |> many1
         |> block
         <?> "cases"
@@ -472,7 +465,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     tupleExprRef :=
         lparen
         |> attempt
-        >>. ignored
+        >>. space
         >>. sepBy expression (separator comma)
         .>> rparen
 
@@ -508,9 +501,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             | [ one ] -> one
             | _ -> Union tlist)
         .>>. opt
-            (ignored
+            (space
             >>. lambdaOperator
-            >>. ignored
+            >>. space
             >>. typeName
             |> attempt)
         |>> fun (paramsType, retType) ->
@@ -520,7 +513,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     identifierRef :=
         identifierStr
-        .>> ignored
+        .>> space
         .>>. genericArgs
         |>> fun (name, gparams) ->
             { Name = name
@@ -530,22 +523,22 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         skipString "if"
         >>. ignored1OrSep
         >>. expressionInParens
-        .>> ignored
+        .>> space
         .>>. statementBlock
         |> attempt
         .>>. choice
             [
-                ignored
+                space
                 >>. skipString "else"
                 |> attempt
                 >>. choice
                     [
-                        ignored1
+                        space1
                         >>. ifStatement
                         |> attempt
                         |>> fun e -> [ IfStatement e ]
 
-                        ignored
+                        space
                         >>. statementBlock
                         |> attempt;
                     ]
@@ -560,9 +553,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     matchStatementRef :=
         skipString "match"
-        >>. ignored
+        >>. space
         >>. expressionInParens
-        .>> ignored
+        .>> space
         .>>. matchCases
         |>> fun (against, cases) -> { Against = against; Cases = cases }
 
@@ -577,8 +570,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 >>. updateUserState newFlags
                 >>. updateUserState (setFlags Flags.Mutable)
                 >>. pattern
-                .>> ignored
-                .>>. opt (equalsExpression .>> ignored .>> semicolon)
+                .>> space
+                .>>. opt (equalsExpression .>> space .>> semicolon)
                 .>>. getUserState
                 .>> updateUserState popFlags
                 |>> (fun ((p, value), state) ->
@@ -594,13 +587,13 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 >>. updateUserState newFlags
                 >>. position
                 .>>. pattern
-                .>> ignored
+                .>> space
                 .>>. getUserState
                 >>= (fun ((pos, p), state) ->
                     let value =
                         equalsExpression
                         |> attempt
-                        .>> ignored
+                        .>> space
                         .>> semicolon
                     let rest =
                         (match p with
@@ -611,9 +604,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                                     value
 
                                     paramTupleList
-                                    .>> ignored
+                                    .>> space
                                     .>>. typeAnnotationOpt
-                                    .>> ignored
+                                    .>> space
                                     .>>. (statementBlock <?> "local function body")
                                     |>> fun ((parameters, retType), body) ->
                                         { Body = body 
@@ -636,34 +629,34 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 |>> LocalVar
 
                 skipString "while"
-                >>. ignored
+                >>. space
                 |> attempt
                 >>. lparen
                 >>. expression
                 .>> rparen
-                .>> ignored
+                .>> space
                 .>>. statementBlock
                 |>> While
                 <?> "while loop"
 
                 skipString "return"
-                >>. ignored1
+                >>. space1
                 |> attempt
                 >>. expression
                 |>> Return
                 <?> "return statement"
-                .>> ignored
+                .>> space
                 .>> semicolon
 
                 skipString "throw"
                 >>. choice
                     [
-                        ignored1
+                        space1
                         |> attempt
                         >>. expression
                         |>> Some
 
-                        ignored
+                        space
                         >>. semicolon
                         >>% None
                     ]
@@ -678,7 +671,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 tryBlock |>> TryStatement <?> "try statement"
                 
                 expression
-                .>> ignored
+                .>> space
                 .>>. choice
                     [
                         followedBy rcurlybracket
@@ -695,19 +688,19 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     tryBlockRef :=
         skipString "try"
-        >>. ignored
+        >>. space
         >>. statementBlock
         |> attempt
-        .>>. (ignored
+        .>>. (space
             >>. skipString "catch"
-            >>. ignored
+            >>. space
             |> attempt
             >>. matchCases
             |> optList)
         .>>.
-            (ignored
+            (space
             >>. skipString "finally"
-            >>. ignored
+            >>. space
             |> attempt
             >>. statementBlock
             <?> "finally block"
@@ -723,14 +716,14 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let extends =
         skipString "extends"
-        .>> ignored1
+        .>> space1
         |> attempt
         >>. identifierList
         |> optList
 
     let implements =
         skipString "implements"
-        .>> ignored1
+        .>> space1
         |> attempt
         >>. sepBy1 identifierFull (separator comma)
         |> optList
@@ -741,12 +734,12 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             choice
                 [
                     skipString "in"
-                    >>. ignored1
+                    >>. space1
                     |> attempt
                     >>% Contravariant;
 
                     skipString "out"
-                    >>. ignored1
+                    >>. space1
                     |> attempt
                     >>% Covariant;
 
@@ -754,7 +747,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
             .>>. identifierStr
             |> attempt
-            .>> ignored
+            .>> space
             .>>. extends
             .>>. implements
             <?> "generic parameter"
@@ -771,7 +764,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         <?> "generic parameters"
     let genericIdentifier: Parser<Identifier, _> =
         identifierStr
-        .>> ignored
+        .>> space
         .>>. genericParams
         |>> fun (name, gparams) ->
             { Name = name
@@ -793,7 +786,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let functionHeader f =
         genericDefinition
-        .>> ignored
+        .>> space
         .>>. paramTupleList
         |> attempt
         .>>. getUserState
@@ -816,10 +809,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 "inline", Flags.Inline
             ]
         >>. skipString "def"
-        >>. ignored1
+        >>. space1
         >>. functionHeader f
         .>>. typeAnnotationOpt
-        .>> ignored
+        .>> space
         .>>. functionBody
         >>= fun (((def, fparams), retType), body) ->
             let func =
@@ -855,14 +848,14 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let typeDef word =
         skipString word
-        >>. ignored1
+        >>. space1
         |> attempt
 
     let interfaceDef =
         typeDef "interface"
         >>. genericDefinition
         .>>. implements
-        .>> ignored
+        .>> space
         .>> updateUserState newMembers
         .>> blockChoice
             [
@@ -870,7 +863,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     methodDef
                     nestedTypes
                 ]
-                |> (choice >> accessed Flags.Internal)
+                |> (choice >> accessModifier Flags.Internal)
             ]
         .>>. getUserState
         .>> updateUserState popMembers
@@ -890,7 +883,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 attempt statement
 
                 choice members
-                |> accessed Flags.Private
+                |> accessModifier Flags.Private
                 |>> LocalMember // TODO: Use Choice<'T1,'T2> to parse either a statement or a member.
             ]
         |> attempt
@@ -907,9 +900,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
 
     let classDef =
         let classCtor =
-            optList (paramTuple .>> ignored)
+            optList (paramTuple .>> space)
             .>>. getUserState
-            |> accessed Flags.Private
+            |> accessModifier Flags.Private
             |>> fun (ctorParams, state) ->
                 let flags =
                     match ctorParams with
@@ -921,8 +914,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                       Parameters = ctorParams }
         let classExtends =
             extends
-            .>>. optList (tupleExpr .>> ignored)
-            .>> ignored
+            .>>. optList (tupleExpr .>> space)
+            .>> space
 
         modifiers
             [
@@ -933,7 +926,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>. choice
             [
                 skipString "data"
-                >>. ignored1
+                >>. space1
                 |> attempt
                 // Append the record members
                 >>% (fun (parameters: Param list) pos ->
@@ -973,11 +966,11 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> typeDef "class"
         |> attempt
         .>>. genericDefinition // TODO: Validate the class name here with userStateSatisfies. Nested classes should check the Members stack while top-level classes should check the GlobalsTable.
-        .>> ignored
+        .>> space
         .>>. classCtor
         .>>. classExtends
         .>>. implements
-        .>> ignored
+        .>> space
         .>>. choice
             [
                 [
@@ -1007,7 +1000,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>. position
         .>>. identifierStr
         .>>. getUserState
-        .>> ignored
+        .>> space
         .>>. memberBlockInit
             [
                 functionDef Function <?> "function definition"
@@ -1033,13 +1026,13 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |>> Type
 
     updateUserState newMembers
-    >>. ignored
+    >>. space
     >>. optList
         (skipString "namespace"
-        >>. ignored1
+        >>. space1
         |> attempt
         >>. sepBy1 identifierStr (separator period)
-        .>> ignored
+        .>> space
         .>> semicolon
         <?> "namespace declaration"
         >>= fun names ->
@@ -1047,24 +1040,24 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             |> updateSymbols
             |> updateUserState
             >>% names)
-    .>> ignored
+    .>> space
     .>>. many
         (skipString "use"
-        >>. ignored1
+        >>. space1
         |> attempt
         >>. identifierList
-        .>> ignored
+        .>> space
         .>> semicolon
         <?> "use statement"
-        .>> ignored)
+        .>> space)
     .>>. (choice
              [
                  classDef
                  interfaceDef
                  moduleDef
              ]
-         |> (accessed Flags.Internal >> attempt)
-         .>> ignored
+         |> (accessModifier Flags.Internal >> attempt)
+         .>> space
          |> many1)
     .>> eof
     .>> updateUserState clearAllFlags

@@ -40,13 +40,17 @@ module Numeric =
         | Integral of IntegralLit
         | FPointVal of FPointVal
 
+[<StructuralEquality>]
+[<StructuralComparison>]
+type Access =
+    | Public
+    | Internal
+    | Protected
+    | Private
+
 type Name =
     { Identifier: Identifier
       Position: FParsec.Position }
-
-    static member empty =
-        { Identifier = { Name = String.Empty; Generics = [] }
-          Position = FParsec.Position(String.Empty, 0L, 0L, 0L) }
 
     override this.ToString() = this.Identifier.ToString()
 
@@ -168,16 +172,6 @@ type FunctionDef =
       FuncDef: Name
       SelfIdentifier: string option }
 
-    static member generatedDef =
-        { Function = Function.empty
-          FuncDef = Name.empty
-          SelfIdentifier = Some "&this" }
-
-    static member placeholder def fparams =
-        { Function = { Function.empty with Parameters = fparams }
-          FuncDef = def
-          SelfIdentifier = None }
-
 type ConstructorBase =
     | SelfCall of Expression list
     | SuperCall of Expression list
@@ -192,23 +186,23 @@ type TypeDef<'Member> =
         {| ClassName: Name
            Body: Statement list
            Interfaces: FullIdentifier list
-           Members: ImmutableList<'Member>
+           Members: ImmutableSortedSet<'Member>
            PrimaryCtor: Constructor
            SuperClass: FullIdentifier |}
     | Interface of
         {| InterfaceName: Name
-           Members: ImmutableList<'Member>
+           Members: ImmutableSortedSet<'Member>
            SuperInterfaces: FullIdentifier list |}
     | Module of
         {| Body: Statement list
            ModuleName: Name
-           Members: ImmutableList<'Member> |}
+           Members: ImmutableSortedSet<'Member> |}
 
 type MemberDef =
     | Ctor of Constructor
     | Function of FunctionDef
     | Method of FunctionDef
-    | Type of TypeDef<MemberDef>
+    | Type of TypeDef<Access * MemberDef>
 
     static member name mdef =
         match mdef with
@@ -243,9 +237,10 @@ type MemberDef =
         | _ -> None
         |> Option.defaultValue List.empty
 
-type TypeDef = TypeDef<MemberDef>
+type Member = Access * MemberDef
+type TypeDef = TypeDef<Member>
 
 type CompilationUnit =
-    { Definitions: TypeDef list
+    { Definitions: ImmutableSortedSet<Access * TypeDef>
       Namespace: string list
       Usings: FullIdentifier list }
