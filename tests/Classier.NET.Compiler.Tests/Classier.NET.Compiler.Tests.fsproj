@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>$(Product).Tests</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <!-- Source files -->
+  <ItemGroup>
+    <Compile Include="ParserTests.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <!-- References -->
+  <ItemGroup>
+    <ProjectReference Include="$(RootDirectory)/src/$(Product)/$(Product).fsproj" />
+  </ItemGroup>
+
+</Project>

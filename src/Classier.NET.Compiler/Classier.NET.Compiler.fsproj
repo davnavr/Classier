@@ -1,10 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>$(Product).Compiler</AssemblyName>
+    <AssemblyName>$(Product)</AssemblyName>
     <GenerateDocumentationFile Condition="'$(Configuration)' != 'DEBUG'">false</GenerateDocumentationFile>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
   <!-- Source files -->

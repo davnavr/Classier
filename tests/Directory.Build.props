@@ -8,11 +8,4 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <!-- C# project properties -->
-  <PropertyGroup Condition="'$(ProjectLang)' == 'csharp'">
-    <AssemblyName>$(RootNamespace).Tests</AssemblyName>
-    <NoWarn>$(NoWarn);SA0001;SA1600</NoWarn>
-    <RootNamespace>$(TestProjectFor)</RootNamespace>
-  </PropertyGroup>
-
 </Project>
