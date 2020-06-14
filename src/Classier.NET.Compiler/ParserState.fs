@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.GlobalType
+open FParsec
 
 type ParserState<'Validator> =
     { Members: ImmutableSortedSet<MemberDef> list
@@ -17,6 +18,7 @@ module ParserState =
         | ValidationError of string
 
     type Validator = Validator of (ParserState<Validator> -> MemberDef -> ValidationResult<Validator>)
+    type ParserState = ParserState<Validator>
 
     let private errEmptyStack = ValidationError "The member stack was empty"
 
@@ -40,6 +42,10 @@ module ParserState =
         |> ImmutableSortedSet.Empty.WithComparer
 
     let newMembers state = { state with Members = emptyMembers :: state.Members }
+    let popMembers state =
+        match state.Members with
+        | [] -> None
+        | _ -> Some { state with Members = state.Members.Tail }
 
     let defaultState =
         { Members = List.empty
@@ -93,4 +99,11 @@ module ParserState =
             | None -> errEmptyStack)
         |> Validator
 
-type ParserState = ParserState<ParserState.Validator>
+    [<AutoOpen>]
+    module StateManagement =
+        let tryUpdateState f msg =
+            getUserState
+            >>= fun state ->
+                match f state with
+                | Some newState -> setUserState newState
+                | None -> fail msg

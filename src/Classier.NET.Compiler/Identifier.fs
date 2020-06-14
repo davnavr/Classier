@@ -33,11 +33,12 @@ let ofStrings<'Generic> names =
     |> Seq.fold
         (fun list name ->
             match list with
-            | Some (prev: ImmutableList<_>) ->
+            | Some prev ->
                 match ofString name with
                 | Some (next: Identifier<'Generic>) ->
-                    prev.Add(next) |> Some
+                    prev @ [ next ] |> Some
                 | _ -> None
             | _ -> None)
-        (Some ImmutableList.Empty)
-    |> Option.map (List.ofSeq >> FullIdentifier)
+        (Some List.Empty)
+    |> Option.filter (List.isEmpty >> not)
+    |> Option.map FullIdentifier

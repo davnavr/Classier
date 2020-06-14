@@ -186,7 +186,7 @@ type TypeDef<'Member> =
            Interfaces: FullIdentifier list
            Members: ImmutableSortedSet<'Member>
            PrimaryCtor: Constructor
-           SuperClass: FullIdentifier |}
+           SuperClass: FullIdentifier option |}
     | Interface of
         {| InterfaceName: Name
            Members: ImmutableSortedSet<'Member>
@@ -240,5 +240,5 @@ type TypeDef = TypeDef<Member>
 
 type CompilationUnit =
     { Definitions: ImmutableSortedSet<Access * TypeDef>
-      Namespace: string list
+      Namespace: FullIdentifier option
       Usings: FullIdentifier list }

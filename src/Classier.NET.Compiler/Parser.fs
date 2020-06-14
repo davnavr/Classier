@@ -55,6 +55,11 @@ let space1 =
             followedBy lparen
         ]
 
+let keyword word =
+    skipString word
+    >>. space1
+    |> attempt
+
 let accessModifier lowestAccess =
     let modifiers =
         [
@@ -65,10 +70,7 @@ let accessModifier lowestAccess =
         ]
         |> Seq.map (fun (str, vis) ->
             if vis <= lowestAccess then
-                skipString str
-                .>> space1
-                |> attempt
-                >>% vis
+                keyword str >>% vis
             else
                 vis
                 |> sprintf "%A access is not valid here"
@@ -141,6 +143,20 @@ let identifierFull =
     sepBy1 identifier (separator period |> attempt)
     |>> FullIdentifier
     <?> "fully qualified name"
+
+let extends =
+    skipString "extends"
+    .>> space1
+    |> attempt
+    >>. identifierFull
+    |> opt
+let implements =
+    skipString "implements"
+    .>> space1
+    |> attempt
+    >>. sepBy1 identifierFull (separator comma)
+    |> optList
+    <?> "interface implementations"
 
 let paramTuple =
     let param =
@@ -460,349 +476,114 @@ do
             ]
             "statement"
 
-// TODO: Clean up parser and put all the functions in the module.
-let compilationUnit: Parser<CompilationUnit, ParserState> =
-
-    let extends =
-        skipString "extends"
-        .>> space1
-        |> attempt
-        >>. identifierList
-        |> optList
-
-    let implements =
-        skipString "implements"
-        .>> space1
-        |> attempt
-        >>. sepBy1 identifierFull (separator comma)
-        |> optList
-        <?> "interface implementations"
-
-    let genericParams =
-        let genericParam =
-            choice
-                [
-                    skipString "in"
-                    >>. space1
-                    |> attempt
-                    >>% Contravariant;
-
-                    skipString "out"
-                    >>. space1
-                    |> attempt
-                    >>% Covariant;
-
-                    preturn NoVariance;
-                ]
-            .>>. identifierStr
-            |> attempt
-            .>> space
-            .>>. extends
-            .>>. implements
-            <?> "generic parameter"
-            |>> fun (((variance, name), super), iimpl) ->
-                { Name = name
-                  RequiredInterfaces = iimpl
-                  RequiredSuperClass = super
-                  Variance = variance }
-        ltsign
-        |> attempt
-        >>. sepBy1 genericParam (separator comma)
-        .>> gtsign
-        |> optList
-        <?> "generic parameters"
-    let genericIdentifier: Parser<Identifier, _> =
-        identifierStr
-        .>> space
-        .>>. genericParams
-        |>> fun (name, gparams) ->
-            { Name = name
-              Generics = List.map GenericParam gparams }
-    let genericDefinition =
-        position
-        .>>. genericIdentifier
-        .>>. getUserState
-        |>> (fun ((pos, id), state) -> Definition.ofIdentifier state pos id)
-
-    let functionBody =
-        choiceL
+let genericParams =
+    let genericParam =
+        choice
             [
-                statementBlock
-                
-                lambdaOperator
-                |> attempt
-                >>. space
-                >>. expression
-                |>> (Return >> List.singleton)
-                .>> space
-                .>> semicolon
-
-                semicolon >>% []
-            ]
-            "function body"
-
-    let functionHeader f =
-        genericDefinition
-        .>> space
-        .>>. paramTupleList
-        |> attempt
-        .>>. getUserState
-        >>= fun ((def, fparams), state) ->
-            let containsDup =
-                FunctionDef.placeholder def fparams
-                |> f
-                |> (state.Members.Head).Contains
-
-            if containsDup then
-                Param.toString fparams
-                |> sprintf "A member with the signature %s %s already exists in the same scope" (string def)
-                |> fail
-            else
-                preturn (def, fparams)
-
-    let functionDef f =
-        modifiersOLD
-            [
-                "inline", Flags.Inline
-            ]
-        >>. skipString "def"
-        >>. space1
-        >>. functionHeader f
-        .>>. typeAnnotation
-        .>> space
-        .>>. functionBody
-        >>= fun (((def, fparams), retType), body) ->
-            let func =
-                { FuncDef = def
-                  Function =
-                    { Body = body
-                      Parameters = fparams
-                      ReturnType = retType }
-                  SelfIdentifier = None }
-                |> f
-
-            addMember func
-            |> updateUserState
-            >>% func
-
-    let methodDef =
-        modifiersOLD
-            [
-                //"inline", Flags.Inline
-                "abstract", Flags.Abstract
-                "sealed", Flags.Sealed
-                "override", Flags.Override
-                "virtual", Flags.Virtual
-            ]
-        >>. validateFlags
-                (fun flags -> (flags.HasFlag Flags.Abstract) && (flags &&& Flags.MethodImplMask > Flags.None))
-                "Valid modifier on abstract method" // TODO: Replace these with explicit calls to fail, since these are not used as proper error messages.
-        >>. validateFlags
-                (fun flags -> (flags &&& Flags.MethodImplMask).HasFlag(Flags.Sealed ||| Flags.Virtual))
-                "Unsealed virtual method"
-        >>. functionDef Method
-        <?> "method definition"
-
-    let typeDef word =
-        skipString word
-        >>. space1
-        |> attempt
-
-    let interfaceDef =
-        typeDef "interface"
-        >>. genericDefinition
-        .>>. implements
-        .>> space
-        .>> updateUserState newMembers
-        .>> blockChoice
-            [
-                [
-                    methodDef
-                    nestedTypes
-                ]
-                |> (choice >> accessModifier Flags.Internal)
-            ]
-        .>>. getUserState
-        .>> updateUserState popMembers
-        <?> "interface definition"
-        |>> fun ((def, iimpls), state) ->
-            { TypeDef = def
-              Header = Interface
-              InitBody = []
-              Interfaces = iimpls
-              Members = state.Members.Head }
-
-    /// Allows both members and statements.
-    let memberBlockInit members =
-        updateUserState newMembers
-        >>. blockChoice
-            [
-                attempt statement
-
-                choice members
-                |> accessModifier Flags.Private
-                |>> LocalMember // TODO: Use Choice<'T1,'T2> to parse either a statement or a member.
-            ]
-        |> attempt
-        .>>. getUserState
-        .>> updateUserState popMembers
-        |>> fun (st, state) ->
-            let body =
-                st
-                |> List.choose (fun s ->
-                    match s with
-                    | LocalMember _ -> None
-                    | _ -> Some s)
-            state.Members.Head, body
-
-    let classDef =
-        let classCtor =
-            optList (paramTuple .>> space)
-            .>>. getUserState
-            |> accessModifier Flags.Private
-            |>> fun (ctorParams, state) ->
-                let flags =
-                    match ctorParams with
-                    | [] -> Flags.Public
-                    | _ -> currentFlags state
-                fun body baseArgs ->
-                    { BaseCall = SuperCall baseArgs
-                      Body = body
-                      Parameters = ctorParams }
-        let classExtends =
-            extends
-            .>>. optList (tupleExpr .>> space)
-            .>> space
-
-        modifiersOLD
-            [
-                "abstract", Flags.Abstract
-                "inheritable", Flags.Inheritable
-                "mutable", Flags.Mutable
-            ]
-        >>. choice
-            [
-                skipString "data"
+                skipString "in"
                 >>. space1
                 |> attempt
-                // Append the record members
-                >>% (fun (parameters: Param list) pos ->
-                    parameters
-                    |> List.map (fun param ->
-                        { FunctionDef.generatedDef with
-                            FuncDef =
-                              { Flags = Flags.Public
-                                Identifier = Identifier.ofString param.Name
-                                Position = pos }
-                            Function =
-                              { Body =
-                                  [
-                                      Identifier.ofString param.Name
-                                      |> IdentifierRef
-                                      |> Return
-                                  ]
-                                Parameters = []
-                                ReturnType = param.Type } }
-                        |> Method)
-                    |> List.append
-                        [
-                            { FunctionDef.generatedDef with
-                                FuncDef =
-                                  { Flags = Flags.Public
-                                    Identifier = Identifier.ofString "equals"
-                                    Position = pos }
-                                Function =
-                                    { Body = [] // TODO: Create the body here
-                                      Parameters = [ [ { Name = "obj"; Type = Inferred } ] ]
-                                      ReturnType = Primitive PrimitiveType.Boolean } }
-                            |> Method
-                        ])
+                >>% Contravariant;
 
-                preturn (fun _ _ -> [])
+                skipString "out"
+                >>. space1
+                |> attempt
+                >>% Covariant;
+
+                preturn NoVariance;
             ]
-        .>> typeDef "class"
-        |> attempt
-        .>>. genericDefinition // TODO: Validate the class name here with userStateSatisfies. Nested classes should check the Members stack while top-level classes should check the GlobalsTable.
-        .>> space
-        .>>. classCtor
-        .>>. classExtends
-        .>>. implements
-        .>> space
-        .>>. choice
-            [
-                [
-                    methodDef
-                    nestedTypes
-                ]
-                |> memberBlockInit
-
-                semicolon >>% (emptyMembers, [])
-            ]
-        <??> "class definition"
-        |>> fun (((((recordMembers, def), ctor), (superclass, baseArgs)), iimpls), (members, body)) ->
-            let primaryCtor = ctor body baseArgs
-            { TypeDef = def
-              Header = Class
-                { PrimaryCtor = primaryCtor
-                  SuperClass = superclass }
-              InitBody = body
-              Interfaces = iimpls
-              Members =
-                match recordMembers primaryCtor.Parameters def.Position with
-                | [] -> members
-                | others -> members.Union(others) }
-
-    let moduleDef =
-        typeDef "module"
-        >>. position
         .>>. identifierStr
-        .>>. getUserState
+        |> attempt
         .>> space
-        .>>. memberBlockInit
-            [
-                functionDef Function <?> "function definition"
-                nestedTypes
-            ]
-        <??> "module definition"
-        |>> fun (((pos, name), state), (members, body)) ->
-            { TypeDef =
-                Identifier.ofString name
-                |> Definition.ofIdentifier state pos
-              Header = Module
-              InitBody = body
-              Interfaces = []
-              Members = members }
+        .>>. extends
+        .>>. implements
+        <?> "generic parameter"
+        |>> fun (((variance, name), super), iimpl) ->
+            { Name = name
+              RequiredInterfaces = iimpl
+              RequiredSuperClass = super
+              Variance = variance }
+    ltsign
+    |> attempt
+    >>. sepBy1 genericParam (separator comma)
+    .>> gtsign
+    |> optList
+    <?> "generic parameters"
+let genericIdentifier: Parser<Identifier, _> =
+    identifierStr
+    .>> space
+    .>>. genericParams
+    |>> fun (name, gparams) ->
+        { Name = name
+          Generics = List.map GenericParam gparams }
+let genericName =
+    tuple2
+        position
+        genericIdentifier
+    |>> fun (pos, id) -> { Identifier = id; Position = pos }
 
-    nestedTypesRef :=
+let functionBody =
+    choiceL
         [
-            classDef <??> "nested class"
-            interfaceDef <?> "nested interface"
-            moduleDef <?> "nested module"
-        ]
-        |> choice
-        |>> Type
+            statementBlock
+            
+            lambdaOperator
+            |> attempt
+            >>. space
+            >>. expression
+            |>> (Return >> List.singleton)
+            .>> space
+            .>> semicolon
 
-    updateUserState newMembers
-    >>. space
-    >>. optList
-        (skipString "namespace"
+            semicolon >>% []
+        ]
+        "function body"
+
+let functionDef = fail "not implemented"
+let methodDef = fail "not implemented"
+
+let interfaceDef =
+    keyword "interface"
+    >>. genericName
+    .>>. implements
+    .>> space
+    .>> updateUserState newMembers
+    // .>>. blockChoice
+    .>> fail "not implemented"
+
+let classDef = fail "not implemented"
+
+let moduleDef = fail "not implemented"
+
+// TODO: Clean up parser and put all the functions in the module.
+let compilationUnit: Parser<CompilationUnit, ParserState> =
+    let namespaceDecl =
+        skipString "namespace"
         >>. space1
         |> attempt
         >>. sepBy1 identifierStr (separator period)
         .>> space
         .>> semicolon
+        |> opt
         <?> "namespace declaration"
         >>= fun names ->
-            GlobalsTable.addNamespace names
+            let ns =
+                names
+                |> Option.defaultValue []
+                |> Identifier.ofStrings
+            GlobalsTable.addNamespace ns
             |> updateSymbols
             |> updateUserState
-            >>% names)
+            >>% ns
+    updateUserState newMembers
+    >>. space
+    >>. namespaceDecl
     .>> space
     .>>. many
         (skipString "use"
         >>. space1
         |> attempt
-        >>. identifierList
+        >>. identifierFull
         .>> space
         .>> semicolon
         <?> "use statement"
@@ -817,7 +598,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
          .>> space
          |> many1)
     .>> eof
-    .>> updateUserState clearAllFlags
+    .>> tryUpdateState (popMembers) "The member stack was SOMETHING"
     >>= fun ((ns, uses), defs) ->
         // TODO: Figure out how to fail when a type with a duplicate name is parsed.
         GlobalsTable.addNamespace ns
