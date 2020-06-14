@@ -12,10 +12,6 @@ type GlobalType =
 type GlobalTypeSymbol =
     { Namespace: FullIdentifier option
       Type: GlobalType }
-    
-    static member ofTypeDef ns typeDef =
-        { Namespace = ns
-          Type = DefinedType typeDef }
 
 let getName gtype =
     match gtype with

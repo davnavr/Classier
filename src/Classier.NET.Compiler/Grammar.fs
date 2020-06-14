@@ -58,17 +58,6 @@ type Param =
     { Name: string
       Type: TypeName }
 
-    static member toString (paramSet: Param list) =
-        paramSet
-        |> Seq.map string
-        |> String.concat ", "
-        |> sprintf "(%s)"
-
-    static member toString (paramSets: Param list list) =
-        paramSets
-        |> Seq.map (Param.toString)
-        |> String.concat " "
-
     override this.ToString () =
         match this.Type with
         | TypeName.Inferred -> String.Empty
@@ -170,6 +159,10 @@ type FunctionDef =
       FuncDef: Name
       SelfIdentifier: string option }
 
+type EntryPoint =
+    { Body: Statement list
+      Parameters: Param list }
+
 type ConstructorBase =
     | SelfCall of Expression list
     | SuperCall of Expression list
@@ -202,7 +195,8 @@ type MemberDef =
     | Method of FunctionDef
     | Type of TypeDef<Access * MemberDef>
 
-    static member name mdef =
+module MemberDef =
+    let name mdef =
         match mdef with
         | Function fdef
         | Method fdef -> Some fdef.FuncDef
@@ -214,12 +208,13 @@ type MemberDef =
             |> Some
         | _ -> None
 
-    static member identifier mdef =
-        MemberDef.name mdef
-        |> Option.map (fun def -> def.Identifier)
+    let identifier mdef =
+        Option.map
+            (fun def -> def.Identifier)
+            (name mdef)
 
     /// Gets the parameters of the method, function, or constructor.
-    static member paramSets mdef =
+    let paramSets mdef =
         match mdef with
         | Ctor ctor -> [ ctor.Parameters ]
         | Function fdef
@@ -227,7 +222,7 @@ type MemberDef =
         | _ -> List.empty
 
     /// Gets the first parameter set of the method or function, or the parameters of the constructor.
-    static member firstParams mdef =
+    let firstParams mdef =
         match mdef with
         | Ctor ctor -> Some ctor.Parameters
         | Function fdef
@@ -239,6 +234,7 @@ type Member = Access * MemberDef
 type TypeDef = TypeDef<Member>
 
 type CompilationUnit =
-    { Definitions: ImmutableSortedSet<Access * TypeDef>
+    { EntryPoint: EntryPoint option
       Namespace: FullIdentifier option
-      Usings: FullIdentifier list }
+      Usings: FullIdentifier list
+      Types: ImmutableSortedSet<Access * TypeDef> }

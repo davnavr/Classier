@@ -14,7 +14,6 @@ let private optList p = opt p |>> Option.defaultValue []
 
 // TODO: Remove these single character parsers if they are only used once
 let comma = skipChar ','
-let dquotes = skipChar '\"' <?> "quotation mark"
 let gtsign = skipChar '>'
 let lcurlybracket = skipChar '{' <?> "opening bracket"
 let lparen = skipChar '(' <?> "opening parenthesis"
@@ -24,9 +23,6 @@ let rcurlybracket = skipChar '}' <?> "closing bracket"
 let rparen = skipChar ')' <?> "closing parenthesis"
 let semicolon = skipChar ';' <?> "semicolon"
 let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
-
-// TODO: These forwarded parsers are not needed.
-let nestedTypes, private nestedTypesRef = createParserForwardedToRef<MemberDef,_>()
 
 let space =
     choice
@@ -96,7 +92,7 @@ let typeAnnotation =
     |>> Option.defaultValue Inferred
     <?> "type annotation"
 
-let modifiers: Parser<string list, _> = fail "not implemented"
+let modifiers: Parser<string list, ParserState> = fail "not implemented"
 
 let private separator p = space >>. attempt p .>> space
 
@@ -539,8 +535,8 @@ let functionBody =
         ]
         "function body"
 
-let functionDef = fail "not implemented"
-let methodDef = fail "not implemented"
+let functionDef: Parser<unit, ParserState> = fail "not implemented"
+let methodDef: Parser<unit, ParserState> = fail "not implemented"
 
 let interfaceDef =
     keyword "interface"
@@ -573,41 +569,53 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 |> Identifier.ofStrings
             GlobalsTable.addNamespace ns
             |> updateSymbols
+            >> setNamespace ns
             |> updateUserState
             >>% ns
-    updateUserState newMembers
-    >>. space
-    >>. namespaceDecl
-    .>> space
-    .>>. many
-        (skipString "use"
+    let useStatements =
+        skipString "use"
         >>. space1
         |> attempt
         >>. identifierFull
         .>> space
         .>> semicolon
         <?> "use statement"
-        .>> space)
-    .>>. (choice
-             [
-                 classDef
-                 interfaceDef
-                 moduleDef
-             ]
-         |> (accessModifier Flags.Internal >> attempt)
-         .>> space
-         |> many1)
+        .>> space
+        |> many
+    let definitions =
+        [
+            accessModifier Access.Internal
+            >>. choice
+                [
+                    classDef
+                    interfaceDef
+                    moduleDef
+                ]
+            |>> ignore
+
+            skipString "main"
+            |> attempt
+            >>. space
+            >>. paramTuple
+            .>>. functionBody
+            |>> ignore
+            <?> "entry point"
+        ]
+        |> choice
+        .>> space
+        |> many1
+
+    updateUserState newMembers
+    >>. space
+    >>. namespaceDecl
+    .>> space
+    .>>. useStatements
+    .>> definitions
     .>> eof
-    .>> tryUpdateState (popMembers) "The member stack was SOMETHING"
-    >>= fun ((ns, uses), defs) ->
-        // TODO: Figure out how to fail when a type with a duplicate name is parsed.
-        GlobalsTable.addNamespace ns
-        >> GlobalsTable.addTypes
-            (Seq.map (GlobalTypeSymbol.ofTypeDef ns) defs)
-            ns
-        |> updateSymbols
-        |> updateUserState
-        >>%
-        { Definitions = defs
+    .>> tryPopMembers
+    .>>. getUserState
+    |>> fun ((ns, uses), state) ->
+        { EntryPoint = state.EntryPoint
           Namespace = ns
-          Usings = uses }
+          Usings = uses
+          Types = invalidOp "not impl" }

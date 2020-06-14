@@ -2,12 +2,10 @@
 
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.TypeSystem
 
 type ExternType =
     { Kind: ExternTypeKind
       Members: ImmutableSortedSet<ExternMember>
-      TypeFlags: Flags
       TypeName: Identifier }
 and [<RequireQualifiedAccess>]
     ExternTypeKind =

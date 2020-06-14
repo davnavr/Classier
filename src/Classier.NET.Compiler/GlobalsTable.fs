@@ -25,13 +25,13 @@ module GlobalsTable =
                         | _ -> -1
                     | _ -> 0
                 | _ -> 0
-            | _ as result -> result
+            | result -> result
         let typeComparer =
             { new System.Collections.Generic.IComparer<GlobalTypeSymbol> with
                   member _.Compare(one, two) =
                       match compare one.Namespace two.Namespace with
                       | 0 -> compareType one.Type two.Type
-                      | _ as result -> result }
+                      | result -> result }
         ImmutableSortedSet.Empty.WithComparer typeComparer
 
     // TODO: Add a 'bind' function or whatever it is called.

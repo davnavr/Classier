@@ -7,7 +7,8 @@ open Classier.NET.Compiler.GlobalType
 open FParsec
 
 type ParserState<'Validator> =
-    { Members: ImmutableSortedSet<MemberDef> list
+    { EntryPoint: EntryPoint option
+      Members: ImmutableSortedSet<MemberDef> list
       Namespace: FullIdentifier option
       Validator: 'Validator list
       Symbols: GlobalsTable }
@@ -48,12 +49,14 @@ module ParserState =
         | _ -> Some { state with Members = state.Members.Tail }
 
     let defaultState =
-        { Members = List.empty
+        { EntryPoint = None
+          Members = List.empty
           Namespace = None
           Validator = List.empty
           Symbols = GlobalsTable.empty }
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
+    let setNamespace ns state = { state with ParserState.Namespace = ns }
 
     // TODO: Make more detailed error messages for the validators.
     /// Validates the names of non-nested types or modules.
@@ -67,9 +70,8 @@ module ParserState =
                     |> sprintf "A type with the name %A already exists in this scope"
                     |> ValidationError
                 let typeSymbol =
-                    GlobalTypeSymbol.ofTypeDef
-                        state.Namespace
-                        tdef
+                    { Namespace = state.Namespace
+                      Type = DefinedType tdef }
 
                 state.Symbols
                 |> GlobalsTable.addType typeSymbol
@@ -107,3 +109,8 @@ module ParserState =
                 match f state with
                 | Some newState -> setUserState newState
                 | None -> fail msg
+
+        let tryPopMembers: Parser<_, ParserState> =
+            tryUpdateState
+                popMembers
+                "The member stack was unexpectedly empty"

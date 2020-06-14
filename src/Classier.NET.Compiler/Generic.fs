@@ -18,6 +18,6 @@ and GenericVariance =
 and [<StructuredFormatDisplay("{Name}")>]
     GenericParam =
     { Name: string
-      RequiredSuperClass: Identifier<Generic> list
-      RequiredInterfaces: TypeName<Generic> list
+      RequiredInterfaces: FullIdentifier<Generic> list
+      RequiredSuperClass: FullIdentifier<Generic> option
       Variance: GenericVariance }
