@@ -6,7 +6,7 @@
     <LangVersion>4.7</LangVersion>
     <NeutralLanguage>en-US</NeutralLanguage>
     <Product>Classier.NET.Compiler</Product>
-    <RootNamespace>$(Product)</RootNamespace>
+    <RootNamespace>$(AssemblyName)</RootNamespace>
     <RootDirectory>$(MSBuildThisFileDirectory)</RootDirectory>
   </PropertyGroup>
 

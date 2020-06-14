@@ -4,3 +4,7 @@ obj/
 
 # Visual Studio cache
 .vs/
+
+# Paket
+.paket/
+paket-files/
