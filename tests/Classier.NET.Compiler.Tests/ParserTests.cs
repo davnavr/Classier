@@ -1,6 +1,7 @@
 ﻿namespace Classier.NET.Compiler
 {
     using System.Collections.Immutable;
+    using System.ComponentModel.DataAnnotations;
     using System.Linq;
     using System.Text;
     using Microsoft.FSharp.Collections;
@@ -8,6 +9,7 @@
     using static Classier.NET.Compiler.Grammar;
     using static Classier.NET.Compiler.Parser;
     using static FParsec.CharParsers;
+    using PState = ParserState<ParserState.Validator>;
 
     public class ParserTests
     {
@@ -41,7 +43,7 @@
             var result = new SuccessResult(compilationUnit, stream, name, Encoding.UTF8).Result;
 
             // Assert
-            Assert.Equal(namespaceName, result.Namespace);
+            Assert.Equal(Identifier.ofStrings<Generic.Generic>(namespaceName), result.Namespace);
         }
 
         [InlineData("AbstractSealedMethod.txt", "Invalid modifiers")]
@@ -56,7 +58,7 @@
             using var stream = new EmbeddedSourceFile(name).GetStream();
 
             // Act
-            var error = (ParserResult<CompilationUnit, ParserState>.Failure)runParserOnStream(compilationUnit, ParserStateModule.defaultState, name, stream, Encoding.UTF8);
+            var error = (ParserResult<CompilationUnit, PState>.Failure)runParserOnStream(compilationUnit, ParserState.defaultState<ParserState.Validator>(), name, stream, Encoding.UTF8);
 
             // Assert
             Assert.Contains(errorSubstring, error.Item1);
@@ -78,7 +80,7 @@
             // Assert
             Assert.NotEmpty(
                 GlobalsTableModule.getTypes(
-                    ListModule.OfArray(namespaceNames),
+                    Identifier.ofStrings<Generic.Generic>(namespaceNames),
                     namespaces));
         }
 
@@ -95,7 +97,7 @@
             // Act
             var types =
                 GlobalsTableModule.getTypes(
-                    ListModule.OfArray(namespaceNames),
+                    Identifier.ofStrings<Generic.Generic>(namespaceNames),
                     new SuccessResult(compilationUnit, stream, file, Encoding.UTF8).State.Symbols)
                 .Select(type => GlobalType.getName(type.Type).ToString())
                 .ToImmutableSortedSet();
