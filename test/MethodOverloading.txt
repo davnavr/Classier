@@ -1,0 +1,12 @@
+
+public class OverloadingExample {
+  public def myMethod (one) {
+    while (one) {
+      42 * 2
+    }
+  }
+
+  public def myMethod (one, two) {
+    9 + ((10 * 21) / 4)
+  }
+}

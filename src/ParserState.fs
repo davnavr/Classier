@@ -9,7 +9,7 @@ open FParsec
 type ParserState<'Validator> =
     { EntryPoint: EntryPoint option
       Members: ImmutableSortedSet<MemberDef> list
-      Namespace: FullIdentifier option
+      Namespace: FullIdentifier
       Validator: 'Validator list
       Symbols: GlobalsTable }
 
@@ -48,10 +48,10 @@ module ParserState =
         | [] -> None
         | _ -> Some { state with Members = state.Members.Tail }
 
-    let defaultState =
+    let defaultState: ParserState =
         { EntryPoint = None
           Members = List.empty
-          Namespace = None
+          Namespace = FullIdentifier.Empty
           Validator = List.empty
           Symbols = GlobalsTable.empty }
 

@@ -29,7 +29,7 @@ let runProj proj =
         |> FileInfo.ofPath
     let action =
         if projFile.Exists then
-            sprintf "--project %s --no-restore"
+            sprintf "--project %s --no-restore --configuration Release"
             >> DotNetCli.exec id "run"
             >> handleError
         else

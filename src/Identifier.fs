@@ -19,7 +19,10 @@ type Identifier<'Generic> =
 
 [<StructuralComparison>]
 [<StructuralEquality>]
-type FullIdentifier<'Generic> = FullIdentifier of Identifier<'Generic> list
+type FullIdentifier<'Generic> =
+    | FullIdentifier of Identifier<'Generic> list
+
+    static member Empty = List.empty<Identifier<'Generic>> |> FullIdentifier
 
 let private nameRegex = "^[A-Za-z_][A-Za-z_0-9]*$" |> Regex
 
@@ -40,5 +43,5 @@ let ofStrings<'Generic> names =
                 | _ -> None
             | _ -> None)
         (Some List.Empty)
-    |> Option.filter (List.isEmpty >> not)
     |> Option.map FullIdentifier
+    |> Option.defaultValue FullIdentifier.Empty

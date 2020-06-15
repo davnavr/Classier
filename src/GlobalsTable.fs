@@ -6,7 +6,7 @@ open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Grammar
 
 /// Stores the namespaces and types declared in compilation units.
-type GlobalsTable = GlobalsTable of ImmutableSortedDictionary<FullIdentifier option, ImmutableSortedSet<GlobalTypeSymbol>>
+type GlobalsTable = GlobalsTable of ImmutableSortedDictionary<FullIdentifier, ImmutableSortedSet<GlobalTypeSymbol>>
 
 module GlobalsTable =
     let private emptySymbols =

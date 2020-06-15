@@ -235,6 +235,6 @@ type TypeDef = TypeDef<Member>
 
 type CompilationUnit =
     { EntryPoint: EntryPoint option
-      Namespace: FullIdentifier option
+      Namespace: FullIdentifier
       Usings: FullIdentifier list
       Types: ImmutableSortedSet<Access * TypeDef> }
