@@ -13,12 +13,6 @@
       "commands": [
         "fake"
       ]
-    },
-    "paket": {
-      "version": "5.247.1",
-      "commands": [
-        "paket"
-      ]
     }
   }
 }

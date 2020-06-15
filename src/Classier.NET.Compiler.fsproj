@@ -24,6 +24,9 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
 
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+  <!-- References -->
+  <ItemGroup>
+    <PackageReference Include="FParsec" Version="1.1.1" />
+  </ItemGroup>
 
 </Project>
