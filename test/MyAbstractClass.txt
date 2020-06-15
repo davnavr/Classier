@@ -1,0 +1,41 @@
+
+namespace this.is.my.space;
+
+use java.lang;
+use java.util;
+
+internal abstract class MyAbstractClass {
+  let tester: java.lang.String = someUndefinedGlobal;
+
+  let complexDecisions =
+        if (1) {
+            testing + 1
+        }
+        else if (2) {
+            Console.WriteLine(12362367);
+            help
+        }
+        else if (3) {
+            oh
+        }
+        else {
+            no
+        };
+
+  public abstract def noBody (iUsedToKnow);
+
+  private inline def doesSomething () {
+    let myCurriedResult = this.noBody (45.6) (blah);
+
+    if (iExist) {
+        java.lang.System.out.println(this);
+    }
+
+    tester.doThingsWith(this) // implicit return here.
+  }
+
+  internal def doSomethingElse(a: ()) : () {
+      let lambda = (a) => "this is \u7253 the return" + a;
+      lambda ("test");
+  }
+}
