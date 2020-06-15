@@ -20,3 +20,8 @@ let equal expected actual =
     Assert.Equal(msg, expected, actual)
 
 let testsOfResult tests result = Seq.map (fun (test: 'a -> Test) -> test result) tests
+
+let notEmpty col =
+    if Seq.isEmpty col
+    then raise (AssertException "The collection was unexpectedly empty")
+    else ()

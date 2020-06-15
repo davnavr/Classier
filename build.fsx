@@ -22,6 +22,21 @@ let handleError (result: ProcessResult) =
     | 0 -> ()
     | code -> failwithf "Process returned with an exit code of %i\n" code
 
+let runProj proj =
+    let projFile =
+        proj
+        |> Path.getFullName
+        |> FileInfo.ofPath
+    let action =
+        if projFile.Exists then
+            sprintf "--project %s --no-restore"
+            >> DotNetCli.exec id "run"
+            >> handleError
+        else
+            failwithf "Unable to run the project file %s as it does not exist\n"
+
+    action projFile.FullName
+
 Target.create "Clean" (fun _ ->
     slnFile
     |> DotNetCli.exec id "clean"
@@ -40,21 +55,14 @@ Target.create "Lint" (fun _ ->
 )
 
 Target.create "Test" (fun _ ->
-    "./test/Classier.NET.Compiler.Tests.fsproj"
-    |> Path.getFullName
-    |> sprintf "--project %s --no-build"
-    |> DotNetCli.exec id "run"
-    |> handleError
+    runProj "./test/Classier.NET.Compiler.Tests.fsproj"
 )
 
 Target.create "Publish" (fun _ ->
-    ()
+    Trace.trace "Publishing..."
 )
 
-"Clean" ==>
-"Build" ==>
-"Lint" ==>
-"Test" ==>
-"Publish"
+"Clean" ==> "Build" ==> "Test" ==> "Publish"
+"Build" ==> "Lint" ==> "Publish"
 
 Target.runOrDefault "Publish"

@@ -27,12 +27,14 @@ let main args =
         ]
         |> Seq.map
             (fun (sourceName, ns, usings) ->
+                let expectedNs = Identifier.ofStrings ns
+
                 parseSource sourceName
                 |> testsOfResult
                     [
                         testSuccess
                             "correct namespace"
-                            (fun (cu, _) -> equal (Identifier.ofStrings ns) cu.Namespace)
+                            (fun (cu, _) -> equal expectedNs cu.Namespace)
 
                         testSuccess
                             "correct usings"
@@ -42,8 +44,15 @@ let main args =
                                     |> Seq.map (Identifier.ofStrings >> Option.get)
                                     |> List.ofSeq
                                 cu.Usings |> equal useList)
-                    ])
-        |> Seq.collect id
+
+                        testSuccess
+                            "namespace in symbol table"
+                            (fun (_, state) ->
+                                state.Symbols
+                                |> GlobalsTable.getTypes expectedNs
+                                |> Assert.notEmpty)
+                    ]
+                |> testList sourceName)
         |> testList "success tests"
     ]
     |> testList "parser tests"
