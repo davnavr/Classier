@@ -1,5 +1,6 @@
 source https://api.nuget.org/v3/index.json
 
-storage: none
+storage: packages
 framework: netcoreapp3.1, netstandard2.0, netstandard2.1
+
 nuget FParsec
