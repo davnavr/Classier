@@ -31,12 +31,19 @@ Target.create "Lint" (fun _ ->
 
 Target.create "Test" (fun _ ->
     let testsPath = Path.getFullName "test/"
+
+    [ "bin"; "obj" ]
+    |> Seq.map (Path.combine testsPath)
+    |> Shell.cleanDirs
+
     testsPath
     |> DirectoryInfo.ofPath
     |> DirectoryInfo.getMatchingFiles "*.fs"
     |> Seq.iter
         (fun testFile ->
             let testName = Path.GetFileNameWithoutExtension testFile.Name
+
+            Trace.logfn "Running tests for %s..." testName
 
             DotNetCli.build
                 (fun options ->
@@ -47,7 +54,9 @@ Target.create "Test" (fun _ ->
                 "bin/Release/netcoreapp3.1/%s.dll"
                 testName
             |> Path.combine testsPath
-            |> DotNetCli.exec id "exec"
+            |> DotNetCli.exec
+                id
+                "exec"
             |> ignore)
 )
 
@@ -55,8 +64,7 @@ Target.create "Publish" (fun _ ->
     ()
 )
 
-//"Clean" ==> "Build" ==> "Test" ==> "Publish"
-"Test" ==> "Publish"
+"Clean" ==> "Build" ==> "Test" ==> "Publish"
 
 // start build
 Target.runOrDefault "Publish"
