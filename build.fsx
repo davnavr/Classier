@@ -8,8 +8,10 @@ nuget Fake.IO.FileSystem
 
 #load "./.fake/build.fsx/intellisense.fsx"
 
+open System.IO
 open Fake.Core
 open Fake.Core.TargetOperators
+open Fake.IO
 
 // Workaround because intellisense doesn't want to cooperate
 module DotNetCli = Fake.DotNet.DotNet
@@ -22,8 +24,31 @@ Target.create "Build" (fun _ ->
     DotNetCli.build id "Classier.NET.Compiler.sln"
 )
 
+Target.create "Lint" (fun _ ->
+    DotNetCli.exec id "fsharplint" "lint Classier.NET.Compiler.sln"
+    |> ignore
+)
+
 Target.create "Test" (fun _ ->
-    DotNetCli.test id ""
+    let testsPath = Path.getFullName "test/"
+    testsPath
+    |> DirectoryInfo.ofPath
+    |> DirectoryInfo.getMatchingFiles "*.fs"
+    |> Seq.iter
+        (fun testFile ->
+            let testName = Path.GetFileNameWithoutExtension testFile.Name
+
+            DotNetCli.build
+                (fun options ->
+                    { options with MSBuildParams = { options.MSBuildParams with Properties = [ "TestFile", testName ] } })
+                (Path.getFullName "test/Classier.NET.Compiler.Tests.fsproj")
+
+            sprintf
+                "bin/Release/netcoreapp3.1/%s.dll"
+                testName
+            |> Path.combine testsPath
+            |> DotNetCli.exec id "exec"
+            |> ignore)
 )
 
 Target.create "Publish" (fun _ ->
