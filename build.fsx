@@ -10,7 +10,6 @@ nuget Fake.IO.FileSystem
 
 open Fake.Core
 open Fake.Core.TargetOperators
-open Fake.IO
 
 // Workaround because intellisense doesn't want to cooperate
 module DotNetCli = Fake.DotNet.DotNet
@@ -24,16 +23,7 @@ Target.create "Build" (fun _ ->
 )
 
 Target.create "Test" (fun _ ->
-    let tests =
-        "tests/"
-        |> Path.getDirectory
-        |> Path.getFullName
-        |> DirectoryInfo.ofPath
-    tests
-    |> DirectoryInfo.getMatchingFilesRecursive "*.fs"
-    |> sprintf "Testing... %A"
-    |> Trace.trace
-    // TODO: Call FSI on test scripts
+    DotNetCli.test id ""
 )
 
 Target.create "Publish" (fun _ ->
