@@ -8,7 +8,6 @@ nuget Fake.IO.FileSystem
 
 #load "./.fake/build.fsx/intellisense.fsx"
 
-open System.IO
 open Fake.Core
 open Fake.Core.TargetOperators
 open Fake.IO
@@ -18,10 +17,15 @@ module DotNetCli = Fake.DotNet.DotNet
 
 let slnFile = "Classier.NET.Compiler.sln"
 
+let handleError (result: ProcessResult) =
+    match result.ExitCode with
+    | 0 -> ()
+    | code -> failwithf "Process returned with an exit code of %i\n" code
+
 Target.create "Clean" (fun _ ->
     slnFile
     |> DotNetCli.exec id "clean"
-    |> ignore
+    |> handleError
 )
 
 Target.create "Build" (fun _ ->
@@ -32,11 +36,15 @@ Target.create "Lint" (fun _ ->
     slnFile
     |> sprintf "lint %s"
     |> DotNetCli.exec id "fsharplint"
-    |> ignore
+    |> handleError
 )
 
 Target.create "Test" (fun _ ->
-    DotNetCli.test id slnFile
+    "./test/Classier.NET.Compiler.Tests.fsproj"
+    |> Path.getFullName
+    |> sprintf "--project %s --no-build"
+    |> DotNetCli.exec id "run"
+    |> handleError
 )
 
 Target.create "Publish" (fun _ ->
@@ -49,5 +57,4 @@ Target.create "Publish" (fun _ ->
 "Test" ==>
 "Publish"
 
-// start build
 Target.runOrDefault "Publish"
