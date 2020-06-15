@@ -1,12 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>$(Product)</AssemblyName>
+    <AssemblyName>Classier.NET.Compiler</AssemblyName>
     <GenerateDocumentationFile Condition="'$(Configuration)' != 'DEBUG'">false</GenerateDocumentationFile>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
-
+  
   <!-- Source files -->
   <ItemGroup>
     <Compile Include="SortedSet.fs" />
@@ -24,9 +24,6 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
 
-  <!-- References -->
-  <ItemGroup>
-    <PackageReference Include="FParsec" Version="1.1.1" />
-  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 
 </Project>
