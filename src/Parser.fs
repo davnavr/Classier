@@ -1,6 +1,7 @@
 ﻿module Classier.NET.Compiler.Parser
 
 open System
+open System.Collections.Immutable
 open FParsec
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
@@ -93,6 +94,48 @@ let typeAnnotation =
     <?> "type annotation"
 
 let modifiers: Parser<string list, ParserState> = fail "modifiers not implemented"
+let private specModifiers modf (validator: ImmutableList<_> -> string -> Result<_, string>) =
+    let (dupm, uniqueModfs) =
+        modf
+        |> Seq.fold
+            (fun (dup, dist) item ->
+                let isDup = List.contains item dist
+                let nextDup =
+                    match dup with
+                    | Some _ -> dup
+                    | None when isDup -> Some item
+                    | None -> None
+                let nextDist =
+                    if isDup
+                    then dist
+                    else item :: dist
+
+                nextDup, nextDist)
+            (None, List.empty)
+    match dupm with
+    | Some _ ->
+        dupm.Value
+        |> sprintf "Duplicate modifier %s"
+        |> fail
+    | None ->
+        let results = // TODO: How do we preserve the error msg
+            uniqueModfs
+            |> Seq.fold
+                (fun prev modifier ->
+                    match prev with
+                    | Result.Error _ -> prev
+                    | Result.Ok prevList ->
+                        match validator prevList modifier with
+                        | Result.Ok result ->
+                            result
+                            |> prevList.Add
+                            |> Result.Ok
+                        | _ -> Result.mapError id prev)
+                (Result.Ok ImmutableList.Empty)
+
+        match results with
+        | Result.Ok resultVals -> preturn resultVals
+        | Result.Error msg -> fail msg
 
 let private separator p = space >>. attempt p .>> space
 
@@ -537,7 +580,7 @@ let functionBody =
 let functionDef: Parser<unit, ParserState> = fail "func not implemented"
 let methodDef: Parser<unit, ParserState> = fail "method not implemented"
 
-let interfaceDef =
+let interfaceDef modfs =
     keyword "interface"
     >>. genericName
     .>>. implements
@@ -546,9 +589,15 @@ let interfaceDef =
     // .>>. blockChoice
     .>> fail "interface not implemented"
 
-let classDef = fail "class not implemented"
+let classDef (modfs: string list) =
+    specModifiers
+        modfs
+        (fun prev modf ->
+            invalidOp "bad")
+    .>>. keyword "class"
+    fail "class not implemented"
 
-let moduleDef = fail "module not implemented"
+let moduleDef modfs = fail "module not implemented"
 
 do
     let expr = OperatorPrecedenceParser<_,_,_>()
@@ -608,15 +657,16 @@ do
                 skipChar '_'
                 <?> "digit separator"
                 |> skipMany
-            //pchar '_'
-            //|> skipMany
-            //<?> "digit separator"
-            //|> sepBy1 (anyOf chars)
-            //|>> (List.toArray >> String)
-            anyOf chars
-            |> attempt
+            let digit = anyOf chars
+
+            attempt digit
             .>> digitSep
-            |> many1Chars
+            .>>. opt digit
+            |>> fun (d1, d2) ->
+                match d2 with
+                | Some two -> sprintf "%c%c" d1 two
+                | None -> d1.ToString()
+            |> many1Strings
         let decimalChars = [ '0'..'9' ]
         let hexChars =
             [
@@ -819,12 +869,15 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let definitions =
         [
             accessModifier Access.Internal
-            >>. choice
+            .>>. modifiers
+            >>= (fun (acc, modfs) ->
                 [
                     classDef
                     interfaceDef
                     moduleDef
                 ]
+                |> Seq.map (fun def -> def modfs)
+                |> choice)
             |>> ignore
 
             skipString "main"

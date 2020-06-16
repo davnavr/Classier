@@ -33,7 +33,7 @@ let notEmpty col =
     |> isTrue "The collection was unexpectedly empty"
 
 let isSuperSet other col =
-    let missing = Enumerable.Except(other, col)
+    let missing = other |> Seq.except col
     let msg =
         missing
         |> String.concat ", "
