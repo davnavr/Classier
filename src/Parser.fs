@@ -13,6 +13,13 @@ let private position: Parser<Position, _> = fun stream -> Reply(stream.Position)
 
 let private optList p = opt p |>> Option.defaultValue []
 
+let private tuple6 p1 p2 p3 p4 p5 p6 =
+    tuple5 p1 p2 p3 p4 p5 .>>. p6
+    |>> (fun ((a, b, c, d, e), f) -> a, b, c, d, e, f)
+let private tuple7 p1 p2 p3 p4 p5 p6 p7 =
+    tuple6 p1 p2 p3 p4 p5 p6 .>>. p7
+    |>> (fun ((a, b, c, d, e, f), g) -> a, b, c, d, e, f, g)
+
 // TODO: Remove these single character parsers if they are only used once
 let comma = skipChar ','
 let gtsign = skipChar '>'
@@ -349,7 +356,6 @@ let throwStatement =
 //        // Call f inside here
 //    inner inner
 let ifStatement, private ifStatementRef = createParserForwardedToRef<If,_>()
-
 do
     ifStatementRef :=
         skipString "if"
@@ -574,10 +580,10 @@ let genericName =
         position
         genericIdentifier
     |>> fun (pos, id) -> { Identifier = id; Position = pos }
-let private genericNameValidated def =
+let private genericNameValidated placeholder =
     genericName
     >>= fun name ->
-        tryAddMember (def name) >>% name
+        tryAddMember (placeholder name) >>% name
 
 let functionBody =
     choiceL
@@ -597,7 +603,8 @@ let functionBody =
         "function body"
 
 let functionDef: Parser<unit, ParserState> = fail "func not implemented"
-let methodDef: Parser<unit, ParserState> = fail "method not implemented"
+let methodDef modf = fail "method not implemented"
+let propDef modf = fail "not implemented"
 
 let interfaceDef modfs =
     keyword "interface"
@@ -606,7 +613,7 @@ let interfaceDef modfs =
     .>> space
     .>> updateUserState newMembers
     // .>>. blockChoice
-    .>> fail "interface not implemented"
+    fail "interface not implemented"
 
 let classDef modfs =
     let classModf =
@@ -625,16 +632,89 @@ let classDef modfs =
             (Sealed)
     let className =
         genericNameValidated
-            (fun _ -> invalidOp "no impl")
+            (fun name ->
+                let tdef =
+                    name
+                    |> TypeDef.placeholderClass
+                    |> Type
+                Access.Public, tdef)
+        .>> space
     let classCtor =
-        fail "not implemented"
+        let cparams =
+            paramTuple
+            .>> space
+            |> optList
 
+        accessModifier Access.Private
+        .>> space
+        .>>. cparams
+        |>> fun (acc, ctorParams) ->
+            fun body baseArgs ->
+                let ctor =
+                    { BaseCall = baseArgs
+                      Body = body
+                      Parameters = ctorParams }
+                acc, ctor
+    let classBase =
+        extends
+        .>> space
+        .>>. optList tupleExpr
+        .>> space
+    let classSelfId =
+        keyword "as"
+        >>. identifierStr
+        .>> space
+        |> opt
+        |>> Option.defaultValue "this"
+    let classBody =
+        let classMembers =
+            modifiers
+            >>= fun memberModfs ->
+                [
+                    methodDef
+                    propDef
+                    // TODO: Nested class somehow
+                ]
+                |> Seq.map (fun def -> def memberModfs)
+                |> choice
+        (newMembers >> pushValidator memberValidator)
+        |> updateUserState
+        >>. blockChoice
+            [
+                statement
+                |> attempt
+                |>> Some
+
+                accessModifier Access.Private
+                .>>. classMembers
+                |>> (fun _ -> None)
+            ]
+        |>> List.choose id
+        .>>. (getUserState |>> getMembers)
+        .>> tryPopMembers
+        .>> tryPopValidators
     keyword "class"
-    >>. tuple3
+    >>. tuple7
         classModf
         className
         classCtor
-    fail "class not implemented"
+        classBase
+        (implements .>> space)
+        classSelfId
+        classBody
+    |>> fun (cmodf, name, ctor, (sclass, superCall), ilist, selfid, (body, members)) ->
+        Class
+            {| ClassName = name
+               Body = body
+               Inheritance = cmodf
+               Interfaces = ilist
+               Members = members
+               PrimaryCtor =
+                 superCall
+                 |> SuperCall
+                 |> ctor body
+               SelfIdentifier = selfid
+               SuperClass = sclass |}
 
 let moduleDef modfs = fail "module not implemented"
 
@@ -906,10 +986,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> space
         |> many
     let definitions =
-        [
-            accessModifier Access.Internal
-            .>>. modifiers
-            >>= (fun (acc, modfs) ->
+        let typeDef =
+            modifiers
+            >>= (fun modfs ->
                 [
                     classDef
                     interfaceDef
@@ -917,6 +996,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> Seq.map (fun def -> def modfs)
                 |> choice)
+        [
+            accessModifier Access.Internal
+            .>>. typeDef
+            //>>= (replacePlaceholder >> updateUserState) // TODO: Should instead be replacing the one in the globals table.
             |>> ignore
 
             skipString "main"

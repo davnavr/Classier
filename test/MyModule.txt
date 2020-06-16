@@ -4,7 +4,7 @@ namespace blah.blah.blah;
 use system.reflection.Assembly;
 
 public module Math {
-    let myGlobal: long = 42L;
+    let myGlobal: long = 42L; // TODO: Replace these 'let' thngs with properties, meaning only classes will have bodies.
 
     let three: uint = 03;
 

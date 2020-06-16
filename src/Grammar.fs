@@ -186,10 +186,11 @@ type TypeDef<'Member> =
     | Class of
         {| ClassName: Name
            Body: Statement list
-           Interfaces: FullIdentifier list
            Inheritance: ClassInheritance
+           Interfaces: FullIdentifier list
            Members: ImmutableSortedSet<'Member>
-           PrimaryCtor: Constructor
+           PrimaryCtor: Access * Constructor
+           SelfIdentifier: string
            SuperClass: FullIdentifier option |}
     | Interface of
         {| InterfaceName: Name
@@ -207,6 +208,11 @@ type MemberDef =
     | Type of TypeDef<Access * MemberDef>
 
 module MemberDef =
+    let placeholderCtor cparams =
+        { BaseCall = ConstructorBase.SuperCall List.empty
+          Body = List.empty
+          Parameters = cparams }
+
     let name mdef =
         match mdef with
         | Function fdef
@@ -243,6 +249,18 @@ module MemberDef =
 
 type Member = Access * MemberDef
 type TypeDef = TypeDef<Member>
+
+module TypeDef =
+    let placeholderClass name =
+        Class
+            {| ClassName = name
+               Body = List.empty
+               Inheritance = ClassInheritance.Sealed
+               Interfaces = List.empty
+               Members = ImmutableSortedSet.Empty
+               PrimaryCtor = Access.Public, (MemberDef.placeholderCtor List.empty)
+               SelfIdentifier = "this"
+               SuperClass = None |}
 
 type CompilationUnit =
     { EntryPoint: EntryPoint option

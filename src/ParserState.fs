@@ -17,7 +17,7 @@ module ParserState =
     type Validator = Validator of (ParserState<Validator> -> Access * MemberDef -> Result<ParserState<Validator>, string>)
     type ParserState = ParserState<Validator>
 
-    let private errEmptyStack = Result.Error "The member stack was empty"
+    let private errEmptyStack = sprintf "The %s stack was unexpectedly empty"
 
     let private emptyMembers =
         { new IComparer<Access * MemberDef> with
@@ -37,7 +37,6 @@ module ParserState =
                             (MemberDef.identifier m2)
                 | _ -> paramCompare }
         |> ImmutableSortedSet.Empty.WithComparer
-
     let newMembers state = { state with Members = emptyMembers :: state.Members }
     let popMembers state =
         match state.Members with
@@ -55,8 +54,14 @@ module ParserState =
           Symbols = GlobalsTable.empty }
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
+
     let setNamespace ns state = { state with ParserState.Namespace = ns }
 
+    let pushValidator validator state = { state with Validators = validator :: state.Validators }
+    let popValidator state =
+        match state.Validators with
+        | [] -> None
+        | _ -> Some { state with Validators = state.Validators.Tail }
     // TODO: Make more detailed error messages for the validators.
     /// Validates the names of non-nested types or modules.
     let typeValidator =
@@ -81,7 +86,6 @@ module ParserState =
                 |> sprintf "The member %s is not a non-nested type or module"
                 |> Result.Error)
         |> Validator
-
     let memberValidator =
         (fun state (acc, mdef) ->
             match List.tryHead state.Members with
@@ -96,8 +100,13 @@ module ParserState =
                 |> Option.map
                     (fun next -> Result.Ok { state with Members = next :: state.Members.Tail })
                 |> Option.defaultWith dupMsg
-            | None -> errEmptyStack)
+            | None ->
+                "member"
+                |> errEmptyStack
+                |> Result.Error)
         |> Validator
+
+    let replacePlaceholder mdef state = invalidOp "not implemented"
 
     [<AutoOpen>]
     module StateManagement =
@@ -111,7 +120,12 @@ module ParserState =
         let tryPopMembers: Parser<_, ParserState> =
             tryUpdateState
                 popMembers
-                "The member stack was unexpectedly empty"
+                (errEmptyStack "member")
+
+        let tryPopValidators: Parser<_, ParserState> =
+            tryUpdateState
+                popValidator
+                (errEmptyStack "validator")
 
         let tryAddMember mdef =
             getUserState

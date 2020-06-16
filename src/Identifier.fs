@@ -1,7 +1,6 @@
 ﻿module Classier.NET.Compiler.Identifier
 
 open System
-open System.Collections.Immutable
 open System.Text.RegularExpressions
 
 [<StructuralComparison>]
