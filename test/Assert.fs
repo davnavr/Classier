@@ -17,7 +17,6 @@ let equal expected actual =
             "%A should be equal to %A"
             actual
             expected
-
     Assert.Equal(msg, expected, actual)
 
 let testsOfResult tests result = Seq.map (fun (test: 'a -> Test) -> test result) tests
@@ -38,5 +37,4 @@ let isSuperSet other col =
         missing
         |> String.concat ", "
         |> sprintf "The set is missing the following elements: %s"
-
     missing.Any() |> not |> isTrue msg

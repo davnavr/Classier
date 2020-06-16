@@ -53,8 +53,8 @@ let space1 =
         ]
 
 let keyword word =
-    skipString word
-    >>. space1
+    pstring word
+    .>> space1
     |> attempt
 
 let accessModifier lowestAccess =
@@ -93,49 +93,63 @@ let typeAnnotation =
     |>> Option.defaultValue Inferred
     <?> "type annotation"
 
-let modifiers: Parser<string list, ParserState> = fail "modifiers not implemented"
-let private specModifiers modf (validator: ImmutableList<_> -> string -> Result<_, string>) =
-    let (dupm, uniqueModfs) =
-        modf
-        |> Seq.fold
-            (fun (dup, dist) item ->
-                let isDup = List.contains item dist
-                let nextDup =
-                    match dup with
-                    | Some _ -> dup
-                    | None when isDup -> Some item
-                    | None -> None
-                let nextDist =
-                    if isDup
-                    then dist
-                    else item :: dist
-
-                nextDup, nextDist)
-            (None, List.empty)
-    match dupm with
-    | Some _ ->
-        dupm.Value
-        |> sprintf "Duplicate modifier %s"
-        |> fail
-    | None ->
-        let results = // TODO: How do we preserve the error msg
-            uniqueModfs
+let modifiers =
+    let modifier =
+        [
+            "abstract"
+            "data"
+            "implicit"
+            "inheritable"
+            "inline"
+            "override"
+            "sealed"
+            "virtual"
+        ]
+        |> Seq.map keyword
+        |> choice
+    (fun stream ->
+        let results =
+            Seq.unfold
+                (fun _ ->
+                    let result = modifier stream
+                    match result.Status with
+                    | Ok -> Some (result.Result, ())
+                    | _ -> None)
+                ()
             |> Seq.fold
-                (fun prev modifier ->
-                    match prev with
-                    | Result.Error _ -> prev
-                    | Result.Ok prevList ->
-                        match validator prevList modifier with
-                        | Result.Ok result ->
+                (fun state result ->
+                    match state with
+                    | Result.Ok (resultList: ImmutableList<_>) ->
+                        if resultList.Contains result then
                             result
-                            |> prevList.Add
+                            |> sprintf "Duplicate modifier %s"
+                            |> Result.Error
+                        else
+                            result
+                            |> resultList.Add
                             |> Result.Ok
-                        | _ -> Result.mapError id prev)
+                    | _ -> state)
                 (Result.Ok ImmutableList.Empty)
 
         match results with
-        | Result.Ok resultVals -> preturn resultVals
-        | Result.Error msg -> fail msg
+        | Result.Ok resultList -> Reply resultList
+        | Result.Error err -> Reply(Error, messageError err))
+    <?> "modifiers"
+let private validateModifiers (modfs: seq<string>) validator initial =
+    let results =
+        modfs
+        |> Seq.fold
+            (fun prev modifier ->
+                match prev with
+                | Result.Error _ -> prev
+                | Result.Ok prevList ->
+                    match validator prevList modifier with
+                    | Result.Ok result -> Result.Ok result
+                    | _ -> Result.mapError id prev)
+            (Result.Ok initial)
+    match results with
+    | Result.Ok resultList -> preturn resultList
+    | Result.Error msg -> fail msg
 
 let private separator p = space >>. attempt p .>> space
 
@@ -551,6 +565,7 @@ let genericIdentifier: Parser<Identifier, _> =
     identifierStr
     .>> space
     .>>. genericParams
+    .>> space1
     |>> fun (name, gparams) ->
         { Name = name
           Generics = List.map GenericParam gparams }
@@ -559,6 +574,10 @@ let genericName =
         position
         genericIdentifier
     |>> fun (pos, id) -> { Identifier = id; Position = pos }
+let private genericNameValidated def =
+    genericName
+    >>= fun name ->
+        tryAddMember (def name) >>% name
 
 let functionBody =
     choiceL
@@ -589,12 +608,32 @@ let interfaceDef modfs =
     // .>>. blockChoice
     .>> fail "interface not implemented"
 
-let classDef (modfs: string list) =
-    specModifiers
-        modfs
-        (fun prev modf ->
-            invalidOp "bad")
-    .>>. keyword "class"
+let classDef modfs =
+    let classModf =
+        validateModifiers
+            modfs
+            (fun inheritKind modf ->
+                match (inheritKind, modf) with
+                | (MustInherit, "inheritable")
+                | (CanInherit, "abstract") -> Result.Error "An abstract class already implies that it is inheritable"
+                | (_, "inheritable") -> Result.Ok CanInherit
+                | (_, "abstract") -> Result.Ok MustInherit
+                | _ ->
+                    modf
+                    |> sprintf "The modifier %s is not valid on a class"
+                    |> Result.Error)
+            (Sealed)
+    let className =
+        genericNameValidated
+            (fun _ -> invalidOp "no impl")
+    let classCtor =
+        fail "not implemented"
+
+    keyword "class"
+    >>. tuple3
+        classModf
+        className
+        classCtor
     fail "class not implemented"
 
 let moduleDef modfs = fail "module not implemented"

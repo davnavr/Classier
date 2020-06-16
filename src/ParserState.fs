@@ -10,18 +10,14 @@ type ParserState<'Validator> =
     { EntryPoint: EntryPoint option
       Members: ImmutableSortedSet<Access * MemberDef> list
       Namespace: FullIdentifier
-      Validator: 'Validator list
+      Validators: 'Validator list
       Symbols: GlobalsTable }
 
 module ParserState =
-    type ValidationResult<'Validator> =
-        | ValidationSuccess of ParserState<'Validator>
-        | ValidationError of string
-
-    type Validator = Validator of (ParserState<Validator> -> Access * MemberDef -> ValidationResult<Validator>)
+    type Validator = Validator of (ParserState<Validator> -> Access * MemberDef -> Result<ParserState<Validator>, string>)
     type ParserState = ParserState<Validator>
 
-    let private errEmptyStack = ValidationError "The member stack was empty"
+    let private errEmptyStack = Result.Error "The member stack was empty"
 
     let private emptyMembers =
         { new IComparer<Access * MemberDef> with
@@ -55,7 +51,7 @@ module ParserState =
         { EntryPoint = None
           Members = List.empty
           Namespace = FullIdentifier.Empty
-          Validator = List.empty
+          Validators = List.empty
           Symbols = GlobalsTable.empty }
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
@@ -65,26 +61,25 @@ module ParserState =
     /// Validates the names of non-nested types or modules.
     let typeValidator =
         (fun state (_, mdef) ->
-            match (mdef, state.Members) with
-            | (_, []) -> errEmptyStack
-            | (Type tdef, _) ->
+            match mdef with
+            | Type tdef ->
                 let dupMsg() =
                     MemberDef.name mdef
                     |> sprintf "A type with the name %A already exists in this scope"
-                    |> ValidationError
+                    |> Result.Error
                 let typeSymbol =
                     { Namespace = state.Namespace
                       Type = DefinedType tdef }
 
                 state.Symbols
                 |> GlobalsTable.addType typeSymbol
-                |> Option.map (fun symbols -> ValidationSuccess { state with Symbols = symbols })
+                |> Option.map (fun symbols -> Result.Ok { state with Symbols = symbols })
                 |> Option.defaultWith dupMsg
-            | (_, _) ->
+            | _ ->
                 mdef
                 |> string
                 |> sprintf "The member %s is not a non-nested type or module"
-                |> ValidationError)
+                |> Result.Error)
         |> Validator
 
     let memberValidator =
@@ -94,12 +89,12 @@ module ParserState =
                 let dupMsg() =
                     MemberDef.name mdef
                     |> sprintf "A member with the name %A already exists in this scope"
-                    |> ValidationError
+                    |> Result.Error
 
                 members
                 |> SortedSet.add(acc, mdef)
                 |> Option.map
-                    (fun next -> ValidationSuccess { state with Members = next :: state.Members.Tail })
+                    (fun next -> Result.Ok { state with Members = next :: state.Members.Tail })
                 |> Option.defaultWith dupMsg
             | None -> errEmptyStack)
         |> Validator
@@ -117,3 +112,14 @@ module ParserState =
             tryUpdateState
                 popMembers
                 "The member stack was unexpectedly empty"
+
+        let tryAddMember mdef =
+            getUserState
+            >>= fun state ->
+                match List.tryHead state.Validators with
+                | Some (Validator validator) ->
+                    let result = validator state mdef
+                    match result with
+                    | Result.Ok newState -> setUserState newState
+                    | Result.Error msg -> fail msg
+                | None -> fail "The validator stack was empty"

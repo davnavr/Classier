@@ -177,11 +177,17 @@ type Constructor =
       Body: Statement list
       Parameters: Param list }
 
+type ClassInheritance =
+    | MustInherit
+    | CanInherit
+    | Sealed
+
 type TypeDef<'Member> =
     | Class of
         {| ClassName: Name
            Body: Statement list
            Interfaces: FullIdentifier list
+           Inheritance: ClassInheritance
            Members: ImmutableSortedSet<'Member>
            PrimaryCtor: Constructor
            SuperClass: FullIdentifier option |}
