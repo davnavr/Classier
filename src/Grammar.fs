@@ -14,31 +14,34 @@ module Numeric =
         | Binary
         | Decimal
         | Hexadecimal
-
-    [<RequireQualifiedAccess>]
-    [<StructuredFormatDisplay("{Item}")>]
-    type IntegralVal =
-        | Byte of int8
-        | UByte of uint8
-        | Short of int16
-        | UShort of uint16
-        | Int of int32
-        | UInt of uint32
-        | Long of int64
-        | ULong of uint64
-
-    [<RequireQualifiedAccess>]
-    type FPointVal =
-        | Float of float
     
-    [<StructuredFormatDisplay("{Value}")>]
     type IntegralLit =
         { Base: NumBase
-          Value: IntegralVal }
+          Digits: string
+          Negative: bool }
+
+    type FPointLit =
+        { IntDigits: string
+          FracDigits: string
+          Negative: bool }
+
+        override this.ToString() =
+            let sign =
+                if this.Negative
+                then "-"
+                else String.Empty
+
+            sprintf "%s%s.%s"
+                sign
+                this.IntDigits
+                this.FracDigits
 
     type NumericLit =
         | Integral of IntegralLit
-        | FPointVal of FPointVal
+        | FPoint of FPointLit
+        | Double of FPointLit
+        | Float of FPointLit
+        | Long of IntegralLit
 
 [<StructuralEquality>]
 [<StructuralComparison>]
@@ -136,6 +139,7 @@ type Expression =
     | MatchExpr of Match<Expression>
     | MemberAccess of Expression * Identifier
     | Nested of Expression
+    | NullLit
     | NumLit of NumericLit
     | StrLit of string
     | ThrowExpr of Expression
@@ -238,4 +242,4 @@ type CompilationUnit =
     { EntryPoint: EntryPoint option
       Namespace: FullIdentifier
       Usings: FullIdentifier list
-      Types: ImmutableSortedSet<Access * TypeDef> }
+      Types: seq<Access * TypeDef> }

@@ -25,6 +25,7 @@ let main args =
         [
             [
                 "FancyClass", List.empty, [ [ "System" ] ], [ "FancyClass" ]
+                "HelloWorld", List.empty, [ [ "System"; "Console" ] ], List.empty
                 "MethodOverloading", List.empty, List.empty, [ "OverloadingExample" ]
                 "MultipleClasses", [ "test" ], List.empty, [ "Class1"; "Class2"; "Interface1"; "Class3"; "Class4"; "Class5"; "Class6" ]
                 "MyAbstractClass", [ "this"; "is"; "my"; "space" ], [ [ "java"; "lang" ]; [ "java"; "util" ] ], [ "MyAbstractClass" ]

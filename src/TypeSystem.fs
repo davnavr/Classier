@@ -15,15 +15,10 @@ type PrimitiveType =
     | Unit
     // Integral
     | Byte
-    | UByte
     | Short
-    | UShort
     | Int
-    | UInt
     | Long
-    | ULong
     // Floating-point
-    | Decimal
     | Double
     | Float
 
@@ -34,15 +29,10 @@ type PrimitiveType =
             String, "string"
 
             Byte, "byte"
-            UByte, "ubyte"
             Short, "short"
-            UShort, "ushort"
             Int, "int"
-            UInt, "uint"
             Long, "long"
-            ULong, "ulong"
 
-            Decimal, "decimal"
             Double, "double"
             Float, "float"
         ]

@@ -8,7 +8,7 @@ open FParsec
 
 type ParserState<'Validator> =
     { EntryPoint: EntryPoint option
-      Members: ImmutableSortedSet<MemberDef> list
+      Members: ImmutableSortedSet<Access * MemberDef> list
       Namespace: FullIdentifier
       Validator: 'Validator list
       Symbols: GlobalsTable }
@@ -18,14 +18,14 @@ module ParserState =
         | ValidationSuccess of ParserState<'Validator>
         | ValidationError of string
 
-    type Validator = Validator of (ParserState<Validator> -> MemberDef -> ValidationResult<Validator>)
+    type Validator = Validator of (ParserState<Validator> -> Access * MemberDef -> ValidationResult<Validator>)
     type ParserState = ParserState<Validator>
 
     let private errEmptyStack = ValidationError "The member stack was empty"
 
     let private emptyMembers =
-        { new IComparer<MemberDef> with
-            member _.Compare(m1, m2) =
+        { new IComparer<Access * MemberDef> with
+            member _.Compare((_, m1), (_, m2)) =
                 let paramCompare =
                     compare
                         (MemberDef.firstParams m1)
@@ -47,6 +47,9 @@ module ParserState =
         match state.Members with
         | [] -> None
         | _ -> Some { state with Members = state.Members.Tail }
+    let getMembers state =
+        List.tryHead state.Members
+        |> Option.defaultValue emptyMembers
 
     let defaultState: ParserState =
         { EntryPoint = None
@@ -61,7 +64,7 @@ module ParserState =
     // TODO: Make more detailed error messages for the validators.
     /// Validates the names of non-nested types or modules.
     let typeValidator =
-        (fun state mdef ->
+        (fun state (_, mdef) ->
             match (mdef, state.Members) with
             | (_, []) -> errEmptyStack
             | (Type tdef, _) ->
@@ -85,7 +88,7 @@ module ParserState =
         |> Validator
 
     let memberValidator =
-        (fun state mdef ->
+        (fun state (acc, mdef) ->
             match List.tryHead state.Members with
             | Some members ->
                 let dupMsg() =
@@ -94,7 +97,7 @@ module ParserState =
                     |> ValidationError
 
                 members
-                |> SortedSet.add(mdef)
+                |> SortedSet.add(acc, mdef)
                 |> Option.map
                     (fun next -> ValidationSuccess { state with Members = next :: state.Members.Tail })
                 |> Option.defaultWith dupMsg

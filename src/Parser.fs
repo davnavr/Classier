@@ -92,7 +92,7 @@ let typeAnnotation =
     |>> Option.defaultValue Inferred
     <?> "type annotation"
 
-let modifiers: Parser<string list, ParserState> = fail "not implemented"
+let modifiers: Parser<string list, ParserState> = fail "modifiers not implemented"
 
 let private separator p = space >>. attempt p .>> space
 
@@ -270,6 +270,22 @@ let tryBlock =
                   Handlers = catchBlock
                   Finally = finallyBlock }
 
+let throwStatement =
+    skipString "throw"
+    >>. choice
+        [
+            space1
+            |> attempt
+            >>. expression
+            |>> Some
+
+            space
+            >>. semicolon
+            >>% None
+        ]
+    |> attempt
+    <?> "throw statement"
+
 // TODO: For parsers that rely on themselves, try to see if this works instead:
 //let ifStatement =
 //    let inner f =
@@ -386,7 +402,7 @@ do
                         .>> semicolon
                     let rest =
                         match p with
-                        | VarPattern (name, vtype) ->
+                        | VarPattern (name, vtype) -> // TODO: Is name needed here. Maybe simplify things by introducing a Statement case that represents a local functon?
                             match vtype with
                             | Inferred ->
                                 [
@@ -434,26 +450,9 @@ do
                 .>> space
                 .>> semicolon
 
-                skipString "throw"
-                >>. choice
-                    [
-                        space1
-                        |> attempt
-                        >>. expression
-                        |>> Some
-
-                        space
-                        >>. semicolon
-                        >>% None
-                    ]
-                |> attempt
-                |>> Throw
-                <?> "throw statement"
-
+                throwStatement |>> Throw
                 ifStatement |>> IfStatement <?> "if statement"
-
                 matchStatement |>> MatchStatement <?> "match statement"
-
                 tryBlock |>> TryStatement <?> "try statement"
             
                 expression
@@ -552,8 +551,7 @@ let classDef = fail "class not implemented"
 let moduleDef = fail "module not implemented"
 
 do
-    let op = OperatorPrecedenceParser<_,_,_>()
-    let expr = op.ExpressionParser <?> "expression"
+    let expr = OperatorPrecedenceParser<_,_,_>()
 
     let callExpr target args name =
         match Identifier.ofString name with
@@ -575,11 +573,185 @@ do
             ]
     ]
     |> Seq.collect id
-    |> Seq.iter op.AddOperator
+    |> Seq.iter expr.AddOperator
 
-    op.TermParser <-
+    let strLit =
+        let quote = skipChar '\"' <?> "quotation mark"
+        let strChar = manySatisfy (fun c -> c <> '\\' && c <> '"' && c <> '\n')
+        let strEscaped =
+            skipChar '\\'
+            |> attempt
+            >>. choice
+                [
+                    skipChar 'n' >>% '\n'
+                    skipChar 'r' >>% '\r'
+                    skipChar 't' >>% '\t'
+
+                    skipChar 'u'
+                    |> attempt
+                    >>. parray 4 hex
+                    |>> (fun chars -> Convert.ToUInt32(String chars, 16) |> char)
+                ]
+            |>> string
+            <?> "escaped character"
+
+        between
+            quote
+            quote
+            (stringsSepBy strChar strEscaped)
+        |>> StrLit
+        <?> "string literal"
+
+    let numLit =
+        let digits chars =
+            let digitSep =
+                skipChar '_'
+                <?> "digit separator"
+                |> skipMany
+            //pchar '_'
+            //|> skipMany
+            //<?> "digit separator"
+            //|> sepBy1 (anyOf chars)
+            //|>> (List.toArray >> String)
+            anyOf chars
+            |> attempt
+            .>> digitSep
+            |> many1Chars
+        let decimalChars = [ '0'..'9' ]
+        let hexChars =
+            [
+                decimalChars
+                [ 'a'..'z' ]
+                [ 'A'..'Z' ]
+            ]
+            |> List.collect id
+
+        skipChar '-' >>% true <|>% false
+        .>>. choice
+            [
+                skipChar '0'
+                >>. choice
+                    [
+                        anyOf [ 'b'; 'B' ] >>% ([ '0'; '1' ], NumBase.Binary)
+                        anyOf [ 'x'; 'X' ] >>% (hexChars, NumBase.Hexadecimal)
+                    ]
+                |> attempt
+
+                period >>% (List.empty, NumBase.Decimal)
+
+                preturn (decimalChars, NumBase.Decimal)
+            ]
+        >>= (fun (isNeg, (chars, nbase)) ->
+            let decimalDigits = digits decimalChars
+            let numParser =
+                match chars with
+                | [] ->
+                    decimalDigits
+                    |>> fun fdigits ->
+                        String.Empty, fdigits
+                | _ when chars.Length = 10 ->
+                    let fraction =
+                        skipChar '.'
+                        |> attempt
+                        >>. decimalDigits
+                        |> opt
+                        |>> Option.defaultValue String.Empty
+                    decimalDigits .>>. fraction
+                | _ ->
+                    digits chars
+                    |>> fun digits ->
+                        digits, String.Empty
+            numParser .>>. preturn (nbase, isNeg))
+        >>= fun ((idigits, fdigits), (nbase, isNeg)) ->
+            let suffixes pairs none =
+                pairs
+                |> Seq.map (fun (c, ntype) -> skipChar c >>% ntype)
+                |> choice
+                <|>% none
+                <?> "numeric suffix"
+
+            match fdigits with
+            | "" ->
+                suffixes
+                    [ 'l', Long ]
+                    Integral
+                |>> fun intType ->
+                    { Base = nbase
+                      Digits = idigits
+                      Negative = isNeg }
+                    |> intType
+            | _ ->
+                suffixes
+                    [
+                        'd', Double
+                        'f', Float
+                    ]
+                    Double
+                |>> fun fpType ->
+                    { IntDigits = idigits
+                      FracDigits = fdigits
+                      Negative = isNeg }
+                    |> fpType
+
+    expr.TermParser <-
         choice
             [
+                strLit
+
+                paramTuple
+                .>> space
+                .>> lambdaOperator
+                |> attempt
+                .>> space
+                .>>. expression
+                <?> "anonymous function"
+                |>> fun (parameters, retVal) ->
+                    { Body = [ Return retVal ]
+                      Parameters = [ parameters ]
+                      ReturnType = Inferred }
+                    |> AnonFunc
+
+                tupleExpr
+                <?> "tuple"
+                |>> (fun ex ->
+                    match ex with
+                    | [] -> UnitLit
+                    | [ nested ] -> nested
+                    | _ -> TupleLit ex)
+
+                ifStatement |>> IfExpr <?> "if expression"
+                matchStatement |>> MatchExpr <?> "match expression"
+                tryBlock |>> TryExpr <?> "try expression"
+                skipString "null" >>% NullLit <?> "null literal"
+
+                throwStatement
+                >>= fun ex ->
+                    match ex with
+                    | None -> fail "Throw statements used as expressions must provide an exception to throw"
+                    | Some _ -> ex.Value |> ThrowExpr |> preturn
+
+                skipString "new"
+                >>. space
+                |> attempt
+                >>. identifierFull
+                .>> space
+                .>>. (tupleExpr <?> "constructor arguments")
+                <?> "explicit constructor call"
+                |>> (fun (ctype, args) ->
+                    CtorCall
+                        {| Arguments = args
+                           Type = Identifier ctype |})
+
+                [
+                    pstring "true"
+                    pstring "false"
+                ]
+                |> choice
+                |>> (bool.Parse >> BoolLit)
+                <?> "boolean literal"
+
+                identifier |>> IdentifierRef
+                numLit |>> NumLit
             ]
         .>> space
         >>= fun target ->
@@ -612,7 +784,7 @@ do
                 (fun prev next -> next prev)
                 target
 
-    expressionRef := expr
+    expressionRef := expr.ExpressionParser <?> "expression"
 
 let compilationUnit: Parser<CompilationUnit, ParserState> =
     let namespaceDecl =
@@ -681,4 +853,11 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         { EntryPoint = state.EntryPoint
           Namespace = ns
           Usings = uses
-          Types = invalidOp "not impl" }
+          Types =
+            state
+            |> ParserState.getMembers
+            |> Seq.choose
+                (fun (acc, mdef) ->
+                    match mdef with
+                    | Type tdef -> Some (acc, tdef)
+                    | _ -> None)}
