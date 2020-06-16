@@ -1,0 +1,7 @@
+
+use System;
+
+main (args) {
+  "Hello there!" |> System.Console.WriteLine
+  0
+}

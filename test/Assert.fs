@@ -1,5 +1,6 @@
 ﻿module Classier.NET.Compiler.Assert
 
+open System.Linq
 open FParsec
 open Fuchu
 
@@ -21,7 +22,21 @@ let equal expected actual =
 
 let testsOfResult tests result = Seq.map (fun (test: 'a -> Test) -> test result) tests
 
+let isTrue msg value =
+    if value
+    then ()
+    else raise (AssertException msg)
+
 let notEmpty col =
-    if Seq.isEmpty col
-    then raise (AssertException "The collection was unexpectedly empty")
-    else ()
+    Seq.isEmpty col
+    |> not
+    |> isTrue "The collection was unexpectedly empty"
+
+let isSuperSet other col =
+    let missing = Enumerable.Except(other, col)
+    let msg =
+        missing
+        |> String.concat ", "
+        |> sprintf "The set is missing the following elements: %s"
+
+    missing.Any() |> not |> isTrue msg

@@ -535,8 +535,8 @@ let functionBody =
         ]
         "function body"
 
-let functionDef: Parser<unit, ParserState> = fail "not implemented"
-let methodDef: Parser<unit, ParserState> = fail "not implemented"
+let functionDef: Parser<unit, ParserState> = fail "func not implemented"
+let methodDef: Parser<unit, ParserState> = fail "method not implemented"
 
 let interfaceDef =
     keyword "interface"
@@ -545,13 +545,75 @@ let interfaceDef =
     .>> space
     .>> updateUserState newMembers
     // .>>. blockChoice
-    .>> fail "not implemented"
+    .>> fail "interface not implemented"
 
-let classDef = fail "not implemented"
+let classDef = fail "class not implemented"
 
-let moduleDef = fail "not implemented"
+let moduleDef = fail "module not implemented"
 
-// TODO: Clean up parser and put all the functions in the module.
+do
+    let op = OperatorPrecedenceParser<_,_,_>()
+    let expr = op.ExpressionParser <?> "expression"
+
+    let callExpr target args name =
+        match Identifier.ofString name with
+        | None ->
+            name
+            |> sprintf "A function or method with the name %s is invalid"
+            |> InvalidExpr
+        | Some funcName ->
+            FuncCall
+                {| Arguments = args
+                   Target = MemberAccess(target, funcName) |}
+
+    [
+        Seq.ofList<Operator<_,_,_>>
+            [
+                InfixOperator<_,_,_>(">>", space, 18, Associativity.Left, fun f g -> FuncComp (f, g))
+                InfixOperator<_,_,_>("|>", space, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ args ]; Target = f |})
+                PrefixOperator<_,_,_>("!", space, 32, true, fun exp -> callExpr exp [] "not")
+            ]
+    ]
+    |> Seq.collect id
+    |> Seq.iter op.AddOperator
+
+    op.TermParser <-
+        choice
+            [
+            ]
+        .>> space
+        >>= fun target ->
+            choice
+                [
+                    period
+                    |> attempt
+                    >>. space
+                    >>. identifier
+                    .>> space
+                    <?> "member access"
+                    |> many1
+                    |>> fun members t ->
+                            members
+                            |> Seq.fold
+                                (fun prev tmember -> MemberAccess (prev, tmember))
+                                t
+
+                    tupleExpr
+                    .>> space
+                    <?> "argument list"
+                    |>> fun args t ->
+                            match args with
+                            | [] -> target
+                            | _ -> FuncCall {| Arguments = args; Target = t |}
+                ]
+            .>> space
+            |> many
+            |>> Seq.fold
+                (fun prev next -> next prev)
+                target
+
+    expressionRef := expr
+
 let compilationUnit: Parser<CompilationUnit, ParserState> =
     let namespaceDecl =
         skipString "namespace"
@@ -597,6 +659,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             |> attempt
             >>. space
             >>. paramTuple
+            .>> space
             .>>. functionBody
             |>> ignore
             <?> "entry point"

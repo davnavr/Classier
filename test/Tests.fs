@@ -21,27 +21,18 @@ let parseSource source =
 
 [<EntryPoint>]
 let main args =
-    let testFilter (name: string) =
-        match args with
-        | [||] -> true
-        | _ ->
-            args
-            |> Seq.fold
-                (fun found arg ->
-                    found || name.StartsWith arg)
-                false
-
     [
         [
             [
-                "MethodOverloading", List.empty, List.empty
-                "MultipleClasses", [ "test" ], List.empty
-                "MyAbstractClass", [ "this"; "is"; "my"; "space" ], [ [ "java"; "lang" ]; [ "java"; "util" ] ]
-                "MyModule", List.replicate 3 "blah", [ [ "system"; "reflection"; "Assembly" ] ]
-                "NoAccessModifiers", [ "My"; "Awesome"; "Project" ], List.empty
+                "FancyClass", List.empty, [ [ "System" ] ], [ "FancyClass" ]
+                "MethodOverloading", List.empty, List.empty, [ "OverloadingExample" ]
+                "MultipleClasses", [ "test" ], List.empty, [ "Class1"; "Class2"; "Interface1"; "Class3"; "Class4"; "Class5"; "Class6" ]
+                "MyAbstractClass", [ "this"; "is"; "my"; "space" ], [ [ "java"; "lang" ]; [ "java"; "util" ] ], [ "MyAbstractClass" ]
+                "MyModule", List.replicate 3 "blah", [ [ "system"; "reflection"; "Assembly" ] ], [ "Math" ]
+                "NoAccessModifiers", [ "My"; "Awesome"; "Project" ], List.empty, [ "MyModule"; "MyModule"; "MyInterface" ]
             ]
             |> Seq.map
-                (fun (sourceName, ns, usings) ->
+                (fun (sourceName, ns, usings, defs) ->
                     let expectedNs = Identifier.ofStrings ns
 
                     parseSource sourceName
@@ -66,13 +57,33 @@ let main args =
                                     state.Symbols
                                     |> GlobalsTable.getTypes expectedNs
                                     |> Assert.notEmpty)
+
+                            testSuccess
+                                "types in symbol table"
+                                (fun (_, state) ->
+                                    state.Symbols
+                                    |> GlobalsTable.getTypes expectedNs
+                                    |> Seq.map string
+                                    |> isSuperSet defs)
                         ]
                     |> testList sourceName)
             |> testList "success tests"
+
+            parseSource "HelloWorld"
+            |> testSuccess
+                "valid entry point"
+                (fun (cu, _) -> cu.EntryPoint.IsSome |> isTrue "The entry point is missing")
         ]
         |> testList "parser tests"
     ]
-    //|> Seq.map (filter testFilter)
     |> testList "compiler tests"
-    |> filter testFilter
+    |> filter
+        (fun name ->
+            match args with
+            | [||] -> true
+            | _ ->
+                args
+                |> Seq.fold
+                    (fun found arg -> found || name.StartsWith arg)
+                    false)
     |> run

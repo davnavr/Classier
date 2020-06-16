@@ -127,11 +127,12 @@ type Expression =
         {| Arguments: Expression list
            Type: TypeName |}
     | FuncCall of
-        {| Arguments: Expression list list
+        {| Arguments: Expression list
            Target: Expression |}
     | FuncComp of Expression * Expression
     | IdentifierRef of Identifier
     | IfExpr of If<Expression>
+    | InvalidExpr of string
     | MatchExpr of Match<Expression>
     | MemberAccess of Expression * Identifier
     | Nested of Expression
