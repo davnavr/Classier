@@ -216,6 +216,7 @@ type MethodImpl =
     | AbstractOrSealed of MethodInheritance
     | Override of MethodInheritance option
     | Virtual
+    // | Inline
 
 type MethodModifiers =
     { ImplKind: MethodImpl
@@ -242,6 +243,14 @@ module MemberDef =
         { BaseCall = ConstructorBase.SuperCall List.empty
           Body = List.empty
           Parameters = cparams }
+
+    let placeholderFunc name fparams =
+        Function
+            {| Function =
+                { Body = List.empty
+                  Parameters = fparams
+                  ReturnType = TypeName.Inferred }
+               FunctionName = name |}
 
     let placeholderMethod name selfid mparams =
         Method

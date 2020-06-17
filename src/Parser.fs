@@ -633,7 +633,31 @@ let functionBody =
         ]
         "function body"
 
-let functionDef modfs: Parser<_, ParserState> = fail "func not implemented"
+let functionDef modfs =
+    let funcHeader =
+        genericName
+        .>>. paramTupleList
+        .>> space
+        >>= fun (name, fparams) ->
+            let placeholder =
+                MemberDef.placeholderFunc
+                    name
+                    fparams
+            tryAddMember (Access.Public, placeholder) >>% (name, fparams)
+    noModifiers
+        modfs
+        "Modifiers are not valid on a function"
+    >>. tuple3
+        funcHeader
+        (typeAnnotation .>> space)
+        functionBody
+    |>> fun ((name, fparams), retType, body) ->
+        Function
+            {| Function =
+                { Body = body
+                  Parameters = fparams
+                  ReturnType = retType }
+               FunctionName = name |}
 let methodDef body modfs =
     let methodModf =
         validateModifiers
@@ -686,10 +710,7 @@ let methodDef body modfs =
                     name
                     selfId
                     mparams
-            (Access.Public, placeholder)
-            |> tryAddMember 
-            >>% (selfId, name, mparams)
-
+            tryAddMember (Access.Public, placeholder) >>% (selfId, name, mparams)
     tuple4
         methodModf
         methodHeader
