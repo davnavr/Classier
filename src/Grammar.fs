@@ -295,6 +295,12 @@ module TypeDef =
                SelfIdentifier = "this"
                SuperClass = None |}
 
+    let placeholderInterface name =
+        Interface
+            {| InterfaceName = name
+               Members = ImmutableSortedSet.Empty
+               SuperInterfaces = List.empty |}
+
     let placeholderModule name =
         Module
             {| Body = List.empty

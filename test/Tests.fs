@@ -56,7 +56,7 @@ let main args =
                                 "types in symbol table"
                                 (fun (_, state) ->
                                     state.Symbols
-                                    |> GlobalsTable.getTypes expectedNs
+                                    |> GlobalsTable.getTypes expectedNs // TODO: Instead of mapping the GlobalsTable to a string seq, map the expected strings into placeholder defs.
                                     |> Seq.map
                                         (fun gtype ->
                                             gtype.Type

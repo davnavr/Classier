@@ -172,6 +172,11 @@ let private validateModifiers (modfs: seq<string>) validator initial =
     match results with
     | Result.Ok resultList -> preturn resultList
     | Result.Error msg -> fail msg
+let private noModifiers modfs msg =
+    validateModifiers
+        modfs
+        (fun _ _ -> Result.Error msg)
+        ()
 
 let private separator p = space >>. attempt p .>> space
 
@@ -591,16 +596,23 @@ let genericName =
         genericIdentifier
     .>> space
     |>> fun (pos, id) -> { Identifier = id; Position = pos }
-let private genericNameValidated placeholder =
+let private genericTypeName placeholder =
     genericName
     >>= fun name ->
-        tryAddMember (placeholder name) >>% name
+        let def = 
+            name
+            |> placeholder
+            |> Type
+        (Access.Public, def)
+        |> tryAddMember
+        >>% name
 
 let opName: Parser<_, ParserState> =
     [ '!'; '%'; '&'; '*'; '+'; '-'; '/'; '<'; '='; '<'; '?'; '|'; '~' ]
     |> anyOf
     |> many1Chars
 
+let emptyBody = semicolon >>% []
 let functionBody =
     choiceL
         [
@@ -614,12 +626,12 @@ let functionBody =
             .>> space
             .>> semicolon
 
-            semicolon >>% []
+            emptyBody
         ]
         "function body"
 
 let functionDef modfs: Parser<_, ParserState> = fail "func not implemented"
-let methodDef modfs =
+let methodDef body modfs =
     let methodModf =
         validateModifiers
             modfs
@@ -679,7 +691,7 @@ let methodDef modfs =
         methodModf
         methodHeader
         (typeAnnotation .>> space)
-        functionBody
+        body
     |>> fun (mmodf, (selfId, name, mparams), retType, body) ->
         Method
             {| Method =
@@ -725,14 +737,36 @@ let memberBlock members types =
     .>>. (getUserState |>> getMembers)
     |> memberSection
 
+let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
 let interfaceDef modfs =
     keyword "interface"
-    >>. genericName
-    .>>. implements
-    .>> space
-    .>> updateUserState newMembers
-    // .>>. blockChoice
-    fail "interface not implemented"
+    >>. noModifiers
+        modfs
+        "Modifiers are not valid on an interface"
+    >>. tuple3
+        (genericTypeName TypeDef.placeholderInterface)
+        (implements .>> space)
+        interfaceMembers
+    <?> "interface definition"
+    |>> fun (name, ilist, members) ->
+        Interface
+            {| InterfaceName = name
+               Members = members
+               SuperInterfaces = ilist |}
+do
+    interfaceMembersRef :=
+        accessModifier Access.Private
+        >>. memberDef
+            [
+                methodDef emptyBody
+            ]
+            [
+                interfaceDef
+            ]
+        >>. (getUserState |>> getMembers)
+        |> memberSection
+        |> block
+        <?> "interface body"
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
 let classDef modfs =
@@ -750,14 +784,6 @@ let classDef modfs =
                     |> sprintf "The modifier %s is not valid on a class"
                     |> Result.Error)
             (Sealed)
-    let className =
-        genericNameValidated
-            (fun name ->
-                let tdef =
-                    name
-                    |> TypeDef.placeholderClass
-                    |> Type
-                Access.Public, tdef)
     let classCtor =
         let cparams =
             paramTuple
@@ -793,7 +819,7 @@ let classDef modfs =
     keyword "class"
     >>. tuple7
         classModf
-        className
+        (genericTypeName TypeDef.placeholderClass)
         classCtor
         classBase
         (implements .>> space)
@@ -817,7 +843,7 @@ do
     classBodyRef :=
         memberBlock
             [
-                methodDef
+                methodDef functionBody
                 propDef
             ]
             [
@@ -828,24 +854,14 @@ do
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
 let moduleDef modfs =
-    let moduleModf =
-        validateModifiers
-            modfs
-            (fun _ _ -> Result.Error "No modifiers are valid on a module")
-            ()
-    let moduleName =
-        genericNameValidated
-            (fun name ->
-                let tdef =
-                    name
-                    |> TypeDef.placeholderModule
-                    |> Type
-                Access.Public, tdef)
     keyword "module"
-    >>. moduleModf
+    >>. noModifiers
+        modfs
+        "Modifiers are not valid on aa module"
     >>. tuple2
-        moduleName
+        (genericTypeName TypeDef.placeholderModule)
         moduleBody
+    <?> "module definition"
     |>> fun (name, (body, members)) ->
         Module
             {| Body = body
