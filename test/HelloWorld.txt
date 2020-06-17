@@ -2,6 +2,6 @@
 use System.Console;
 
 main (args) {
-  "Hello there!" |> System.Console.WriteLine;
+  System.Console.WriteLine("Hello there!");
   0
 }

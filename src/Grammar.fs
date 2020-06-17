@@ -58,7 +58,7 @@ type Name =
     override this.ToString() = this.Identifier.ToString()
 
 type Param =
-    { Name: string
+    { Name: string // TODO: Use string option in order to allow ignored parameters with a _
       Type: TypeName }
 
     override this.ToString () =
@@ -132,7 +132,8 @@ type Expression =
     | FuncCall of
         {| Arguments: Expression list
            Target: Expression |}
-    | FuncComp of Expression * Expression
+    | PrefixOp of string * Expression
+    | InfixOp of Expression * string * Expression
     | IdentifierRef of Identifier
     | IfExpr of If<Expression>
     | InvalidExpr of string

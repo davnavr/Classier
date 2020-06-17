@@ -20,7 +20,6 @@ let private tuple7 p1 p2 p3 p4 p5 p6 p7 =
     tuple6 p1 p2 p3 p4 p5 p6 .>>. p7
     |>> (fun ((a, b, c, d, e, f), g) -> a, b, c, d, e, f, g)
 
-// TODO: Remove these single character parsers if they are only used once
 let comma = skipChar ','
 let gtsign = skipChar '>'
 let lcurlybracket = skipChar '{' <?> "opening bracket"
@@ -239,7 +238,9 @@ let paramTupleList =
     |> many1
     <?> "parameter list"
 
-let expression, private expressionRef = createParserForwardedToRef<Expression, _>()
+let expressionRef = OperatorPrecedenceParser<_,_,_>()
+let expression = expressionRef.ExpressionParser <?> "expression"
+
 let tupleExpr =
     lparen
     |> attempt
@@ -351,11 +352,6 @@ let throwStatement =
     |> attempt
     <?> "throw statement"
 
-// TODO: For parsers that rely on themselves, try to see if this works instead:
-//let ifStatement =
-//    let inner f =
-//        // Call f inside here
-//    inner inner
 let ifStatement, private ifStatementRef = createParserForwardedToRef<If,_>()
 do
     ifStatementRef :=
@@ -466,7 +462,7 @@ do
                         .>> semicolon
                     let rest =
                         match p with
-                        | VarPattern (name, vtype) -> // TODO: Is name needed here. Maybe simplify things by introducing a Statement case that represents a local functon?
+                        | VarPattern (name, vtype) -> // TODO: Is name needed here? Maybe simplify things by introducing a Statement case that represents a local functon?
                             match vtype with
                             | Inferred ->
                                 [
@@ -586,6 +582,11 @@ let private genericNameValidated placeholder =
     genericName
     >>= fun name ->
         tryAddMember (placeholder name) >>% name
+
+let opName: Parser<_, ParserState> =
+    [ '!'; '%'; '&'; '*'; '+'; '-'; '/'; '<'; '='; '<'; '?'; '|'; '~' ]
+    |> anyOf
+    |> many1Chars
 
 let functionBody =
     choiceL
@@ -851,31 +852,42 @@ do
         <?> "module block"
 
 do
-    let expr = OperatorPrecedenceParser<_,_,_>()
-
-    let callExpr target args name =
-        match Identifier.ofString name with
-        | None ->
-            name
-            |> sprintf "A function or method with the name %s is invalid"
-            |> InvalidExpr
-        | Some funcName ->
-            FuncCall
-                {| Arguments = args
-                   Target = MemberAccess(target, funcName) |}
+    let toOp op = op :> Operator<_,_,_>
+    let prefixOp op prec =
+        (op, space, prec, true, fun exp -> PrefixOp (op, exp))
+        |> PrefixOperator<_,_,_>
+        |> toOp
+    let infixOp op prec =
+        (op, space, prec, Associativity.Left, fun e1 e2 -> InfixOp (e1, op, e2))
+        |> InfixOperator<_,_,_>
+        |> toOp
+    let varAssignment target value =
+        VarAssignment
+            {| Target = target
+               Value = value |}
 
     [
-        // TODO: Add numeric operators again.
+        infixOp "|>" 20
+        infixOp ">>" 20
+        infixOp ">>=" 20
+        infixOp "||" 33
+        infixOp "&&" 34
+        infixOp "|" 35
+        infixOp "^" 36
+        infixOp "&" 37
+        infixOp "==" 38
+        infixOp "+" 40
+        infixOp "-" 40
+        infixOp "*" 50
+        infixOp "/" 50
+        prefixOp "-" 60
+        prefixOp "!" 70
 
-        Seq.ofList<Operator<_,_,_>>
-            [
-                InfixOperator<_,_,_>(">>", space, 18, Associativity.Left, fun f g -> FuncComp (f, g))
-                InfixOperator<_,_,_>("|>", space, 20, Associativity.Left, fun args f -> FuncCall {| Arguments = [ args ]; Target = f |})
-                PrefixOperator<_,_,_>("!", space, 32, true, fun exp -> callExpr exp [] "not")
-            ]
+        ("<-", space, 100, Associativity.Right, varAssignment)
+        |> InfixOperator<_,_,_>
+        |> toOp
     ]
-    |> Seq.collect id
-    |> Seq.iter expr.AddOperator
+    |> Seq.iter expressionRef.AddOperator
 
     let strLit =
         let quote = skipChar '\"' <?> "quotation mark"
@@ -996,7 +1008,7 @@ do
                       Negative = isNeg }
                     |> fpType
 
-    expr.TermParser <-
+    let simpleExpression =
         choice
             [
                 strLit
@@ -1087,7 +1099,7 @@ do
                 (fun prev next -> next prev)
                 target
 
-    expressionRef := expr.ExpressionParser <?> "expression"
+    expressionRef.TermParser <- simpleExpression
 
 let compilationUnit: Parser<CompilationUnit, ParserState> =
     let namespaceDecl =
