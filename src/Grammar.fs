@@ -201,6 +201,24 @@ type TypeDef<'Member> =
            ModuleName: Name
            Members: ImmutableSortedSet<'Member> |}
 
+[<RequireQualifiedAccess>]
+type MethodInheritance =
+    | Abstract
+    | Sealed
+
+type MethodImpl =
+    | AbstractOrSealed of MethodInheritance
+    | Override of MethodInheritance option
+    | Virtual
+
+type MethodModifiers =
+    { ImplKind: MethodImpl
+      IsMutator: bool }
+
+    static member Default =
+        { ImplKind = AbstractOrSealed MethodInheritance.Sealed
+          IsMutator = false }
+
 type MemberDef =
     | Ctor of Constructor
     | Function of
@@ -209,6 +227,7 @@ type MemberDef =
     | Method of
         {| Method: Function
            MethodName: Name
+           Modifiers: MethodModifiers
            SelfIdentifier: string option |}
     | Type of TypeDef<Access * MemberDef>
 
@@ -225,6 +244,7 @@ module MemberDef =
                   Parameters = mparams
                   ReturnType = TypeName.Inferred }
                MethodName = name
+               Modifiers = MethodModifiers.Default
                SelfIdentifier = selfid |}
 
     let name mdef =

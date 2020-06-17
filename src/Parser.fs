@@ -105,11 +105,14 @@ let modifiers =
         [
             "abstract"
             "data"
+            "extern"
             "implicit"
             "inheritable"
             "inline"
+            "mutator"
             "override"
             "sealed"
+            "tailrec"
             "virtual"
         ]
         |> Seq.map keyword
@@ -604,7 +607,38 @@ let functionBody =
         "function body"
 
 let functionDef: Parser<unit, ParserState> = fail "func not implemented"
-let methodDef modf =
+let methodDef modfs =
+    let methodModf =
+        validateModifiers
+            modfs
+            (fun prev modf ->
+                match modf with
+                | "abstract" ->
+                    let redundantAbstract = Result.Error "An abstract method cannot also be sealed"
+                    match prev.ImplKind with
+                    | AbstractOrSealed _ -> redundantAbstract
+                    | Override nested ->
+                        match nested with
+                        | None -> Result.Ok { prev with ImplKind = Some MethodInheritance.Abstract |> Override }
+                        | Some _ -> redundantAbstract
+                    | Virtual -> Result.Error "An abstract method already implies that it can be overriden, making the virtual modifier redundant"
+                | "sealed" ->
+                    let badInhType = function
+                        | MethodInheritance.Abstract -> Result.Error "A sealed method cannot also be abstract"
+                        | MethodInheritance.Sealed -> Result.Error "The sealed modifier is redundant, since methods cannot be overriden by default"
+                    match prev.ImplKind with
+                    | AbstractOrSealed inhType -> badInhType inhType
+                    | Override nested ->
+                        match nested with
+                        | None -> Result.Ok { prev with ImplKind = Some MethodInheritance.Sealed |> Override }
+                        | Some _ -> badInhType nested.Value
+                    | Virtual -> Result.Error "Virtual methods cannot be sealed"
+                | "mutator" -> Result.Ok { prev with IsMutator = true }
+                | _ ->
+                    modf
+                    |> sprintf "The modifier %s is not valid on a method"
+                    |> Result.Error)
+            MethodModifiers.Default
     let methodHeader =
         choice
             [
@@ -629,17 +663,19 @@ let methodDef modf =
             |> tryAddMember 
             >>% (selfId, name, mparams)
 
-    tuple3
+    tuple4
+        methodModf
         methodHeader
         (typeAnnotation .>> space)
         functionBody
-    |>> fun ((selfId, name, mparams), retType, body) ->
+    |>> fun (mmodf, (selfId, name, mparams), retType, body) ->
         Method
             {| Method =
                 { Body = body
                   Parameters = mparams
                   ReturnType = retType }
                MethodName = name
+               Modifiers = mmodf
                SelfIdentifier = selfId |}
 let propDef modf = fail "not implemented"
 let memberDefs members modfs =
