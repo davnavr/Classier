@@ -18,7 +18,7 @@ let debugIt p =
         p
         getUserState
     >>= fun (result, state) ->
-        preturn result
+        preturn result // Put a breakpoint here!
 
 let private tuple6 p1 p2 p3 p4 p5 p6 =
     tuple5 p1 p2 p3 p4 p5 .>>. p6
@@ -62,7 +62,13 @@ let space1 =
     choice
         [
             notEmpty space
-            followedBy lparen
+
+            [
+                lparen
+                lcurlybracket
+            ]
+            |> choice
+            |> followedBy
         ]
 
 let keyword word =
@@ -1152,9 +1158,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         [
             accessModifier Access.Internal
             .>>. typeDef
-            >>= (replacePlaceholder >> updateUserState) // TODO: For some reason, the type is not in the final state returned even though it is processed by the validator and added.
+            >>= (replacePlaceholder >> updateUserState)
             |>> ignore
-            |> debugIt
 
             skipString "main"
             |> attempt
