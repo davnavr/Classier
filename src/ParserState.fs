@@ -140,3 +140,10 @@ module ParserState =
                     string mdef
                     |> sprintf "The validator stack was empty while trying to add the member %s"
                     |> fail
+
+        let memberSection p =
+            (newMembers >> pushValidator memberValidator)
+            |> updateUserState
+            >>. p
+            .>> tryPopMembers
+            .>> tryPopValidators

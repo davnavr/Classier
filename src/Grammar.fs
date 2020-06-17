@@ -289,10 +289,16 @@ module TypeDef =
                Body = List.empty
                Inheritance = ClassInheritance.Sealed
                Interfaces = List.empty
-               Members = ImmutableSortedSet.Empty
+               Members = ImmutableSortedSet.Empty // NOTE: These empty sorted sets don't have the correct comparer for members.
                PrimaryCtor = Access.Public, (MemberDef.placeholderCtor List.empty)
                SelfIdentifier = "this"
                SuperClass = None |}
+
+    let placeholderModule name =
+        Module
+            {| Body = List.empty
+               ModuleName = name
+               Members = ImmutableSortedSet.Empty |}
 
 type CompilationUnit =
     { EntryPoint: EntryPoint option

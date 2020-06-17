@@ -208,16 +208,14 @@ let identifierFull =
     <?> "fully qualified name"
 
 let extends =
-    skipString "extends"
-    .>> space1
-    |> attempt
+    keyword "extends"
     >>. identifierFull
     |> opt
 let implements =
-    skipString "implements"
-    .>> space1
-    |> attempt
-    >>. sepBy1 identifierFull (separator comma)
+    keyword "implements"
+    >>. sepBy1
+        identifierFull
+        (separator comma)
     |> optList
     <?> "interface implementations"
 
@@ -606,7 +604,7 @@ let functionBody =
         ]
         "function body"
 
-let functionDef: Parser<unit, ParserState> = fail "func not implemented"
+let functionDef modfs: Parser<_, ParserState> = fail "func not implemented"
 let methodDef modfs =
     let methodModf =
         validateModifiers
@@ -678,20 +676,40 @@ let methodDef modfs =
                Modifiers = mmodf
                SelfIdentifier = selfId |}
 let propDef modf = fail "not implemented"
-let memberDefs members modfs =
-    let defs =
-        members
-        |> Seq.map (fun def -> def modfs .>> space)
-        |> choice
+let memberDef members types =
+    modifiers
+    >>= fun modfs ->
+        let memberDefs =
+            Seq.map
+                (fun def -> def modfs .>> space)
+                members
+        [
+            keyword "def"
+            >>. choice
+                memberDefs
 
-    keyword "def" >>. defs
-let nestedTypes types modfs =
-    types
-    |> Seq.map (fun def ->
-        def modfs
-        |>> Type
-        .>> space)
-    |> choice
+            types
+            |> Seq.map (fun def ->
+                def modfs
+                |>> Type
+                .>> space)
+            |> choice
+        ]
+        |> choice
+let memberBlock members types =
+    blockChoice
+        [
+            statement
+            |> attempt
+            |>> Some
+
+            accessModifier Access.Private
+            .>>. memberDef members types
+            |>> (fun _ -> None)
+        ]
+    |>> List.choose id
+    .>>. (getUserState |>> getMembers)
+    |> memberSection
 
 let interfaceDef modfs =
     keyword "interface"
@@ -781,46 +799,56 @@ let classDef modfs =
                  |> ctor body
                SelfIdentifier = selfid
                SuperClass = sclass |}
-
 do
-    let classMembers =
-        modifiers
-        >>= fun memberModfs ->
-            [
-                memberDefs
-                    [
-                        methodDef
-                        propDef
-                    ]
-
-                nestedTypes
-                    [
-                        classDef
-                        interfaceDef
-                    ]
-            ]
-            |> Seq.map (fun def -> def memberModfs)
-            |> choice
     classBodyRef :=
-        (newMembers >> pushValidator memberValidator)
-        |> updateUserState
-        >>. blockChoice
+        memberBlock
             [
-                statement
-                |> attempt
-                |>> Some
-
-                accessModifier Access.Private
-                .>>. classMembers
-                |>> (fun _ -> None)
+                methodDef
+                propDef
+            ]
+            [
+                classDef
+                interfaceDef
             ]
         <?> "class body"
-        |>> List.choose id
-        .>>. (getUserState |>> getMembers)
-        .>> tryPopMembers
-        .>> tryPopValidators
 
-let moduleDef modfs = fail "module not implemented"
+let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
+let moduleDef modfs =
+    let moduleModf =
+        validateModifiers
+            modfs
+            (fun _ _ -> Result.Error "No modifiers are valid on a module")
+            ()
+    let moduleName =
+        genericNameValidated
+            (fun name ->
+                let tdef =
+                    name
+                    |> TypeDef.placeholderModule
+                    |> Type
+                Access.Public, tdef)
+    keyword "module"
+    >>. moduleModf
+    >>. tuple2
+        moduleName
+        moduleBody
+    |>> fun (name, (body, members)) ->
+        Module
+            {| Body = body
+               ModuleName = name
+               Members = members |}
+do
+    moduleBodyRef :=
+        memberBlock
+            [
+                functionDef
+            ]
+            [
+                classDef
+                interfaceDef
+                moduleDef
+            ]
+        <?> "module block"
 
 do
     let expr = OperatorPrecedenceParser<_,_,_>()
@@ -837,6 +865,8 @@ do
                    Target = MemberAccess(target, funcName) |}
 
     [
+        // TODO: Add numeric operators again.
+
         Seq.ofList<Operator<_,_,_>>
             [
                 InfixOperator<_,_,_>(">>", space, 18, Associativity.Left, fun f g -> FuncComp (f, g))
