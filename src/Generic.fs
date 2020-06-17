@@ -10,14 +10,18 @@ type Generic =
     | GenericArg of TypeName<Generic>
     | GenericParam of GenericParam
 
-    override this.ToString() = string this
+    override this.ToString() =
+        match this with
+        | GenericArg arg -> string arg
+        | GenericParam gparam -> string gparam
 and GenericVariance =
     | NoVariance
     | Covariant
     | Contravariant
-and [<StructuredFormatDisplay("{Name}")>]
-    GenericParam =
+and GenericParam =
     { Name: string
       RequiredInterfaces: FullIdentifier<Generic> list
       RequiredSuperClass: FullIdentifier<Generic> option
       Variance: GenericVariance }
+
+    override this.ToString() = this.Name

@@ -53,18 +53,15 @@ let main args =
                                     cu.Usings |> equal useList)
 
                             testSuccess
-                                "namespace in symbol table"
-                                (fun (_, state) ->
-                                    state.Symbols
-                                    |> GlobalsTable.getTypes expectedNs
-                                    |> Assert.notEmpty)
-
-                            testSuccess
                                 "types in symbol table"
                                 (fun (_, state) ->
                                     state.Symbols
                                     |> GlobalsTable.getTypes expectedNs
-                                    |> Seq.map string
+                                    |> Seq.map
+                                        (fun gtype ->
+                                            gtype.Type
+                                            |> GlobalType.getName
+                                            |> string)
                                     |> isSuperSet defs)
                         ]
                     |> testList sourceName)

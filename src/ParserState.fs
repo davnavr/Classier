@@ -45,6 +45,18 @@ module ParserState =
     let getMembers state =
         List.tryHead state.Members
         |> Option.defaultValue emptyMembers
+    let private addMember (acc, mdef) dup state =
+        match List.tryHead state.Members with
+        | Some members ->
+            members
+            |> SortedSet.add(acc, mdef)
+            |> Option.map
+                (fun next -> Result.Ok { state with Members = next :: state.Members.Tail })
+            |> Option.defaultWith dup
+        | None ->
+            "member"
+            |> errEmptyStack
+            |> Result.Error
 
     let defaultState: ParserState =
         { EntryPoint = None
@@ -62,10 +74,8 @@ module ParserState =
         match state.Validators with
         | [] -> None
         | _ -> Some { state with Validators = state.Validators.Tail }
-    // TODO: Make more detailed error messages for the validators.
-    /// Validates the names of non-nested types or modules.
-    let typeValidator = // TODO: This should also make use of the member stack to add the types.
-        (fun state (_, mdef) ->
+    let typeValidator =
+        (fun state (acc, mdef) ->
             match mdef with
             | Type tdef ->
                 let dupMsg() =
@@ -78,7 +88,12 @@ module ParserState =
 
                 state.Symbols
                 |> GlobalsTable.addType typeSymbol
-                |> Option.map (fun symbols -> Result.Ok { state with Symbols = symbols })
+                |> Option.map
+                    (fun symbols ->
+                        { state with Symbols = symbols }
+                        |> addMember
+                            (acc, mdef)
+                            dupMsg)
                 |> Option.defaultWith dupMsg
             | _ ->
                 mdef
@@ -88,22 +103,14 @@ module ParserState =
         |> Validator
     let memberValidator =
         (fun state (acc, mdef) ->
-            match List.tryHead state.Members with
-            | Some members ->
-                let dupMsg() =
-                    MemberDef.name mdef
-                    |> sprintf "A member with the name %A already exists in this scope"
-                    |> Result.Error
-
-                members
-                |> SortedSet.add(acc, mdef)
-                |> Option.map
-                    (fun next -> Result.Ok { state with Members = next :: state.Members.Tail })
-                |> Option.defaultWith dupMsg
-            | None ->
-                "member"
-                |> errEmptyStack
-                |> Result.Error)
+            let dupMsg() =
+                MemberDef.name mdef
+                |> sprintf "A member with the name %A already exists in this scope"
+                |> Result.Error
+            state
+            |> addMember
+                (acc, mdef)
+                dupMsg)
         |> Validator
 
     let replacePlaceholder mdef state = state // NOTE: Not implemented yet

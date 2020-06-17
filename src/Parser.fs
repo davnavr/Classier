@@ -13,6 +13,13 @@ let private position: Parser<Position, _> = fun stream -> Reply(stream.Position)
 
 let private optList p = opt p |>> Option.defaultValue []
 
+let debugIt p =
+    tuple2
+        p
+        getUserState
+    >>= fun (result, state) ->
+        preturn result
+
 let private tuple6 p1 p2 p3 p4 p5 p6 =
     tuple5 p1 p2 p3 p4 p5 .>>. p6
     |>> (fun ((a, b, c, d, e), f) -> a, b, c, d, e, f)
@@ -1145,8 +1152,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         [
             accessModifier Access.Internal
             .>>. typeDef
-            >>= (replacePlaceholder >> updateUserState)
+            >>= (replacePlaceholder >> updateUserState) // TODO: For some reason, the type is not in the final state returned even though it is processed by the validator and added.
             |>> ignore
+            |> debugIt
 
             skipString "main"
             |> attempt
@@ -1169,9 +1177,9 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>>. useStatements
     .>> definitions
     .>> eof
+    .>>. getUserState
     .>> tryPopMembers
     .>> tryPopValidators
-    .>>. getUserState
     |>> fun ((ns, uses), state) ->
         { EntryPoint = state.EntryPoint
           Namespace = ns
