@@ -203,8 +203,13 @@ type TypeDef<'Member> =
 
 type MemberDef =
     | Ctor of Constructor
-    | Function of FunctionDef
-    | Method of FunctionDef
+    | Function of
+        {| Function: Function
+           FunctionName: Name |}
+    | Method of
+        {| Method: Function
+           MethodName: Name
+           SelfIdentifier: string option |}
     | Type of TypeDef<Access * MemberDef>
 
 module MemberDef =
@@ -213,10 +218,19 @@ module MemberDef =
           Body = List.empty
           Parameters = cparams }
 
+    let placeholderMethod name selfid mparams =
+        Method
+            {| Method =
+                { Body = List.empty
+                  Parameters = mparams
+                  ReturnType = TypeName.Inferred }
+               MethodName = name
+               SelfIdentifier = selfid |}
+
     let name mdef =
         match mdef with
-        | Function fdef
-        | Method fdef -> Some fdef.FuncDef
+        | Function fdef -> Some fdef.FunctionName
+        | Method mdef -> Some mdef.MethodName
         | Type tdef ->
             match tdef with
             | Class cdef -> cdef.ClassName
@@ -234,17 +248,15 @@ module MemberDef =
     let paramSets mdef =
         match mdef with
         | Ctor ctor -> [ ctor.Parameters ]
-        | Function fdef
-        | Method fdef -> fdef.Function.Parameters
+        | Function fdef -> fdef.Function.Parameters
+        | Method mdef -> mdef.Method.Parameters
         | _ -> List.empty
 
     /// Gets the first parameter set of the method or function, or the parameters of the constructor.
     let firstParams mdef =
-        match mdef with
-        | Ctor ctor -> Some ctor.Parameters
-        | Function fdef
-        | Method fdef -> List.tryHead fdef.Function.Parameters
-        | _ -> None
+        mdef
+        |> paramSets
+        |> List.tryHead
         |> Option.defaultValue List.empty
 
 type Member = Access * MemberDef

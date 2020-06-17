@@ -579,6 +579,7 @@ let genericName =
     tuple2
         position
         genericIdentifier
+    .>> space
     |>> fun (pos, id) -> { Identifier = id; Position = pos }
 let private genericNameValidated placeholder =
     genericName
@@ -603,8 +604,58 @@ let functionBody =
         "function body"
 
 let functionDef: Parser<unit, ParserState> = fail "func not implemented"
-let methodDef modf = fail "method not implemented"
+let methodDef modf =
+    let methodHeader =
+        choice
+            [
+                identifierStr
+                |>> Some
+                .>> period
+                <?> "self identifier"
+                |> attempt
+                .>>. genericName
+
+                preturn None .>>. genericName
+            ]
+        .>>. paramTupleList
+        .>> space
+        >>= fun ((selfId, name), mparams) ->
+            let placeholder =
+                MemberDef.placeholderMethod
+                    name
+                    selfId
+                    mparams
+            (Access.Public, placeholder)
+            |> tryAddMember 
+            >>% (selfId, name, mparams)
+
+    tuple3
+        methodHeader
+        (typeAnnotation .>> space)
+        functionBody
+    |>> fun ((selfId, name, mparams), retType, body) ->
+        Method
+            {| Method =
+                { Body = body
+                  Parameters = mparams
+                  ReturnType = retType }
+               MethodName = name
+               SelfIdentifier = selfId |}
 let propDef modf = fail "not implemented"
+let memberDefs members modfs =
+    let defs =
+        members
+        |> Seq.map (fun def -> def modfs .>> space)
+        |> choice
+
+    keyword "def" >>. defs
+let nestedTypes types modfs =
+    types
+    |> Seq.map (fun def ->
+        def modfs
+        |>> Type
+        .>> space)
+    |> choice
 
 let interfaceDef modfs =
     keyword "interface"
@@ -639,7 +690,6 @@ let classDef modfs =
                     |> TypeDef.placeholderClass
                     |> Type
                 Access.Public, tdef)
-        .>> space
     let classCtor =
         let cparams =
             paramTuple
@@ -649,6 +699,7 @@ let classDef modfs =
         accessModifier Access.Private
         .>> space
         .>>. cparams
+        |> attempt
         <?> "primary constructor"
         |>> fun (acc, ctorParams) ->
             fun body baseArgs ->
@@ -659,11 +710,13 @@ let classDef modfs =
                 acc, ctor
     let classBase =
         extends
+        |> attempt
         .>> space
         .>>. optList tupleExpr
         .>> space
     let classSelfId =
         keyword "as"
+        |> attempt
         >>. identifierStr
         .>> space
         |> opt
@@ -698,13 +751,20 @@ do
         modifiers
         >>= fun memberModfs ->
             [
-                methodDef
-                propDef
-                classDef
+                memberDefs
+                    [
+                        methodDef
+                        propDef
+                    ]
+
+                nestedTypes
+                    [
+                        classDef
+                        interfaceDef
+                    ]
             ]
             |> Seq.map (fun def -> def memberModfs)
             |> choice
-
     classBodyRef :=
         (newMembers >> pushValidator memberValidator)
         |> updateUserState
