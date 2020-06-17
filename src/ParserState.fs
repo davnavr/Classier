@@ -64,7 +64,7 @@ module ParserState =
         | _ -> Some { state with Validators = state.Validators.Tail }
     // TODO: Make more detailed error messages for the validators.
     /// Validates the names of non-nested types or modules.
-    let typeValidator =
+    let typeValidator = // TODO: This should also make use of the member stack to add the types.
         (fun state (_, mdef) ->
             match mdef with
             | Type tdef ->
@@ -106,7 +106,7 @@ module ParserState =
                 |> Result.Error)
         |> Validator
 
-    let replacePlaceholder mdef state = invalidOp "not implemented"
+    let replacePlaceholder mdef state = state
 
     [<AutoOpen>]
     module StateManagement =
@@ -136,4 +136,7 @@ module ParserState =
                     match result with
                     | Result.Ok newState -> setUserState newState
                     | Result.Error msg -> fail msg
-                | None -> fail "The validator stack was empty"
+                | None ->
+                    string mdef
+                    |> sprintf "The validator stack was empty while trying to add the member %s"
+                    |> fail

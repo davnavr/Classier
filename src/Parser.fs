@@ -615,6 +615,7 @@ let interfaceDef modfs =
     // .>>. blockChoice
     fail "interface not implemented"
 
+let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
 let classDef modfs =
     let classModf =
         validateModifiers
@@ -648,6 +649,7 @@ let classDef modfs =
         accessModifier Access.Private
         .>> space
         .>>. cparams
+        <?> "primary constructor"
         |>> fun (acc, ctorParams) ->
             fun body baseArgs ->
                 let ctor =
@@ -665,34 +667,8 @@ let classDef modfs =
         >>. identifierStr
         .>> space
         |> opt
+        <?> "self identifier"
         |>> Option.defaultValue "this"
-    let classBody =
-        let classMembers =
-            modifiers
-            >>= fun memberModfs ->
-                [
-                    methodDef
-                    propDef
-                    // TODO: Nested class somehow
-                ]
-                |> Seq.map (fun def -> def memberModfs)
-                |> choice
-        (newMembers >> pushValidator memberValidator)
-        |> updateUserState
-        >>. blockChoice
-            [
-                statement
-                |> attempt
-                |>> Some
-
-                accessModifier Access.Private
-                .>>. classMembers
-                |>> (fun _ -> None)
-            ]
-        |>> List.choose id
-        .>>. (getUserState |>> getMembers)
-        .>> tryPopMembers
-        .>> tryPopValidators
     keyword "class"
     >>. tuple7
         classModf
@@ -702,6 +678,7 @@ let classDef modfs =
         (implements .>> space)
         classSelfId
         classBody
+    <?> "class definition"
     |>> fun (cmodf, name, ctor, (sclass, superCall), ilist, selfid, (body, members)) ->
         Class
             {| ClassName = name
@@ -715,6 +692,37 @@ let classDef modfs =
                  |> ctor body
                SelfIdentifier = selfid
                SuperClass = sclass |}
+
+do
+    let classMembers =
+        modifiers
+        >>= fun memberModfs ->
+            [
+                methodDef
+                propDef
+                classDef
+            ]
+            |> Seq.map (fun def -> def memberModfs)
+            |> choice
+
+    classBodyRef :=
+        (newMembers >> pushValidator memberValidator)
+        |> updateUserState
+        >>. blockChoice
+            [
+                statement
+                |> attempt
+                |>> Some
+
+                accessModifier Access.Private
+                .>>. classMembers
+                |>> (fun _ -> None)
+            ]
+        <?> "class body"
+        |>> List.choose id
+        .>>. (getUserState |>> getMembers)
+        .>> tryPopMembers
+        .>> tryPopValidators
 
 let moduleDef modfs = fail "module not implemented"
 
@@ -999,7 +1007,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         [
             accessModifier Access.Internal
             .>>. typeDef
-            //>>= (replacePlaceholder >> updateUserState) // TODO: Should instead be replacing the one in the globals table.
+            >>= (replacePlaceholder >> updateUserState)
             |>> ignore
 
             skipString "main"
@@ -1015,7 +1023,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> space
         |> many1
 
-    updateUserState newMembers
+    (newMembers >> pushValidator typeValidator)
+    |> updateUserState
     >>. space
     >>. namespaceDecl
     .>> space
@@ -1023,6 +1032,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>> definitions
     .>> eof
     .>> tryPopMembers
+    .>> tryPopValidators
     .>>. getUserState
     |>> fun ((ns, uses), state) ->
         { EntryPoint = state.EntryPoint
