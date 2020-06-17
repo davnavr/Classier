@@ -1174,20 +1174,38 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> Seq.map (fun def -> def modfs)
                 |> choice)
+        let entrypoint =
+            let mainDef =
+                position
+                .>> skipString "main"
+                |> attempt
+                .>> space
+            tuple4
+                mainDef
+                (paramTuple .>> space)
+                functionBody
+                getUserState
+            <?> "entry point"
+            >>= fun (pos, eparams, body, state) ->
+                match state.EntryPoint with
+                | Some existing ->
+                    existing.Origin
+                    |> string
+                    |> sprintf "An existing entry point was found at %s"
+                    |> fail
+                | None ->
+                    let def =
+                        { Body = body
+                          Origin = pos
+                          Parameters = eparams }
+                    setUserState { state with EntryPoint = Some def }
         [
             accessModifier Access.Internal
             .>>. typeDef
             >>= (replacePlaceholder >> updateUserState)
             |>> ignore
 
-            skipString "main"
-            |> attempt
-            >>. space
-            >>. paramTuple
-            .>> space
-            .>>. functionBody
-            |>> ignore
-            <?> "entry point"
+            entrypoint
         ]
         |> choice
         .>> space

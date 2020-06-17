@@ -172,6 +172,7 @@ type FunctionDef =
 
 type EntryPoint =
     { Body: Statement list
+      Origin: FParsec.Position
       Parameters: Param list }
 
 type ConstructorBase =
