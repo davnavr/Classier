@@ -17,27 +17,32 @@ module Numeric =
     
     type IntegralLit =
         { Base: NumBase
-          Digits: string
-          Negative: bool }
+          Digits: string }
+
+        override this.ToString() =
+            let prefix =
+                match this.Base with
+                | NumBase.Binary -> "0b"
+                | NumBase.Decimal -> String.Empty
+                | NumBase.Hexadecimal -> "0x"
+            sprintf "%s%s"
+                prefix
+                this.Digits
 
     type FPointLit =
         { IntDigits: string
-          FracDigits: string
-          Negative: bool }
+          FracDigits: string }
 
         override this.ToString() =
-            let sign =
-                if this.Negative
-                then "-"
-                else String.Empty
-
-            sprintf "%s%s.%s"
-                sign
+            sprintf "%s.%s"
                 this.IntDigits
                 this.FracDigits
 
+    [<RequireQualifiedAccess>]
     type NumericLit =
+        /// An integral literal of an unknown type.
         | Integral of IntegralLit
+        /// An floating-point literal of an unknown type.
         | FPoint of FPointLit
         | Double of FPointLit
         | Float of FPointLit

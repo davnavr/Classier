@@ -714,8 +714,8 @@ let memberDef members types =
                 members
         [
             keyword "def"
-            >>. choice
-                memberDefs
+            >>. choice memberDefs
+            <?> "member"
 
             types
             |> Seq.map (fun def ->
@@ -952,96 +952,72 @@ do
         <?> "string literal"
 
     let numLit =
-        let digits chars =
-            let digitSep =
-                skipChar '_'
-                <?> "digit separator"
-                |> skipMany
-            let digit = anyOf chars
-
-            attempt digit
-            .>> digitSep
-            .>>. opt digit
-            |>> fun (d1, d2) ->
-                match d2 with
-                | Some two -> sprintf "%c%c" d1 two
-                | None -> d1.ToString()
-            |> many1Strings
+        let numDigits chars =
+            stringsSepBy1
+                (anyOf chars |> many1Chars)
+                (pchar '_' <?> "digit separator" |> many1Chars)
         let decimalChars = [ '0'..'9' ]
-        let hexChars =
+        let decimalDigits = numDigits decimalChars
+        let integralSuffix =
+            choice
+                [
+                    skipStringCI "L" >>% NumericLit.Long
+                    preturn NumericLit.Integral
+                ]
+        let fpointSuffix =
+            choice
+                [
+                    skipStringCI "F" >>% NumericLit.Float
+                    skipStringCI "D" >>% NumericLit.Double
+                    preturn NumericLit.FPoint
+                ]
+        let nonDecimal s nbase digits =
+            skipChar '0'
+            >>. skipStringCI s
+            |> attempt
+            >>. numDigits digits
+            .>>. integralSuffix
+            |>> fun (digits, itype) ->
+                { Base = nbase
+                  Digits = digits.ToUpper() }
+                |> itype
+        choiceL
             [
-                decimalChars
-                [ 'a'..'z' ]
-                [ 'A'..'Z' ]
-            ]
-            |> List.collect id
+                nonDecimal
+                    "b"
+                    NumBase.Binary
+                    [ '0'; '1' ]
+                <?> "binary literal"
 
-        skipChar '-' >>% true <|>% false
-        .>>. choice
-            [
-                skipChar '0'
-                >>. choice
+                [
+                    decimalChars
+                    [ 'a'..'z' ]
+                    [ 'A'..'Z' ]
+                ]
+                |> Seq.collect List.toSeq
+                |> nonDecimal "x" NumBase.Hexadecimal
+                <?> "hexadecimal literal"
+
+                decimalDigits
+                >>= fun idigits ->
                     [
-                        anyOf [ 'b'; 'B' ] >>% ([ '0'; '1' ], NumBase.Binary)
-                        anyOf [ 'x'; 'X' ] >>% (hexChars, NumBase.Hexadecimal)
-                    ]
-                |> attempt
-
-                period >>% (List.empty, NumBase.Decimal)
-
-                preturn (decimalChars, NumBase.Decimal)
-            ]
-        >>= (fun (isNeg, (chars, nbase)) ->
-            let decimalDigits = digits decimalChars
-            let numParser =
-                match chars with
-                | [] ->
-                    decimalDigits
-                    |>> fun fdigits ->
-                        String.Empty, fdigits
-                | _ when chars.Length = 10 ->
-                    let fraction =
                         skipChar '.'
-                        |> attempt
                         >>. decimalDigits
-                        |> opt
-                        |>> Option.defaultValue String.Empty
-                    decimalDigits .>>. fraction
-                | _ ->
-                    digits chars
-                    |>> fun digits ->
-                        digits, String.Empty
-            numParser .>>. preturn (nbase, isNeg))
-        >>= fun ((idigits, fdigits), (nbase, isNeg)) ->
-            let suffixes pairs none =
-                pairs
-                |> Seq.map (fun (c, ntype) -> skipChar c >>% ntype)
-                |> choice
-                <|>% none
-                <?> "numeric suffix"
+                        .>>. fpointSuffix
+                        |>> fun (ddigits, dtype) ->
+                            { IntDigits = idigits
+                              FracDigits = ddigits }
+                            |> dtype
 
-            match fdigits with
-            | "" ->
-                suffixes
-                    [ 'l', Long ]
-                    Integral
-                |>> fun intType ->
-                    { Base = nbase
-                      Digits = idigits
-                      Negative = isNeg }
-                    |> intType
-            | _ ->
-                suffixes
-                    [
-                        'd', Double
-                        'f', Float
+                        integralSuffix
+                        |>> fun itype ->
+                            { Base = NumBase.Decimal
+                              Digits = idigits }
+                            |> itype
                     ]
-                    Double
-                |>> fun fpType ->
-                    { IntDigits = idigits
-                      FracDigits = fdigits
-                      Negative = isNeg }
-                    |> fpType
+                    |> choice
+            ]
+            "numeric literal"
 
     let simpleExpression =
         choice
