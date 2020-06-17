@@ -14,10 +14,11 @@ let private position: Parser<Position, _> = fun stream -> Reply(stream.Position)
 let private optList p = opt p |>> Option.defaultValue []
 
 let debugIt p =
-    tuple2
+    tuple3
         p
         getUserState
-    >>= fun (result, state) ->
+        position
+    >>= fun (result, state, pos) ->
         preturn result // Put a breakpoint here!
 
 let private tuple6 p1 p2 p3 p4 p5 p6 =
@@ -64,8 +65,9 @@ let space1 =
             notEmpty space
 
             [
-                lparen
                 lcurlybracket
+                lparen
+                ltsign
             ]
             |> choice
             |> followedBy
@@ -584,9 +586,10 @@ let genericParams =
     <?> "generic parameters"
 let genericIdentifier: Parser<Identifier, _> =
     identifierStr
-    .>> space
-    .>>. genericParams
+    |> attempt
     .>> space1
+    .>>. genericParams
+    .>> space
     |>> fun (name, gparams) ->
         { Name = name
           Generics = List.map GenericParam gparams }
@@ -755,7 +758,7 @@ let interfaceDef modfs =
                SuperInterfaces = ilist |}
 do
     interfaceMembersRef :=
-        accessModifier Access.Private
+        accessModifier Access.Internal
         >>. memberDef
             [
                 methodDef emptyBody
@@ -763,6 +766,9 @@ do
             [
                 interfaceDef
             ]
+        |> attempt
+        .>> space
+        |> many
         >>. (getUserState |>> getMembers)
         |> memberSection
         |> block
