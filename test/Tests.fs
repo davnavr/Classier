@@ -1,7 +1,6 @@
 ﻿module Classier.NET.Compiler.Tests
 
 open System.Reflection
-open Classier.NET.Compiler.Assert
 open FParsec
 open Fuchu
 open Fuchu.Test
@@ -37,24 +36,31 @@ let main args =
                     let expectedNs = Identifier.ofStrings ns
 
                     parseSource sourceName
-                    |> testsOfResult
+                    |> TestCase.ofResult
                         [
-                            testSuccess
+                            TestCase.psuccess
                                 "correct namespace"
-                                (fun (cu, _) -> equal expectedNs cu.Namespace)
+                                (fun cu _ ->
+                                    Assert.equal
+                                        "namespaces"
+                                        expectedNs
+                                        cu.Namespace)
 
-                            testSuccess
+                            TestCase.psuccess
                                 "correct usings"
-                                (fun (cu, _) ->
+                                (fun cu _ ->
                                     let useList =
                                         usings
                                         |> Seq.map Identifier.ofStrings
                                         |> List.ofSeq
-                                    cu.Usings |> equal useList)
+                                    cu.Usings
+                                    |> Assert.equal
+                                        "usings"
+                                        useList)
 
-                            testSuccess
+                            TestCase.psuccess
                                 "types in symbol table"
-                                (fun (_, state) ->
+                                (fun _ state ->
                                     state.Symbols
                                     |> GlobalsTable.getTypes expectedNs // TODO: Instead of mapping the GlobalsTable to a string seq, map the expected strings into placeholder defs.
                                     |> Seq.map
@@ -62,15 +68,26 @@ let main args =
                                             gtype.Type
                                             |> GlobalType.getName
                                             |> string)
-                                    |> isSuperSet defs)
+                                    |> Assert.isSuperSet defs)
                         ]
                     |> testList sourceName)
             |> testList "success tests"
 
             parseSource "HelloWorld"
-            |> testSuccess
+            |> TestCase.psuccess
                 "valid entry point"
-                (fun (cu, _) -> cu.EntryPoint.IsSome |> isTrue "The entry point is missing")
+                (fun cu _ -> cu.EntryPoint.IsSome |> Assert.isTrue "The entry point is missing")
+
+            parseSource "DuplicateEntryPoint"
+            |> TestCase.pfailure
+                "duplicate entry point"
+                (fun msg err ->
+                    [
+                        Assert.hasSubstring "existing entry point" msg
+                        Assert.equal "line numbers" 9L err.Position.Line
+                        Assert.equal "column numbers" 5L err.Position.Column
+                    ]
+                    |> Assert.list)
         ]
         |> testList "parser tests"
     ]

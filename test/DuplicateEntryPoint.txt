@@ -1,0 +1,11 @@
+
+use java.lang.System;
+
+main (args) {
+  out.println("Greetings.");
+  0
+}
+
+main (args) {
+  -1
+}

@@ -9,7 +9,7 @@ open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.ParserState
 open Classier.NET.Compiler.TypeSystem
 
-let private position: Parser<Position, _> = fun stream -> Reply(stream.Position)
+let private position: Parser<_, ParserState> = fun stream -> Reply(stream.Position)
 
 let private optList p = opt p |>> Option.defaultValue []
 
@@ -1177,28 +1177,32 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         let entrypoint =
             let mainDef =
                 position
+                .>>. getUserState
                 .>> skipString "main"
                 |> attempt
+                >>= fun (pos, state) ->
+                    match state.EntryPoint with
+                    | Some existing ->
+                        existing.Origin
+                        |> string
+                        |> sprintf "An existing entry point was found at %s"
+                        |> fail
+                    | None ->
+                        preturn (pos, state)
                 .>> space
-            tuple4
+            tuple3
                 mainDef
                 (paramTuple .>> space)
                 functionBody
-                getUserState
             <?> "entry point"
-            >>= fun (pos, eparams, body, state) ->
-                match state.EntryPoint with
-                | Some existing ->
-                    existing.Origin
-                    |> string
-                    |> sprintf "An existing entry point was found at %s"
-                    |> fail
-                | None ->
-                    let def =
-                        { Body = body
-                          Origin = pos
-                          Parameters = eparams }
-                    setUserState { state with EntryPoint = Some def }
+            >>= fun ((pos, state), eparams, body) ->
+                { state with
+                    EntryPoint =
+                      { Body = body
+                        Origin = pos
+                        Parameters = eparams }
+                      |> Some }
+                |> setUserState
         [
             accessModifier Access.Internal
             .>>. typeDef
@@ -1209,7 +1213,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         ]
         |> choice
         .>> space
-        |> many1
+        |> many
 
     (newMembers >> pushValidator typeValidator)
     |> updateUserState
