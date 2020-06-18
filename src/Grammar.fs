@@ -60,11 +60,23 @@ type Name =
     { Identifier: Identifier
       Position: FParsec.Position }
 
+    static member OfString str pos =
+        match Identifier.ofString str with
+        | Some id ->
+            { Identifier = id
+              Position = pos }
+            |> Some
+        | None -> None
+
     override this.ToString() = this.Identifier.ToString()
 
 type Param =
     { Name: string // TODO: Use string option in order to allow ignored parameters with a _
       Type: TypeName }
+
+    static member OfName name ptype =
+        { Name = name
+          Type = ptype }
 
     override this.ToString () =
         match this.Type with
@@ -227,6 +239,12 @@ type MethodModifiers =
         { ImplKind = AbstractOrSealed MethodInheritance.Sealed
           IsMutator = false }
 
+type PropertyAccessors =
+    | AutoGetSet
+    | AutoGet
+    | GetSet of Statement list * Statement list
+    | Get of Statement list
+
 type MemberDef =
     | Ctor of Constructor
     | Function of
@@ -237,6 +255,11 @@ type MemberDef =
            MethodName: Name
            Modifiers: MethodModifiers
            SelfIdentifier: string option |}
+    | Property of
+        {| Accessors: PropertyAccessors
+           PropName: Name
+           SelfIdentifier: string option
+           ValueType: TypeName |}
     | Type of TypeDef<Access * MemberDef>
 
 module MemberDef =
@@ -252,6 +275,13 @@ module MemberDef =
                   Parameters = fparams
                   ReturnType = TypeName.Inferred }
                FunctionName = name |}
+
+    let placeholderProp name =
+        Property
+            {| Accessors = AutoGet
+               PropName = name
+               SelfIdentifier = None
+               ValueType = TypeName.Inferred |}
 
     let placeholderMethod name selfid mparams =
         Method

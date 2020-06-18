@@ -27,6 +27,9 @@ let private tuple6 p1 p2 p3 p4 p5 p6 =
 let private tuple7 p1 p2 p3 p4 p5 p6 p7 =
     tuple6 p1 p2 p3 p4 p5 p6 .>>. p7
     |>> (fun ((a, b, c, d, e, f), g) -> a, b, c, d, e, f, g)
+let private tuple8 p1 p2 p3 p4 p5 p6 p7 p8 =
+    tuple7 p1 p2 p3 p4 p5 p6 p7 .>>. p8
+    |>> (fun ((a, b, c, d, e, f, g), h) -> a, b, c, d, e, f, g, h)
 
 let comma = skipChar ','
 let gtsign = skipChar '>'
@@ -118,7 +121,6 @@ let modifiers =
     let modifier =
         [
             "abstract"
-            "data"
             "extern"
             "implicit"
             "inheritable"
@@ -126,7 +128,6 @@ let modifiers =
             "mutator"
             "override"
             "sealed"
-            "tailrec"
             "virtual"
         ]
         |> Seq.map keyword
@@ -632,7 +633,6 @@ let functionBody =
             emptyBody
         ]
         "function body"
-
 let functionDef modfs =
     let funcHeader =
         genericName
@@ -725,7 +725,9 @@ let methodDef body modfs =
                MethodName = name
                Modifiers = mmodf
                SelfIdentifier = selfId |}
-let propDef modf = fail "not implemented"
+
+let propDef body modfs = fail "properties not yet implemented"
+
 let memberDef members types =
     modifiers
     >>= fun modfs ->
@@ -783,6 +785,7 @@ do
         >>. memberDef
             [
                 methodDef emptyBody
+                propDef emptyBody
             ]
             [
                 interfaceDef
@@ -797,6 +800,36 @@ do
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
 let classDef modfs =
+    let dataMembers =
+        keyword "data"
+        >>. position
+        |>> fun pos ->
+            fun values ->
+                let name str pos =
+                    Name.OfString str pos
+                    |> Option.get
+                let selfid = "__this"
+                seq {
+                    Method
+                        {| Method =
+                            { Body = List.empty // TODO: Create a body here.
+                              Parameters = [ [ Param.OfName "obj" TypeName.Inferred ] ]
+                              ReturnType = TypeName.Primitive PrimitiveType.Boolean }
+                           MethodName = name "equals" pos
+                           Modifiers = MethodModifiers.Default
+                           SelfIdentifier = Some selfid |}
+
+                    yield!
+                        Seq.map
+                            (fun (param: Param) ->
+                                Property
+                                    {| Accessors = AutoGet
+                                       PropName = name param.Name pos
+                                       SelfIdentifier = None
+                                       ValueType = param.Type |})
+                            values
+                }
+        |> opt
     let classModf =
         validateModifiers
             modfs
@@ -843,23 +876,40 @@ let classDef modfs =
         |> opt
         <?> "self identifier"
         |>> Option.defaultValue "this"
-    keyword "class"
-    >>. tuple7
-        classModf
-        (genericTypeName TypeDef.placeholderClass)
-        classCtor
-        classBase
-        (implements .>> space)
-        classSelfId
-        classBody
-    <?> "class definition"
-    |>> fun (cmodf, name, ctor, (sclass, superCall), ilist, selfid, (body, members)) ->
+    let def header label body =
+        tuple8
+            header
+            classModf
+            (genericTypeName TypeDef.placeholderClass)
+            classCtor
+            classBase
+            (implements .>> space)
+            classSelfId
+            body
+        <?> label
+    [
+        [
+            semicolon >>% (List.empty, ImmutableSortedSet.Empty)
+            classBody
+        ]
+        |> choice
+        |> def
+            (dataMembers .>> keyword "class")
+            "record definition"
+
+        def
+            (keyword "class" >>% None)
+            "class definition"
+            classBody
+    ]
+    |> choice
+    |>> fun (rmembers, cmodf, name, ctor, (sclass, superCall), ilist, selfid, (body, cmembers)) ->
         Class
             {| ClassName = name
                Body = body
                Inheritance = cmodf
                Interfaces = ilist
-               Members = members
+               Members = cmembers
                PrimaryCtor =
                  superCall
                  |> SuperCall
@@ -871,7 +921,7 @@ do
         memberBlock
             [
                 methodDef functionBody
-                propDef
+                propDef functionBody
             ]
             [
                 classDef
