@@ -14,10 +14,10 @@ and [<RequireQualifiedAccess>]
     | Module
 and [<RequireQualifiedAccess>]
     ExternMember =
-    | Constructor of ImmutableArray<Param>
+    | Constructor of ImmutableArray<ExpParam>
     | Field of Identifier * TypeName
     | Function of
         {| Name: Identifier
-           Parameters: ImmutableArray<Param>
+           Parameters: ImmutableArray<ExpParam>
            ReturnType: TypeName |}
     | NestedType of ExternType

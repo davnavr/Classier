@@ -22,7 +22,7 @@ type PrimitiveType =
     | Double
     | Float
 
-    static member names =
+    static member internal names =
         [
             Boolean, "boolean"
             Null, "null"

@@ -90,6 +90,7 @@ type Param<'Type> =
 
 /// A parameter whose type can be inferred.
 type InfParam = Param<TypeName option>
+type ExpParam = Param<TypeName>
 
 type If<'Expr, 'Stat> =
     { Condition: 'Expr
@@ -183,7 +184,7 @@ type Function<'Body, 'Type> = Function<Expression, 'Body, 'Type>
 type EntryPoint =
     { Body: Statement list
       Origin: Position
-      Parameters: InfParam list }
+      Parameters: ExpParam list }
 
 type ConstructorBase =
     | SelfCall of Expression list
@@ -218,6 +219,7 @@ type TypeDef<'Member> =
            ModuleName: Name
            Members: ImmutableSortedSet<'Member> |}
 
+[<RequireQualifiedAccess>]
 type MethodImpl =
     | Override
     | Sealed
@@ -229,7 +231,7 @@ type MethodModifiers =
       IsMutator: bool }
 
     static member Default =
-        { ImplKind = Sealed
+        { ImplKind = MethodImpl.Sealed
           IsMutator = false }
 
 type PropertyAutoAccessors =
@@ -247,7 +249,9 @@ type AbstractMemberDef =
            PropName: Name
            ValueType: TypeName |}
     | AbMethod of
-        {| Method: Function<unit, TypeName>
+        {| IsMutator: bool
+           IsOverride: bool
+           Method: Function<unit, TypeName>
            MethodName: Name |}
 
 /// A function whose return type can be inferred.

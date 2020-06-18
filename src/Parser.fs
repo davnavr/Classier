@@ -79,6 +79,8 @@ let space1 =
             |> followedBy
         ]
 
+let private separator p = space >>. attempt p .>> space
+
 let keyword word =
     pstring word
     .>> space1
@@ -117,14 +119,19 @@ let typeNameOpt =
             typeName |>> Some
         ]
 
-let typeAnnotation tname = // TODO: Rename to typeAnn.
+let typeAnn tname =
     space
     >>. colon
     |> attempt
     >>. space
     >>. tname
     <?> "type annotation"
-let typeAnnotationOpt = typeAnnotation typeNameOpt
+let typeAnnOpt =
+    typeNameOpt
+    |> typeAnn
+    |> attempt
+    <|>% None
+let typeAnnExp = typeAnn typeName
 
 let modifiers =
     let modifier =
@@ -164,37 +171,37 @@ let modifiers =
                             |> Result.Ok
                     | _ -> state)
                 (Result.Ok ImmutableList.Empty)
-
         match results with
         | Result.Ok resultList -> Reply resultList
         | Result.Error err -> Reply(Error, messageError err))
     <?> "modifiers"
-let private validateModifiers (modfs: seq<string>) validator initial =
+let private validateModifiers modfs validator initial =
     let results =
-        modfs
-        |> Seq.fold
-            (fun prev modifier ->
+        Seq.fold
+            (fun prev modf ->
                 match prev with
                 | Result.Error _ -> prev
                 | Result.Ok prevList ->
-                    match validator prevList modifier with
+                    match validator prevList modf with
                     | Result.Ok result -> Result.Ok result
-                    | _ -> Result.mapError id prev)
+                    | Result.Error msg -> Result.Error (msg, modf))
             (Result.Ok initial)
+            modfs
     match results with
     | Result.Ok resultList -> preturn resultList
-    | Result.Error msg -> fail msg
+    | Result.Error (err, modf) ->
+        match err with
+        | Some msg -> fail msg
+        | None ->
+            modf
+            |> sprintf "The modifier '%s' is not valid here"
+            |> fail
 let private noModifiers modfs msg =
     validateModifiers
         modfs
-        (fun _ _ -> Result.Error msg)
+        (fun _ _ -> Result.Error None)
         ()
-let private errInvalidModf modf t =
-    modf
-    |> sprintf "The modifier %s is not valid on %s" t
-    |> Result.Error
-
-let private separator p = space >>. attempt p .>> space
+let private badModfier str = str |> Some |> Result.Error
 
 let block p =
     lcurlybracket
@@ -222,10 +229,8 @@ let genericArgs =
     <?> "generic arguments"
 
 let identifierStr =
-    let letterOrUnderscore =
-        asciiLetter <|> pchar '_'
-    letterOrUnderscore
-    .>>. manyChars (letterOrUnderscore <|> digit)
+    asciiLetter
+    .>>. manyChars (asciiLetter <|> pchar '_' <|> digit)
     |>> String.Concat
 let identifier =
     identifierStr
@@ -296,11 +301,11 @@ let pattern =
     [
         identifierStr
         .>> space
-        .>>. typeAnnotationOpt
+        .>>. typeAnnOpt
         |>> VarPattern
         <?> "variable pattern"
 
-        typeAnnotationOpt
+        typeAnnOpt
         |> paramTuple
         |>> TuplePattern
         <?> "tuple deconstruction"
@@ -508,9 +513,9 @@ do
                             [
                                 value
 
-                                paramTupleList typeAnnotationOpt
+                                paramTupleList typeAnnOpt
                                 .>> space
-                                .>>. typeAnnotationOpt
+                                .>>. typeAnnOpt
                                 .>> space
                                 .>>. (statementBlock <?> "local function body")
                                 |>> fun ((parameters, retType), body) ->
@@ -643,7 +648,7 @@ let selfId =
     |> attempt
     |> opt
 
-let emptyBody = semicolon >>% None // TODO: Move this to inside functionBody if it is not needed elsewhere.
+let emptyBody: Parser<Statement list option, _> = semicolon >>% None // TODO: Is this needed?
 let functionBody =
     choiceL
         [
@@ -659,167 +664,105 @@ let functionBody =
             .>> semicolon
         ]
         "function body"
-let functionDef modfs =
-    let funcHeader =
-        genericName
-        .>>. paramTupleList
-        .>> space
-        >>= fun (name, fparams) ->
-            let placeholder =
-                MemberDef.placeholderFunc
-                    name
-                    fparams
-            tryAddMember (Access.Public, placeholder) >>% (name, fparams)
-    noModifiers
-        modfs
-        "Modifiers are not valid on a function"
-    >>. tuple3
-        funcHeader
-        (typeAnnotation .>> space)
-        functionBody
-    |>> fun ((name, fparams), retType, body) ->
-        Function
-            {| Function =
-                { Body = body
-                  Parameters = fparams
-                  ReturnType = retType }
-               FunctionName = name |}
-let methodDef body modfs = // TODO: Implement a choice parser that handles parsing a regular method or an abstract method.
+let functionDef modfs = fail "func no impl"
+let methodDef modfs =
     let methodModf =
         validateModifiers
             modfs
-            (fun prev modf ->
+            (fun (prev, isAbstract) modf ->
                 match modf with
                 | "abstract" ->
-                    let redundantAbstract = Result.Error "An abstract method cannot also be sealed"
                     match prev.ImplKind with
-                    | AbstractOrSealed _ -> redundantAbstract
-                    | Override nested ->
-                        match nested with
-                        | None -> Result.Ok { prev with ImplKind = Some MethodInheritance.Abstract |> Override }
-                        | Some _ -> redundantAbstract
-                    | Virtual -> Result.Error "An abstract method already implies that it can be overriden, making the virtual modifier redundant"
+                    | MethodImpl.Sealed
+                    | MethodImpl.SealedOverride ->
+                        badModfier "A 'sealed' method cannot also be 'abstract'"
+                    | MethodImpl.Virtual ->
+                        badModfier "An 'abstract' method implies that it can be overriden, making the 'virtual' modifier redundant"
+                    | _ -> Result.Ok (prev, true)
+                | "mutator" -> Result.Ok ({ prev with IsMutator = true }, isAbstract)
+                | "override" ->
+                    match prev.ImplKind with
+                    | MethodImpl.Sealed ->
+                        Result.Ok ({ prev with ImplKind = MethodImpl.SealedOverride }, false)
+                    | MethodImpl.Virtual ->
+                        badModfier "A 'virtual' method makes the 'override' modifier redundant, since it already can be overriden"
+                    | _ ->
+                        Result.Ok ({ prev with ImplKind = MethodImpl.Override }, false)
                 | "sealed" ->
-                    let badInhType = function
-                        | MethodInheritance.Abstract -> Result.Error "A sealed method cannot also be abstract"
-                        | MethodInheritance.Sealed -> Result.Error "The sealed modifier is redundant, since methods cannot be overriden by default"
                     match prev.ImplKind with
-                    | AbstractOrSealed inhType -> badInhType inhType
-                    | Override nested ->
-                        match nested with
-                        | None -> Result.Ok { prev with ImplKind = Some MethodInheritance.Sealed |> Override }
-                        | Some _ -> badInhType nested.Value
-                    | Virtual -> Result.Error "Virtual methods cannot be sealed"
-                | "mutator" -> Result.Ok { prev with IsMutator = true }
-                | _ -> errInvalidModf modf "methods")
-            MethodModifiers.Default
-    let methodHeader =
-        tuple3
-            selfId
-            genericName
-            paramTupleList
-        |> attempt
-        .>> space
-        >>= fun (selfId, name, mparams) ->
-            let placeholder =
-                MemberDef.placeholderMethod
-                    name
-                    selfId
-                    mparams
-            tryAddMember (Access.Public, placeholder) >>% (selfId, name, mparams)
-    tuple4
-        methodModf
-        methodHeader
-        (typeAnnotation .>> space)
-        body
-    <?> "method definition"
-    |>> fun (mmodf, (selfId, name, mparams), retType, body) ->
-        Method
-            {| Method =
-                { Body = body
-                  Parameters = mparams
-                  ReturnType = retType }
-               MethodName = name
-               Modifiers = mmodf
-               SelfIdentifier = selfId |}
-
-let propDef body modfs = // TODO: Use Statement list option for methodDef, propDef, functionDef, etc. to represent no body for abstract methods and auto properties.
-    let propName =
-        genericName
-        >>= fun name ->
-            (Access.Public, MemberDef.placeholderProp name)
-            |> tryAddMember
-            >>% name
-    let propBody =
-        let setFull =
-            keyword "set"
-            >>. lparen
-            >>. space
-            >>. param
-            .>> space
-            .>> rparen
-            .>> space
-            .>>. body
-            |> opt
-        let setEmpty =
-            keyword "set"
-            .>> semicolon
-            >>% None
-        [
-            keyword "get"
-            >>. choice
-                [
-                    emptyBody
-                    .>> space
-                    .>>. setEmpty
-
-                    body
-                    .>> space
-                    .>>. setFull
-                ]
-            |> block
-
-            lambdaOperator
+                    | MethodImpl.Sealed ->
+                        badModfier "The 'sealed' modifier is redundant, since methods cannot be overriden by default"
+                    | MethodImpl.Virtual ->
+                        badModfier "The method cannot be 'sealed' since it is already 'virtual'"
+                    | _ when isAbstract -> badModfier "An abstract method cannot also be 'sealed'"
+                    | _ ->
+                        Result.Ok ({ prev with ImplKind = MethodImpl.SealedOverride}, false)
+                | "virtual" ->
+                    match prev.ImplKind with
+                    | MethodImpl.Override ->
+                        badModfier "An overriden method cannot be 'virtual'"
+                    | MethodImpl.Sealed
+                    | MethodImpl.SealedOverride ->
+                        badModfier "A sealed method cannot be 'virutal', since it cannot be overriden"
+                    | _ when isAbstract -> badModfier "An abstract method already implies that the method is 'virtual'"
+                    | _ -> Result.Ok ({ prev with ImplKind = MethodImpl.Virtual }, false)
+                | _ -> Result.Error None)
+            (MethodModifiers.Default, false)
+    methodModf
+    >>= fun (mmodf, isAbstract) ->
+        if isAbstract then
+            tuple3
+                genericName
+                (paramTupleList typeAnnExp .>> space)
+                typeAnnExp
             |> attempt
-            >>. space
-            >>. position
-            .>>. expression
-            .>> space
-            .>> semicolon
-            |>> fun (pos, expr) -> Some [ pos, Return expr ], None
-        ]
-        |> choice
-    let propValue =
-        space
-        >>. equalsExpr
-        |> attempt
-        |> opt
-    noModifiers
-        modfs
-        "Modifiers are not valid on a property"
-    >>. tuple5
-        selfId
-        propName
-        (typeAnnotation .>> space)
-        propBody
-        propValue
-    <?> "property definition"
-    |>> fun (selfid, name, ptype, (get, set), pvalue) ->
-        Property
-            {| Accessors =
-                 match get with
-                 | None ->
-                     match set with
-                     | None -> PropertyAccessors.AutoGet
-                     | Some _ -> PropertyAccessors.AutoGetSet
-                 | Some _ ->
-                     match set with
-                     | None -> PropertyAccessors.Get get
-                     | Some (setParam, setBody) -> PropertyAccessors.GetSet(get, setParam, setBody)
-               PropName = name
-               SelfIdentifier = selfid
-               Value = pvalue
-               ValueType = ptype |}
+            >>= fun (name, mparams, retType) ->
+                let memdef =
+                    {| IsMutator = mmodf.IsMutator
+                       IsOverride =
+                         match mmodf.ImplKind with
+                         | MethodImpl.Override -> true
+                         | _ -> false
+                       Method =
+                           { Body = ()
+                             Parameters = mparams
+                             ReturnType = retType }
+                           : Function<unit, TypeName>
+                       MethodName = name |}
+                    |> AbMethod
+                    |> AbstractDef
+                tryAddMember (Access.Public, memdef)
+                >>. space
+                >>. semicolon
+                >>% memdef
+        else
+            tuple3
+                selfId
+                genericName
+                (paramTupleList typeAnnOpt)
+            |> attempt
+            >>= fun (selfId, name, mparams) ->
+                let placeholder =
+                    MemberDef.placeholderMethod
+                        name
+                        selfId
+                        mparams
+                tryAddMember (Access.Public, placeholder)
+                >>. typeAnnOpt
+                .>> space
+                .>>. functionBody
+                |>> fun (retType, body) ->
+                    {| Method =
+                         { Body = body
+                           Parameters = mparams
+                           ReturnType = retType }
+                       MethodName = name
+                       Modifiers = mmodf
+                       SelfIdentifier = selfId |}
+                    |> Method
+
+let propDef modfs = // TODO: Use Statement list option for methodDef, propDef, functionDef, etc. to represent no body for abstract methods and auto properties.
+    fail "prop no impl"
 
 let memberDef members types =
     modifiers
@@ -876,11 +819,10 @@ do
     interfaceMembersRef :=
         accessModifier Access.Internal
         >>. memberDef
-            ([
-                methodDef // TODO: Instead of empty body, use (fail "message"), since the methodDef and propDef parsers should be checking for empty bodies.
-                propDef
+            [
+                // TODO: Instead of empty body, use (fail "message"), since the methodDef and propDef parsers should be checking for empty bodies.
+                (fun _ -> fail "interface member no impl")
             ]
-            |> Seq.map (fun def -> def emptyBody))
             [
                 interfaceDef
             ]
@@ -902,27 +844,35 @@ let classDef modfs =
                 let name str pos =
                     Name.OfString str pos
                     |> Option.get
-                let selfid = "__this"
+                let selfid = "this__"
                 seq {
                     Method
                         {| Method =
-                            { Body = None // TODO: Create a body here.
+                            { Body = List.empty // TODO: Create a body here.
                               Parameters = [ [ "obj" |> Some |> Param<_>.Create None ] ]
-                              ReturnType = TypeName.Primitive PrimitiveType.Boolean }
+                              ReturnType =
+                                PrimitiveType.Boolean
+                                |> TypeName.Primitive
+                                |> Some }
                            MethodName = name "equals" pos
                            Modifiers = MethodModifiers.Default
                            SelfIdentifier = Some selfid |}
 
                     yield!
-                        Seq.map
-                            (fun (param: Param) ->
-                                Property
-                                    {| Accessors = AutoGet // TODO: Should be a get with a body.
-                                       PropName = name param.Name pos
+                        values
+                        |> Seq.map
+                            (fun (param: InfParam) ->
+                                match param.Name with
+                                | None -> None
+                                | Some pname ->
+                                    {| Accessors = Auto AutoGet // TODO: Should be a get with a body.
+                                       PropName = name pname pos
                                        SelfIdentifier = None
                                        Value = None
-                                       ValueType = param.Type |})
-                            values
+                                       ValueType = param.Type |}
+                                    |> Property
+                                    |> Some)
+                        |> Seq.choose id
                 }
                 |> Seq.map (fun mdef -> Access.Public, mdef)
         |> opt
@@ -932,17 +882,17 @@ let classDef modfs =
             (fun inheritKind modf ->
                 match (inheritKind, modf) with
                 | (MustInherit, "inheritable")
-                | (CanInherit, "abstract") -> Result.Error "An abstract class already implies that it is inheritable"
+                | (CanInherit, "abstract") ->
+                    badModfier "An abstract class already implies that it is 'inheritable'"
                 | (_, "inheritable") -> Result.Ok CanInherit
                 | (_, "abstract") -> Result.Ok MustInherit
-                | _ -> errInvalidModf modf "classes")
-            (Sealed)
+                | _ -> Result.Error None)
+            Sealed
     let classCtor =
         let cparams =
-            paramTuple
+            paramTuple typeAnnOpt
             .>> space
             |> optList
-
         accessModifier Access.Private
         .>> space
         .>>. cparams
@@ -1017,13 +967,11 @@ let classDef modfs =
                SelfIdentifier = selfid
                SuperClass = sclass |}
 do
-    
-
     classBodyRef :=
         memberBlock
             [
-                methodDef functionBody
-                propDef functionBody
+                methodDef
+                propDef
             ]
             [
                 classDef
@@ -1197,7 +1145,7 @@ do
             [
                 strLit
 
-                paramTuple
+                paramTuple typeAnnOpt
                 .>> space
                 .>> lambdaOperator
                 |> attempt
@@ -1208,7 +1156,7 @@ do
                 |>> fun ((parameters, pos), retVal) ->
                     { Body = [ pos, Return retVal ]
                       Parameters = [ parameters ]
-                      ReturnType = Inferred }
+                      ReturnType = None }
                     |> AnonFunc
 
                 tupleExpr
@@ -1343,15 +1291,20 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                     | None ->
                         preturn (pos, state)
                 .>> space
+            let mainParams =
+                typeName
+                |> typeAnn
+                |> paramTuple
+                .>> space
             tuple3
                 mainDef
-                (paramTuple .>> space)
+                mainParams
                 functionBody
             <?> "entry point"
             >>= fun ((pos, state), eparams, body) ->
                 { state with
                     EntryPoint =
-                      { Body = body |> Option.get // TODO: FunctionBody should return a Statement list.
+                      { Body = body
                         Origin = pos
                         Parameters = eparams }
                       |> Some }
