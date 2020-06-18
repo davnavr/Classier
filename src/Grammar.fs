@@ -243,7 +243,7 @@ type MethodModifiers =
 type PropertyAccessors =
     | AutoGetSet
     | AutoGet
-    | GetSet of Statement list * Statement list
+    | GetSet of Statement list * Param * Statement list
     | Get of Statement list
 
 type MemberDef =
@@ -260,21 +260,23 @@ type MemberDef =
         {| Accessors: PropertyAccessors
            PropName: Name
            SelfIdentifier: string option
+           Value: Expression option
            ValueType: TypeName |}
     | Type of TypeDef<Access * MemberDef>
 
 module MemberDef =
     let name mdef =
         match mdef with
+        | Ctor _ -> None
         | Function fdef -> Some fdef.FunctionName
         | Method mdef -> Some mdef.MethodName
+        | Property pdef -> Some pdef.PropName
         | Type tdef ->
             match tdef with
             | Class cdef -> cdef.ClassName
             | Interface idef -> idef.InterfaceName
             | Module mdef -> mdef.ModuleName
             |> Some
-        | _ -> None
 
     let identifier mdef =
         Option.map
@@ -334,6 +336,7 @@ module MemberDef =
             {| Accessors = AutoGet
                PropName = name
                SelfIdentifier = None
+               Value = None
                ValueType = TypeName.Inferred |}
 
     let placeholderMethod name selfid mparams =

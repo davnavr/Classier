@@ -1,0 +1,16 @@
+
+public class PropertyTest {
+    var _test;
+
+    public def name: String {
+        get {
+            _test
+        }
+
+        set(value) {
+            _test <- value;
+        }
+    }
+
+    public def myAutoProperty { get; set; } = "Hello"
+}

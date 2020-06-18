@@ -31,6 +31,7 @@ let private tuple8 p1 p2 p3 p4 p5 p6 p7 p8 =
     tuple7 p1 p2 p3 p4 p5 p6 p7 .>>. p8
     |>> (fun ((a, b, c, d, e, f, g), h) -> a, b, c, d, e, f, g, h)
 
+let colon = skipChar ':'
 let comma = skipChar ','
 let gtsign = skipChar '>'
 let lcurlybracket = skipChar '{' <?> "opening bracket"
@@ -68,9 +69,11 @@ let space1 =
             notEmpty space
 
             [
+                colon
                 lcurlybracket
                 lparen
                 ltsign
+                semicolon
             ]
             |> choice
             |> followedBy
@@ -109,7 +112,7 @@ let accessModifier lowestAccess =
 let typeName, private typeNameRef = createParserForwardedToRef<TypeName,_>()
 let typeAnnotation =
     space
-    >>. skipChar ':'
+    >>. colon
     |> attempt
     >>. space
     >>. typeName
@@ -180,6 +183,10 @@ let private noModifiers modfs msg =
         modfs
         (fun _ _ -> Result.Error msg)
         ()
+let private errInvalidModf modf t =
+    modf
+    |> sprintf "The modifier %s is not valid on %s" t
+    |> Result.Error
 
 let private separator p = space >>. attempt p .>> space
 
@@ -239,14 +246,14 @@ let implements =
     |> optList
     <?> "interface implementations"
 
+let param =
+    identifierStr
+    .>>. typeAnnotation
+    <?> "parameter"
+    |>> fun (name, ptype) ->
+        { Name = name
+          Type = ptype }
 let paramTuple =
-    let param =
-        identifierStr
-        .>>. typeAnnotation
-        <?> "parameter"
-        |>> fun (name, ptype) ->
-            { Name = name
-              Type = ptype }
     lparen
     |> attempt
     .>> space
@@ -261,6 +268,11 @@ let paramTupleList =
 
 let expressionRef = OperatorPrecedenceParser<_,_,_>()
 let expression = expressionRef.ExpressionParser <?> "expression"
+let equalsExpr =
+    skipChar '='
+    |> attempt
+    >>. space
+    >>. expression
 
 let tupleExpr =
     lparen
@@ -450,11 +462,6 @@ do
             | None -> paramsType
 
 do
-    let equalsExpr =
-        skipChar '='
-        |> attempt
-        >>. space
-        >>. expression
     statementRef :=
         choiceL
             [
@@ -588,7 +595,7 @@ let genericParams =
 let genericIdentifier: Parser<Identifier, _> =
     identifierStr
     |> attempt
-    .>> space1
+    .>> space
     .>>. genericParams
     .>> space
     |>> fun (name, gparams) ->
@@ -616,7 +623,16 @@ let opName: Parser<_, ParserState> =
     |> anyOf
     |> many1Chars
 
-let emptyBody = semicolon >>% []
+let selfId = 
+    identifierStr
+    .>> space
+    .>> period
+    .>> space
+    <?> "self identifier"
+    |> attempt
+    |> opt
+
+let emptyBody = semicolon >>% List.empty
 let functionBody =
     choiceL
         [
@@ -685,26 +701,16 @@ let methodDef body modfs =
                         | Some _ -> badInhType nested.Value
                     | Virtual -> Result.Error "Virtual methods cannot be sealed"
                 | "mutator" -> Result.Ok { prev with IsMutator = true }
-                | _ ->
-                    modf
-                    |> sprintf "The modifier %s is not valid on a method"
-                    |> Result.Error)
+                | _ -> errInvalidModf modf "methods")
             MethodModifiers.Default
     let methodHeader =
-        choice
-            [
-                identifierStr
-                |>> Some
-                .>> period
-                <?> "self identifier"
-                |> attempt
-                .>>. genericName
-
-                preturn None .>>. genericName
-            ]
-        .>>. paramTupleList
+        tuple3
+            selfId
+            genericName
+            paramTupleList
+        |> attempt
         .>> space
-        >>= fun ((selfId, name), mparams) ->
+        >>= fun (selfId, name, mparams) ->
             let placeholder =
                 MemberDef.placeholderMethod
                     name
@@ -726,7 +732,74 @@ let methodDef body modfs =
                Modifiers = mmodf
                SelfIdentifier = selfId |}
 
-let propDef body modfs = fail "properties not yet implemented"
+let propDef body modfs = // TODO: Use Statement list option for methodDef, propDef, functionDef, etc. to represent no body for abstract methods and auto properties.
+    let propName =
+        genericName
+        >>= fun name ->
+            (Access.Public, MemberDef.placeholderProp name)
+            |> tryAddMember
+            >>% name
+    let propBody =
+        let setFull =
+            keyword "set"
+            >>. lparen
+            >>. space
+            >>. param
+            .>> space
+            .>> rparen
+            .>> space
+            .>>. body
+            |> opt
+        let setEmpty =
+            keyword "set"
+            .>> semicolon
+            >>% None
+        [
+            keyword "get"
+            >>. choice
+                [
+                    emptyBody
+                    .>> space
+                    .>>. setEmpty
+
+                    body
+                    .>> space
+                    .>>. setFull
+                ]
+        ]
+        |> choice
+        |> block
+    let propValue =
+        space
+        >>. equalsExpr
+        |> attempt
+        |> opt
+    noModifiers
+        modfs
+        "Modifiers are not valid on a property"
+    >>. tuple5
+        selfId
+        propName
+        (typeAnnotation .>> space)
+        propBody
+        propValue
+    <?> "property definition"
+    |>> fun (selfid, name, ptype, (get, set), pvalue) ->
+        Property
+            {| Accessors =
+                 match get with
+                 | [] ->
+                     match set with
+                     | None -> PropertyAccessors.AutoGet
+                     | Some _ -> PropertyAccessors.AutoGetSet
+                 | _ ->
+                     match set with
+                     | None -> PropertyAccessors.Get get
+                     | Some (setParam, setBody) -> PropertyAccessors.GetSet(get, setParam, setBody)
+               PropName = name
+               SelfIdentifier = selfid
+               Value = pvalue
+               ValueType = ptype |}
 
 let memberDef members types =
     modifiers
@@ -784,7 +857,7 @@ do
         accessModifier Access.Internal
         >>. memberDef
             [
-                methodDef emptyBody
+                methodDef emptyBody // TODO: Instead of empty body, use (fail "message"), since the methodDef and propDef parsers should be checking for empty bodies.
                 propDef emptyBody
             ]
             [
@@ -826,6 +899,7 @@ let classDef modfs =
                                     {| Accessors = AutoGet
                                        PropName = name param.Name pos
                                        SelfIdentifier = None
+                                       Value = None
                                        ValueType = param.Type |})
                             values
                 }
@@ -840,10 +914,7 @@ let classDef modfs =
                 | (CanInherit, "abstract") -> Result.Error "An abstract class already implies that it is inheritable"
                 | (_, "inheritable") -> Result.Ok CanInherit
                 | (_, "abstract") -> Result.Ok MustInherit
-                | _ ->
-                    modf
-                    |> sprintf "The modifier %s is not valid on a class"
-                    |> Result.Error)
+                | _ -> errInvalidModf modf "classes")
             (Sealed)
     let classCtor =
         let cparams =

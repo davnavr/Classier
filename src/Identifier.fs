@@ -19,7 +19,7 @@ type Identifier<'Generic> =
 [<StructuralComparison>]
 [<StructuralEquality>]
 type FullIdentifier<'Generic> =
-    | FullIdentifier of Identifier<'Generic> list // TODO: Make this an option
+    | FullIdentifier of Identifier<'Generic> list // TODO: Make this an Identifier<'Generic> list option
 
     static member Empty = List.empty<Identifier<'Generic>> |> FullIdentifier
 
