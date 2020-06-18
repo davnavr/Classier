@@ -51,7 +51,6 @@ type TypeName<'Generic> =
         {| ParamType: TypeName<'Generic>
            ReturnType: TypeName<'Generic> |}
     | Identifier of FullIdentifier<'Generic>
-    | Inferred
     | Primitive of PrimitiveType
     | Tuple of TypeName<'Generic> list
     | Union of TypeName<'Generic> list
@@ -60,7 +59,6 @@ type TypeName<'Generic> =
         match this with
         | FuncType f -> sprintf "%s => %s" (string f.ParamType) (string f.ReturnType)
         | Identifier names -> String.Join('.', names)
-        | Inferred -> "_"
         | Primitive p -> p.ToString()
         | Tuple types -> sprintf "(%s)" (String.Join(", ", types))
         | Union options -> String.Join(" | ", options)

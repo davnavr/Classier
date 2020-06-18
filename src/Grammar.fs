@@ -72,19 +72,24 @@ type Name =
 
     override this.ToString() = this.Identifier.ToString()
 
-type Param =
-    { Name: string // TODO: Use string option in order to allow ignored parameters with a _
-      Type: TypeName }
+type Param<'Type> =
+    { Name: string option
+      Type: 'Type }
 
-    static member OfName name ptype =
+    static member Create ptype name =
         { Name = name
           Type = ptype }
 
-    override this.ToString () =
-        match this.Type with
-        | TypeName.Inferred -> String.Empty
-        | _ -> sprintf " : %s" (string this.Type)
-        |> sprintf "%s%s" this.Name
+    override this.ToString() =
+        let name =
+            match this.Name with
+            | None -> "_"
+            | Some pname -> pname
+        this.Type.ToString()
+        |> sprintf "%s%s" name
+
+/// A parameter whose type can be inferred.
+type InfParam = Param<TypeName option>
 
 type If<'Expr, 'Stat> =
     { Condition: 'Expr
@@ -94,8 +99,8 @@ type If<'Expr, 'Stat> =
 type Pattern<'Expr> =
     | Constant of 'Expr
     | Default
-    | TuplePattern of Param list
-    | VarPattern of string * TypeName
+    | TuplePattern of InfParam list
+    | VarPattern of string * TypeName option
 
 [<RequireQualifiedAccess>]
 type Local<'Expr> =
@@ -129,15 +134,10 @@ type Statement<'Expr> =
 
 type PStatement<'Expr> = Position * Statement<'Expr>
 
-type Function<'Expr> =
-    { Body: PStatement<'Expr> list option
-      Parameters: Param list list
-      ReturnType: TypeName }
-
-    static member empty: Function<'Expr> =
-        { Body = None
-          Parameters = List.empty
-          ReturnType = TypeName.Inferred }
+type Function<'Expr, 'Body, 'Type> =
+    { Body: 'Body
+      Parameters: Param<'Type> list list
+      ReturnType: 'Type }
 
 type If<'Expr> = If<'Expr, PStatement<'Expr>>
 type MatchCase<'Expr> = MatchCase<'Expr, PStatement<'Expr>>
@@ -145,7 +145,7 @@ type Match<'Expr> = Match<'Expr, PStatement<'Expr>>
 type Try<'Expr> = Try<'Expr, PStatement<'Expr>>
 
 type Expression =
-    | AnonFunc of Function<Expression>
+    | AnonFunc of Function<Expression, PStatement<Expression> list, TypeName option>
     | BoolLit of bool
     | CtorCall of
         {| Arguments: Expression list
@@ -157,7 +157,6 @@ type Expression =
     | InfixOp of Expression * string * Expression
     | IdentifierRef of Identifier
     | IfExpr of If<Expression>
-    | InvalidExpr of string
     | MatchExpr of Match<Expression>
     | MemberAccess of Expression * Identifier
     | Nested of Expression
@@ -179,17 +178,12 @@ type Local = Local<Expression>
 type MatchCase = MatchCase<Expression>
 type Match = Match<Expression>
 type Try = Try<Expression>
-type Function = Function<Expression>
-
-type FunctionDef =
-    { Function: Function
-      FuncDef: Name
-      SelfIdentifier: string option }
+type Function<'Body, 'Type> = Function<Expression, 'Body, 'Type>
 
 type EntryPoint =
     { Body: Statement list
       Origin: Position
-      Parameters: Param list }
+      Parameters: InfParam list }
 
 type ConstructorBase =
     | SelfCall of Expression list
@@ -198,7 +192,7 @@ type ConstructorBase =
 type Constructor =
     { BaseCall: ConstructorBase
       Body: Statement list
-      Parameters: Param list }
+      Parameters: InfParam list }
 
 type ClassInheritance =
     | MustInherit
@@ -224,38 +218,49 @@ type TypeDef<'Member> =
            ModuleName: Name
            Members: ImmutableSortedSet<'Member> |}
 
-[<RequireQualifiedAccess>]
-type MethodInheritance =
-    | Abstract
-    | Sealed
-
 type MethodImpl =
-    | AbstractOrSealed of MethodInheritance
-    | Override of MethodInheritance option
+    | Override
+    | Sealed
+    | SealedOverride
     | Virtual
-    // | Inline
 
 type MethodModifiers =
     { ImplKind: MethodImpl
       IsMutator: bool }
 
     static member Default =
-        { ImplKind = AbstractOrSealed MethodInheritance.Sealed
+        { ImplKind = Sealed
           IsMutator = false }
 
-type PropertyAccessors =
+type PropertyAutoAccessors =
     | AutoGetSet
     | AutoGet
-    | GetSet of Statement list option * Param * Statement list option
-    | Get of Statement list option
+
+type PropertyAccessors =
+    | Auto of PropertyAutoAccessors
+    | GetSet of Statement list * InfParam * Statement list
+    | Get of Statement list
+
+type AbstractMemberDef =
+    | AbProperty of
+        {| Accessors: PropertyAutoAccessors
+           PropName: Name
+           ValueType: TypeName |}
+    | AbMethod of
+        {| Method: Function<unit, TypeName>
+           MethodName: Name |}
+
+/// A function whose return type can be inferred.
+type InfFunction = Function<Statement list, TypeName option>
 
 type MemberDef =
+    | AbstractDef of AbstractMemberDef
     | Ctor of Constructor
     | Function of
-        {| Function: Function
+        {| Function: InfFunction
            FunctionName: Name |}
     | Method of
-        {| Method: Function
+        {| Method: InfFunction
            MethodName: Name
            Modifiers: MethodModifiers
            SelfIdentifier: string option |}
@@ -264,12 +269,16 @@ type MemberDef =
            PropName: Name
            SelfIdentifier: string option
            Value: Expression option
-           ValueType: TypeName |}
+           ValueType: TypeName option |}
     | Type of TypeDef<Access * MemberDef>
 
 module MemberDef =
     let name mdef =
         match mdef with
+        | AbstractDef adef ->
+            match adef with
+            | AbProperty pdef -> Some pdef.PropName
+            | AbMethod mdef -> Some mdef.MethodName
         | Ctor _ -> None
         | Function fdef -> Some fdef.FunctionName
         | Method mdef -> Some mdef.MethodName
@@ -289,6 +298,17 @@ module MemberDef =
     /// Gets the parameters of the method, function, or constructor.
     let paramSets mdef =
         match mdef with
+        | AbstractDef adef ->
+            match adef with
+            | AbMethod mdef ->
+                let paramMap mparam =
+                    InfParam.Create
+                        (Some mparam.Type)
+                        mparam.Name
+                List.map
+                    (List.map paramMap)
+                    mdef.Method.Parameters
+            | _ -> List.empty
         | Ctor ctor -> [ ctor.Parameters ]
         | Function fdef -> fdef.Function.Parameters
         | Method mdef -> mdef.Method.Parameters
@@ -310,7 +330,7 @@ module MemberDef =
                         (firstParams m2)
                 match paramCompare with
                 | 0 ->
-                    match (m1, m2) with
+                    match (m1, m2) with // TODO: Check for abstract methods too.
                     | (Function _, Method _) -> -1
                     | (Method _, Function _) -> 1
                     | (_, _) ->
@@ -329,25 +349,25 @@ module MemberDef =
     let placeholderFunc name fparams =
         Function
             {| Function =
-                { Body = None
+                { Body = List.empty
                   Parameters = fparams
-                  ReturnType = TypeName.Inferred }
+                  ReturnType = None }
                FunctionName = name |}
 
     let placeholderProp name =
         Property
-            {| Accessors = AutoGet
+            {| Accessors = Auto AutoGet
                PropName = name
                SelfIdentifier = None
                Value = None
-               ValueType = TypeName.Inferred |}
+               ValueType = None |}
 
     let placeholderMethod name selfid mparams =
         Method
             {| Method =
-                { Body = None
+                { Body = List.empty
                   Parameters = mparams
-                  ReturnType = TypeName.Inferred }
+                  ReturnType = None }
                MethodName = name
                Modifiers = MethodModifiers.Default
                SelfIdentifier = selfid |}
@@ -362,7 +382,7 @@ module TypeDef =
                Body = List.empty
                Inheritance = ClassInheritance.Sealed
                Interfaces = List.empty
-               Members = ImmutableSortedSet.Empty // NOTE: These empty sorted sets don't have the correct comparer for members.
+               Members = MemberDef.emptyMemberSet
                PrimaryCtor = Access.Public, (MemberDef.placeholderCtor List.empty)
                SelfIdentifier = "this"
                SuperClass = None |}
@@ -370,14 +390,14 @@ module TypeDef =
     let placeholderInterface name =
         Interface
             {| InterfaceName = name
-               Members = ImmutableSortedSet.Empty
+               Members = MemberDef.emptyMemberSet
                SuperInterfaces = List.empty |}
 
     let placeholderModule name =
         Module
             {| Body = List.empty
                ModuleName = name
-               Members = ImmutableSortedSet.Empty |}
+               Members = MemberDef.emptyMemberSet |}
 
 type CompilationUnit =
     { EntryPoint: EntryPoint option

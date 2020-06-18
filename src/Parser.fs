@@ -110,15 +110,21 @@ let accessModifier lowestAccess =
         ]
 
 let typeName, private typeNameRef = createParserForwardedToRef<TypeName,_>()
-let typeAnnotation =
+let typeNameOpt =
+    choice
+        [
+            skipChar '_' >>% None
+            typeName |>> Some
+        ]
+
+let typeAnnotation tname = // TODO: Rename to typeAnn.
     space
     >>. colon
     |> attempt
     >>. space
-    >>. typeName
-    |> opt
-    |>> Option.defaultValue Inferred
+    >>. tname
     <?> "type annotation"
+let typeAnnotationOpt = typeAnnotation typeNameOpt
 
 let modifiers =
     let modifier =
@@ -246,22 +252,25 @@ let implements =
     |> optList
     <?> "interface implementations"
 
-let param =
+let param typeAnn =
     identifierStr
-    .>>. typeAnnotation
+    .>>. typeAnn
     <?> "parameter"
     |>> fun (name, ptype) ->
-        { Name = name
+        { Name =
+            match name with
+            | "_" -> None
+            | _ -> Some name
           Type = ptype }
-let paramTuple =
+let paramTuple typeAnn =
     lparen
     |> attempt
     .>> space
-    >>. sepBy param (separator comma)
+    >>. sepBy (param typeAnn) (separator comma)
     .>> rparen
     <?> "parameters"
-let paramTupleList =
-    paramTuple
+let paramTupleList typeAnn =
+    paramTuple typeAnn
     .>> space
     |> many1
     <?> "parameter list"
@@ -287,11 +296,12 @@ let pattern =
     [
         identifierStr
         .>> space
-        .>>. typeAnnotation
+        .>>. typeAnnotationOpt
         |>> VarPattern
         <?> "variable pattern"
 
-        paramTuple
+        typeAnnotationOpt
+        |> paramTuple
         |>> TuplePattern
         <?> "tuple deconstruction"
     ]
@@ -435,8 +445,6 @@ do
 
                 identifierFull |>> Identifier
 
-                skipChar '_' >>% Inferred
-
                 between
                     lparen
                     rparen
@@ -496,26 +504,23 @@ do
                         .>> semicolon
                     let rest =
                         match p with
-                        | VarPattern (name, vtype) -> // TODO: Is name needed here? Maybe simplify things by introducing a Statement case that represents a local functon?
-                            match vtype with
-                            | Inferred ->
-                                [
-                                    value
+                        | VarPattern (_, vtype) ->
+                            [
+                                value
 
-                                    paramTupleList
-                                    .>> space
-                                    .>>. typeAnnotation
-                                    .>> space
-                                    .>>. (statementBlock <?> "local function body")
-                                    |>> fun ((parameters, retType), body) ->
-                                        { Body = Some body 
-                                          Parameters = parameters
-                                          ReturnType = retType }
-                                        |> AnonFunc
-                                ]
-                                |> choice
-                                |> Some
-                            | _ -> None
+                                paramTupleList typeAnnotationOpt
+                                .>> space
+                                .>>. typeAnnotationOpt
+                                .>> space
+                                .>>. (statementBlock <?> "local function body")
+                                |>> fun ((parameters, retType), body) ->
+                                    { Body = body
+                                      Parameters = parameters
+                                      ReturnType = retType }
+                                    |> AnonFunc
+                            ]
+                            |> choice
+                            |> Some
                         | _ -> None
                     rest
                     |> Option.defaultValue value
@@ -642,18 +647,16 @@ let emptyBody = semicolon >>% None // TODO: Move this to inside functionBody if 
 let functionBody =
     choiceL
         [
-            statementBlock |>> Some
+            statementBlock
             
             lambdaOperator
             |> attempt
             >>. space
             >>. position
             .>>. expression
-            |>> fun (pos, e) -> Some [ pos, Return e ]
+            |>> fun (pos, e) -> [ pos, Return e ]
             .>> space
             .>> semicolon
-
-            emptyBody
         ]
         "function body"
 let functionDef modfs =
@@ -681,7 +684,7 @@ let functionDef modfs =
                   Parameters = fparams
                   ReturnType = retType }
                FunctionName = name |}
-let methodDef body modfs =
+let methodDef body modfs = // TODO: Implement a choice parser that handles parsing a regular method or an abstract method.
     let methodModf =
         validateModifiers
             modfs
@@ -853,7 +856,7 @@ let memberBlock members types =
     .>>. (getUserState |>> getMembers)
     |> memberSection
 
-let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
+let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>() // TODO: Supply the "abstract" modifiers to all of the members of an interface except nested types.
 let interfaceDef modfs =
     keyword "interface"
     >>. noModifiers
@@ -904,7 +907,7 @@ let classDef modfs =
                     Method
                         {| Method =
                             { Body = None // TODO: Create a body here.
-                              Parameters = [ [ Param.OfName "obj" TypeName.Inferred ] ]
+                              Parameters = [ [ "obj" |> Some |> Param<_>.Create None ] ]
                               ReturnType = TypeName.Primitive PrimitiveType.Boolean }
                            MethodName = name "equals" pos
                            Modifiers = MethodModifiers.Default
@@ -914,7 +917,7 @@ let classDef modfs =
                         Seq.map
                             (fun (param: Param) ->
                                 Property
-                                    {| Accessors = AutoGet
+                                    {| Accessors = AutoGet // TODO: Should be a get with a body.
                                        PropName = name param.Name pos
                                        SelfIdentifier = None
                                        Value = None
@@ -1203,7 +1206,7 @@ do
                 .>>. expression
                 <?> "anonymous function"
                 |>> fun ((parameters, pos), retVal) ->
-                    { Body = Some [ pos, Return retVal ]
+                    { Body = [ pos, Return retVal ]
                       Parameters = [ parameters ]
                       ReturnType = Inferred }
                     |> AnonFunc
