@@ -319,7 +319,11 @@ let matchCases =
     .>> space
     .>>. choice
         [
-            expression |>> (Return >> List.singleton)
+            tuple2
+                position
+                expression
+            |>> fun (pos, expr) -> [ pos, Return expr ]
+
             statementBlock
         ]
     .>> space
@@ -402,9 +406,10 @@ do
                 >>. choice
                     [
                         space1
-                        >>. ifStatement
+                        >>. position
+                        .>>. ifStatement
                         |> attempt
-                        |>> fun e -> [ IfStatement e ]
+                        |>> fun (pos, e) -> [ pos, IfStatement e ]
 
                         space
                         >>. statementBlock
@@ -463,7 +468,8 @@ do
 
 do
     statementRef :=
-        choiceL
+        position
+        .>>. choiceL
             [
                 semicolon >>% Empty <?> "empty statement"
             
@@ -502,7 +508,7 @@ do
                                     .>> space
                                     .>>. (statementBlock <?> "local function body")
                                     |>> fun ((parameters, retType), body) ->
-                                        { Body = body 
+                                        { Body = Some body 
                                           Parameters = parameters
                                           ReturnType = retType }
                                         |> AnonFunc
@@ -632,17 +638,18 @@ let selfId =
     |> attempt
     |> opt
 
-let emptyBody = semicolon >>% List.empty
+let emptyBody = semicolon >>% None // TODO: Move this to inside functionBody if it is not needed elsewhere.
 let functionBody =
     choiceL
         [
-            statementBlock
+            statementBlock |>> Some
             
             lambdaOperator
             |> attempt
             >>. space
-            >>. expression
-            |>> (Return >> List.singleton)
+            >>. position
+            .>>. expression
+            |>> fun (pos, e) -> Some [ pos, Return e ]
             .>> space
             .>> semicolon
 
@@ -722,6 +729,7 @@ let methodDef body modfs =
         methodHeader
         (typeAnnotation .>> space)
         body
+    <?> "method definition"
     |>> fun (mmodf, (selfId, name, mparams), retType, body) ->
         Method
             {| Method =
@@ -771,10 +779,11 @@ let propDef body modfs = // TODO: Use Statement list option for methodDef, propD
             lambdaOperator
             |> attempt
             >>. space
-            >>. expression
+            >>. position
+            .>>. expression
             .>> space
             .>> semicolon
-            |>> fun expr -> [ Return expr ], None
+            |>> fun (pos, expr) -> Some [ pos, Return expr ], None
         ]
         |> choice
     let propValue =
@@ -796,11 +805,11 @@ let propDef body modfs = // TODO: Use Statement list option for methodDef, propD
         Property
             {| Accessors =
                  match get with
-                 | [] ->
+                 | None ->
                      match set with
                      | None -> PropertyAccessors.AutoGet
                      | Some _ -> PropertyAccessors.AutoGetSet
-                 | _ ->
+                 | Some _ ->
                      match set with
                      | None -> PropertyAccessors.Get get
                      | Some (setParam, setBody) -> PropertyAccessors.GetSet(get, setParam, setBody)
@@ -864,10 +873,11 @@ do
     interfaceMembersRef :=
         accessModifier Access.Internal
         >>. memberDef
-            [
-                methodDef emptyBody // TODO: Instead of empty body, use (fail "message"), since the methodDef and propDef parsers should be checking for empty bodies.
-                propDef emptyBody
+            ([
+                methodDef // TODO: Instead of empty body, use (fail "message"), since the methodDef and propDef parsers should be checking for empty bodies.
+                propDef
             ]
+            |> Seq.map (fun def -> def emptyBody))
             [
                 interfaceDef
             ]
@@ -893,7 +903,7 @@ let classDef modfs =
                 seq {
                     Method
                         {| Method =
-                            { Body = List.empty // TODO: Create a body here.
+                            { Body = None // TODO: Create a body here.
                               Parameters = [ [ Param.OfName "obj" TypeName.Inferred ] ]
                               ReturnType = TypeName.Primitive PrimitiveType.Boolean }
                            MethodName = name "equals" pos
@@ -1004,6 +1014,8 @@ let classDef modfs =
                SelfIdentifier = selfid
                SuperClass = sclass |}
 do
+    
+
     classBodyRef :=
         memberBlock
             [
@@ -1187,10 +1199,11 @@ do
                 .>> lambdaOperator
                 |> attempt
                 .>> space
+                .>>. position
                 .>>. expression
                 <?> "anonymous function"
-                |>> fun (parameters, retVal) ->
-                    { Body = [ Return retVal ]
+                |>> fun ((parameters, pos), retVal) ->
+                    { Body = Some [ pos, Return retVal ]
                       Parameters = [ parameters ]
                       ReturnType = Inferred }
                     |> AnonFunc
@@ -1335,7 +1348,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             >>= fun ((pos, state), eparams, body) ->
                 { state with
                     EntryPoint =
-                      { Body = body
+                      { Body = body |> Option.get // TODO: FunctionBody should return a Statement list.
                         Origin = pos
                         Parameters = eparams }
                       |> Some }

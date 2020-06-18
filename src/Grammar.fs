@@ -4,8 +4,9 @@ open System
 open System.Collections.Generic
 open System.Collections.Immutable
 
-type Identifier = Identifier.Identifier<Generic.Generic>
 type FullIdentifier = Identifier.FullIdentifier<Generic.Generic>
+type Identifier = Identifier.Identifier<Generic.Generic>
+type private Position = FParsec.Position
 type TypeName = TypeSystem.TypeName<Generic.Generic>
 
 [<AutoOpen>]
@@ -59,7 +60,7 @@ type Access =
 
 type Name =
     { Identifier: Identifier
-      Position: FParsec.Position }
+      Position: Position }
 
     static member OfString str pos =
         match Identifier.ofString str with
@@ -116,30 +117,32 @@ type Try<'Expr, 'Stat> =
 
 type Statement<'Expr> =
     | Empty
-    | IfStatement of If<'Expr, Statement<'Expr>>
+    | IfStatement of If<'Expr, Position * Statement<'Expr>>
     /// An expression whose result is evaluated then discarded.
     | IgnoredExpr of 'Expr
     | LocalVar of Local<'Expr>
-    | MatchStatement of Match<'Expr, Statement<'Expr>>
+    | MatchStatement of Match<'Expr, Position * Statement<'Expr>>
     | Return of 'Expr
     | Throw of 'Expr option
-    | TryStatement of Try<'Expr, Statement<'Expr>>
-    | While of 'Expr * Statement<'Expr> list
+    | TryStatement of Try<'Expr, Position * Statement<'Expr>>
+    | While of 'Expr * (Position * Statement<'Expr>) list
+
+type PStatement<'Expr> = Position * Statement<'Expr>
 
 type Function<'Expr> =
-    { Body: Statement<'Expr> list
+    { Body: PStatement<'Expr> list option
       Parameters: Param list list
       ReturnType: TypeName }
 
     static member empty: Function<'Expr> =
-        { Body = List.empty
+        { Body = None
           Parameters = List.empty
           ReturnType = TypeName.Inferred }
 
-type If<'Expr> = If<'Expr, Statement<'Expr>>
-type MatchCase<'Expr> = MatchCase<'Expr, Statement<'Expr>>
-type Match<'Expr> = Match<'Expr, Statement<'Expr>>
-type Try<'Expr> = Try<'Expr, Statement<'Expr>>
+type If<'Expr> = If<'Expr, PStatement<'Expr>>
+type MatchCase<'Expr> = MatchCase<'Expr, PStatement<'Expr>>
+type Match<'Expr> = Match<'Expr, PStatement<'Expr>>
+type Try<'Expr> = Try<'Expr, PStatement<'Expr>>
 
 type Expression =
     | AnonFunc of Function<Expression>
@@ -169,7 +172,7 @@ type Expression =
         {| Target: Expression
            Value: Expression |}
 
-type Statement = Statement<Expression>
+type Statement = PStatement<Expression>
 type If = If<Expression>
 type Pattern = Pattern<Expression>
 type Local = Local<Expression>
@@ -185,7 +188,7 @@ type FunctionDef =
 
 type EntryPoint =
     { Body: Statement list
-      Origin: FParsec.Position
+      Origin: Position
       Parameters: Param list }
 
 type ConstructorBase =
@@ -243,8 +246,8 @@ type MethodModifiers =
 type PropertyAccessors =
     | AutoGetSet
     | AutoGet
-    | GetSet of Statement list * Param * Statement list
-    | Get of Statement list
+    | GetSet of Statement list option * Param * Statement list option
+    | Get of Statement list option
 
 type MemberDef =
     | Ctor of Constructor
@@ -326,7 +329,7 @@ module MemberDef =
     let placeholderFunc name fparams =
         Function
             {| Function =
-                { Body = List.empty
+                { Body = None
                   Parameters = fparams
                   ReturnType = TypeName.Inferred }
                FunctionName = name |}
@@ -342,7 +345,7 @@ module MemberDef =
     let placeholderMethod name selfid mparams =
         Method
             {| Method =
-                { Body = List.empty
+                { Body = None
                   Parameters = mparams
                   ReturnType = TypeName.Inferred }
                MethodName = name
