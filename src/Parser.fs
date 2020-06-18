@@ -829,6 +829,7 @@ let classDef modfs =
                                        ValueType = param.Type |})
                             values
                 }
+                |> Seq.map (fun mdef -> Access.Public, mdef)
         |> opt
     let classModf =
         validateModifiers
@@ -889,7 +890,7 @@ let classDef modfs =
         <?> label
     [
         [
-            semicolon >>% (List.empty, ImmutableSortedSet.Empty)
+            semicolon >>% (List.empty, MemberDef.emptyMemberSet)
             classBody
         ]
         |> choice
@@ -904,16 +905,23 @@ let classDef modfs =
     ]
     |> choice
     |>> fun (rmembers, cmodf, name, ctor, (sclass, superCall), ilist, selfid, (body, cmembers)) ->
+        let (ctorAcc, primaryCtor) =
+            superCall
+            |> SuperCall
+            |> ctor body
         Class
             {| ClassName = name
                Body = body
                Inheritance = cmodf
                Interfaces = ilist
-               Members = cmembers
-               PrimaryCtor =
-                 superCall
-                 |> SuperCall
-                 |> ctor body
+               Members =
+                 match rmembers with
+                 | Some recordMems ->
+                    primaryCtor.Parameters
+                    |> recordMems
+                    |> cmembers.Union
+                 | None -> cmembers
+               PrimaryCtor = ctorAcc, primaryCtor
                SelfIdentifier = selfid
                SuperClass = sclass |}
 do

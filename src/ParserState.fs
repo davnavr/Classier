@@ -19,32 +19,15 @@ module ParserState =
 
     let private errEmptyStack = sprintf "The %s stack was unexpectedly empty"
 
-    let private emptyMembers =
-        { new IComparer<Access * MemberDef> with
-            member _.Compare((_, m1), (_, m2)) =
-                let paramCompare =
-                    compare
-                        (MemberDef.firstParams m1)
-                        (MemberDef.firstParams m2)
-                match paramCompare with
-                | 0 ->
-                    match (m1, m2) with
-                    | (Function _, Method _) -> -1
-                    | (Method _, Function _) -> 1
-                    | (_, _) ->
-                        compare
-                            (MemberDef.identifier m1)
-                            (MemberDef.identifier m2)
-                | _ -> paramCompare }
-        |> ImmutableSortedSet.Empty.WithComparer
-    let newMembers state = { state with Members = emptyMembers :: state.Members }
+    let newMembers state = { state with Members = MemberDef.emptyMemberSet :: state.Members }
     let popMembers state =
         match state.Members with
         | [] -> None
         | _ -> Some { state with Members = state.Members.Tail }
     let getMembers state =
-        List.tryHead state.Members
-        |> Option.defaultValue emptyMembers
+        state.Members
+        |> List.tryHead 
+        |> Option.defaultValue MemberDef.emptyMemberSet
     let private addMember (acc, mdef) dup state =
         match List.tryHead state.Members with
         | Some members ->

@@ -1,6 +1,7 @@
 ﻿module Classier.NET.Compiler.Grammar
 
 open System
+open System.Collections.Generic
 open System.Collections.Immutable
 
 type Identifier = Identifier.Identifier<Generic.Generic>
@@ -263,36 +264,6 @@ type MemberDef =
     | Type of TypeDef<Access * MemberDef>
 
 module MemberDef =
-    let placeholderCtor cparams =
-        { BaseCall = ConstructorBase.SuperCall List.empty
-          Body = List.empty
-          Parameters = cparams }
-
-    let placeholderFunc name fparams =
-        Function
-            {| Function =
-                { Body = List.empty
-                  Parameters = fparams
-                  ReturnType = TypeName.Inferred }
-               FunctionName = name |}
-
-    let placeholderProp name =
-        Property
-            {| Accessors = AutoGet
-               PropName = name
-               SelfIdentifier = None
-               ValueType = TypeName.Inferred |}
-
-    let placeholderMethod name selfid mparams =
-        Method
-            {| Method =
-                { Body = List.empty
-                  Parameters = mparams
-                  ReturnType = TypeName.Inferred }
-               MethodName = name
-               Modifiers = MethodModifiers.Default
-               SelfIdentifier = selfid |}
-
     let name mdef =
         match mdef with
         | Function fdef -> Some fdef.FunctionName
@@ -324,6 +295,56 @@ module MemberDef =
         |> paramSets
         |> List.tryHead
         |> Option.defaultValue List.empty
+
+    let memberComparer =
+        { new System.Collections.Generic.IComparer<Access * MemberDef> with
+            member _.Compare((_, m1), (_, m2)) =
+                let paramCompare =
+                    compare
+                        (firstParams m1)
+                        (firstParams m2)
+                match paramCompare with
+                | 0 ->
+                    match (m1, m2) with
+                    | (Function _, Method _) -> -1
+                    | (Method _, Function _) -> 1
+                    | (_, _) ->
+                        compare
+                            (identifier m1)
+                            (identifier m2)
+                | _ -> paramCompare }
+
+    let emptyMemberSet = ImmutableSortedSet.Empty.WithComparer memberComparer
+
+    let placeholderCtor cparams =
+        { BaseCall = ConstructorBase.SuperCall List.empty
+          Body = List.empty
+          Parameters = cparams }
+
+    let placeholderFunc name fparams =
+        Function
+            {| Function =
+                { Body = List.empty
+                  Parameters = fparams
+                  ReturnType = TypeName.Inferred }
+               FunctionName = name |}
+
+    let placeholderProp name =
+        Property
+            {| Accessors = AutoGet
+               PropName = name
+               SelfIdentifier = None
+               ValueType = TypeName.Inferred |}
+
+    let placeholderMethod name selfid mparams =
+        Method
+            {| Method =
+                { Body = List.empty
+                  Parameters = mparams
+                  ReturnType = TypeName.Inferred }
+               MethodName = name
+               Modifiers = MethodModifiers.Default
+               SelfIdentifier = selfid |}
 
 type Member = Access * MemberDef
 type TypeDef = TypeDef<Member>
