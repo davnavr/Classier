@@ -12,5 +12,7 @@ public class PropertyTest {
         }
     }
 
-    public def myAutoProperty { get; set; } = "Hello"
+    public def autoProperty { get; set; } = "Hello"
+
+    public def fancyGet => _test + "very fancy";
 }

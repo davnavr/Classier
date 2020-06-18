@@ -29,6 +29,7 @@ let main args =
                 "MethodOverloading", "", List.empty, [ "OverloadingExample" ]
                 "MultipleClasses", "test", List.empty, [ "Class1"; "Class2"; "Interface1"; "Class3"; "Class4"; "Class5"; "Class6" ]
                 "MyAbstractClass", "this.is.my.space", [ "java.lang"; "java.util" ], [ "MyAbstractClass" ]
+                "MyException1", "", List.empty, [ "MyException1" ]
                 "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>" ]
                 "MyModule", "blah.blah.blah", [ "system.reflection.Assembly" ], [ "Math" ]
                 "NoAccessModifiers", "My.Awesome.Project", List.empty, [ "MyModule"; "MyModule"; "MyInterface" ]

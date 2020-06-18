@@ -766,9 +766,17 @@ let propDef body modfs = // TODO: Use Statement list option for methodDef, propD
                     .>> space
                     .>>. setFull
                 ]
+            |> block
+
+            lambdaOperator
+            |> attempt
+            >>. space
+            >>. expression
+            .>> space
+            .>> semicolon
+            |>> fun expr -> [ Return expr ], None
         ]
         |> choice
-        |> block
     let propValue =
         space
         >>. equalsExpr
