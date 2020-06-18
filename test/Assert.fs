@@ -78,8 +78,7 @@ let notEmpty col =
 let isSuperSet other col =
     let missing = other |> Seq.except col
     let msg =
-        missing
-        |> String.concat ", "
+        String.Join<_>(", ", missing)
         |> sprintf "The set is missing the following elements: %s"
     missing |> Seq.isEmpty |> isTrue msg
 

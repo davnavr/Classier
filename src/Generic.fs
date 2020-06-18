@@ -25,3 +25,15 @@ and GenericParam =
       Variance: GenericVariance }
 
     override this.ToString() = this.Name
+
+let gparam str =
+    { Name = str
+      RequiredInterfaces = List.empty
+      RequiredSuperClass = None
+      Variance = NoVariance }
+    |> GenericParam
+
+let garg strs =
+    Identifier.ofStrings strs
+    |> TypeName.Identifier
+    |> GenericArg

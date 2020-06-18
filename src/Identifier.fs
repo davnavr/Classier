@@ -19,9 +19,13 @@ type Identifier<'Generic> =
 [<StructuralComparison>]
 [<StructuralEquality>]
 type FullIdentifier<'Generic> =
-    | FullIdentifier of Identifier<'Generic> list
+    | FullIdentifier of Identifier<'Generic> list // TODO: Make this an option
 
     static member Empty = List.empty<Identifier<'Generic>> |> FullIdentifier
+
+    override this.ToString() =
+        let (FullIdentifier ids) = this
+        String.Join('.', ids)
 
 let private nameRegex = "^[A-Za-z_][A-Za-z_0-9]*$" |> Regex
 

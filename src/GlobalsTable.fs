@@ -38,6 +38,8 @@ module GlobalsTable =
 
     let empty = GlobalsTable ImmutableSortedDictionary.Empty
 
+    let getNamespaces (GlobalsTable table) = table.Keys
+
     let getTypes ns (GlobalsTable table) =
         let mutable types = null
         table.TryGetValue(ns, &types) |> ignore
