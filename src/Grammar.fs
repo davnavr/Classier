@@ -234,17 +234,6 @@ type MethodModifiers =
         { ImplKind = MethodImpl.Default
           IsMutator = false }
 
-type AbstractMemberDef =
-    | AbProperty of
-        {| HasSet: bool
-           PropName: Name
-           ValueType: TypeName |}
-    | AbMethod of
-        {| IsMutator: bool
-           IsOverride: bool
-           Method: Function<unit, TypeName>
-           MethodName: Name |}
-
 type PropertyAccessors =
     | AutoGet
     | AutoGetSet
@@ -255,7 +244,15 @@ type PropertyAccessors =
 type InfFunction = Function<Statement list, TypeName option>
 
 type MemberDef =
-    | AbstractDef of AbstractMemberDef
+    | AbMethod of
+        {| IsMutator: bool
+           IsOverride: bool
+           Method: Function<unit, TypeName>
+           MethodName: Name |}
+    | AbProperty of
+        {| HasSet: bool
+           PropName: Name
+           ValueType: TypeName |}
     | Ctor of Constructor
     | Function of
         {| Function: InfFunction
@@ -276,10 +273,8 @@ type MemberDef =
 module MemberDef =
     let name mdef =
         match mdef with
-        | AbstractDef adef ->
-            match adef with
-            | AbProperty pdef -> Some pdef.PropName
-            | AbMethod mdef -> Some mdef.MethodName
+        | AbMethod mdef -> Some mdef.MethodName
+        | AbProperty pdef -> Some pdef.PropName
         | Ctor _ -> None
         | Function fdef -> Some fdef.FunctionName
         | Method mdef -> Some mdef.MethodName
@@ -299,17 +294,14 @@ module MemberDef =
     /// Gets the parameters of the method, function, or constructor.
     let paramSets mdef =
         match mdef with
-        | AbstractDef adef ->
-            match adef with
-            | AbMethod mdef ->
-                let paramMap mparam =
-                    InfParam.Create
-                        (Some mparam.Type)
-                        mparam.Name
-                List.map
-                    (List.map paramMap)
-                    mdef.Method.Parameters
-            | _ -> List.empty
+        | AbMethod mdef ->
+            let paramMap mparam =
+                InfParam.Create
+                    (Some mparam.Type)
+                    mparam.Name
+            List.map
+                (List.map paramMap)
+                mdef.Method.Parameters
         | Ctor ctor -> [ ctor.Parameters ]
         | Function fdef -> fdef.Function.Parameters
         | Method mdef -> mdef.Method.Parameters
@@ -331,8 +323,10 @@ module MemberDef =
                         (firstParams m2)
                 match paramCompare with
                 | 0 ->
-                    match (m1, m2) with // TODO: Check for abstract methods too and add a unit test for it.
+                    match (m1, m2) with
+                    | (Function _, AbMethod _)
                     | (Function _, Method _) -> -1
+                    | (AbMethod _, Function _)
                     | (Method _, Function _) -> 1
                     | (_, _) ->
                         compare

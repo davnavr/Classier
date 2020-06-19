@@ -9,4 +9,9 @@ public class OverloadingExample {
   public def myMethod (one, two) {
     9 + ((10 * 21) / 4)
   }
+
+  class AbstractOverloads {
+    abstract def thing (one: int) : ();
+    abstract def thing (one: int, two: int) : int;
+  }
 }

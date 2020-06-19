@@ -752,7 +752,6 @@ let methodDef modfs =
                            : Function<unit, TypeName>
                        MethodName = name |}
                     |> AbMethod
-                    |> AbstractDef
                 tryAddMember (Access.Public, memdef)
                 >>. space
                 >>. semicolon
@@ -831,7 +830,6 @@ let propDef modfs = // TODO: Use Statement list option for methodDef, propDef, f
                    PropName = name
                    ValueType = vtype |}
                 |> AbProperty
-                |> AbstractDef
         else
             let propBody =
                 let setFull =
@@ -939,7 +937,7 @@ let memberBlock members types =
     .>>. (getUserState |>> getMembers)
     |> memberSection
 
-let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>() // TODO: Supply the "abstract" modifiers to all of the members of an interface except nested types.
+let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
 let interfaceDef modfs =
     keyword "interface"
     >>. noModifiers
@@ -982,7 +980,7 @@ do
         |> block
         <?> "interface body"
 
-let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
+let private classBody, private classBodyRef = createParserForwardedToRef<_, _>() // TODO: Handle secondary constructors, and add the primary constructor to the member set.
 let classDef modfs =
     let dataMembers =
         keyword "data"
@@ -1096,7 +1094,7 @@ let classDef modfs =
     ]
     |> choice
     |>> fun (rmembers, cmodf, name, ctor, (sclass, superCall), ilist, selfid, (body, cmembers)) ->
-        let (ctorAcc, primaryCtor) =
+        let primaryCtor =
             superCall
             |> SuperCall
             |> ctor body
@@ -1108,11 +1106,11 @@ let classDef modfs =
                Members =
                  match rmembers with
                  | Some recordMems ->
-                    primaryCtor.Parameters
+                    (snd primaryCtor).Parameters
                     |> recordMems
                     |> cmembers.Union
                  | None -> cmembers
-               PrimaryCtor = ctorAcc, primaryCtor
+               PrimaryCtor = primaryCtor
                SelfIdentifier = selfid
                SuperClass = sclass |}
 do
