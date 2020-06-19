@@ -234,18 +234,9 @@ type MethodModifiers =
         { ImplKind = MethodImpl.Default
           IsMutator = false }
 
-type PropertyAutoAccessors =
-    | AutoGetSet
-    | AutoGet
-
-type PropertyAccessors =
-    | Auto of PropertyAutoAccessors
-    | GetSet of Statement list * InfParam * Statement list
-    | Get of Statement list
-
 type AbstractMemberDef =
     | AbProperty of
-        {| Accessors: PropertyAutoAccessors
+        {| HasSet: bool
            PropName: Name
            ValueType: TypeName |}
     | AbMethod of
@@ -253,6 +244,12 @@ type AbstractMemberDef =
            IsOverride: bool
            Method: Function<unit, TypeName>
            MethodName: Name |}
+
+type PropertyAccessors =
+    | AutoGet
+    | AutoGetSet
+    | Get of Statement list
+    | GetSet of Statement list * InfParam * Statement list
 
 /// A function whose return type can be inferred.
 type InfFunction = Function<Statement list, TypeName option>
@@ -334,7 +331,7 @@ module MemberDef =
                         (firstParams m2)
                 match paramCompare with
                 | 0 ->
-                    match (m1, m2) with // TODO: Check for abstract methods too.
+                    match (m1, m2) with // TODO: Check for abstract methods too and add a unit test for it.
                     | (Function _, Method _) -> -1
                     | (Method _, Function _) -> 1
                     | (_, _) ->
@@ -345,20 +342,12 @@ module MemberDef =
 
     let emptyMemberSet = ImmutableSortedSet.Empty.WithComparer memberComparer
 
-    let placeholderCtor cparams =
+    let placeholderCtor cparams = // TODO: Remove and just use the code.
         { BaseCall = ConstructorBase.SuperCall List.empty
           Body = List.empty
           Parameters = cparams }
 
-    let placeholderProp name =
-        Property
-            {| Accessors = Auto AutoGet
-               PropName = name
-               SelfIdentifier = None
-               Value = None
-               ValueType = None |}
-
-    let placeholderMethod name selfid mparams =
+    let internal placeholderMethod name selfid mparams =
         Method
             {| Method =
                 { Body = List.empty
@@ -371,7 +360,7 @@ module MemberDef =
 type Member = Access * MemberDef
 type TypeDef = TypeDef<Member>
 
-module TypeDef =
+module internal TypeDef =
     let placeholderClass name =
         Class
             {| ClassName = name

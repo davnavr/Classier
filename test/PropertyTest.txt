@@ -1,8 +1,9 @@
 
 public class PropertyTest {
     var test;
+    var other = 0xBL;
 
-    public def name: String {
+    public def name: System.String {
         get {
             test
         }
@@ -15,4 +16,13 @@ public class PropertyTest {
     public def autoProperty { get; set; } = "Hello"
 
     public def fancyGet => test + "very fancy";
+
+    public def fancyAccessors: long {
+        get => 32L;
+        set(thing) => other <- thing;
+    }
+}
+
+interface IPropertyTest {
+    def property: System.String { get; }
 }

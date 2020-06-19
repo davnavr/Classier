@@ -785,7 +785,124 @@ let methodDef modfs =
     <?> "method definition"
 
 let propDef modfs = // TODO: Use Statement list option for methodDef, propDef, functionDef, etc. to represent no body for abstract methods and auto properties.
-    fail "prop no impl"
+    let propModf =
+        validateModifiers
+            modfs
+            (fun _ modf ->
+                match modf with
+                | "abstract" -> Result.Ok true
+                | _ -> Result.Error None)
+            false
+    let propName =
+        genericName
+        >>= fun name ->
+            let placeholder =
+                {| Accessors = AutoGet
+                   PropName = name
+                   SelfIdentifier = None
+                   Value = None
+                   ValueType = None |}
+                |> Property
+            (Access.Public, placeholder)
+            |> tryAddMember
+            >>% name
+    propModf
+    >>= fun isAbstract ->
+        if isAbstract then
+            let body =
+                keyword "get"
+                >>. semicolon
+                >>. space
+                >>. choice
+                    [
+                        keyword "set"
+                        >>. semicolon
+                        >>% true
+
+                        preturn false
+                    ]
+                |> block
+            tuple3
+                propName
+                (typeAnnExp .>> space)
+                body
+            |>> fun (name, vtype, hasSet) ->
+                {| HasSet = hasSet
+                   PropName = name
+                   ValueType = vtype |}
+                |> AbProperty
+                |> AbstractDef
+        else
+            let propBody =
+                let setFull =
+                    keyword "set"
+                    |> attempt
+                    >>. lparen
+                    >>. space
+                    >>. param typeAnnOpt
+                    .>> space
+                    .>> rparen
+                    .>> space
+                    .>>. functionBody
+                    |> opt
+                    <?> "set accessor"
+                [
+                    keyword "get"
+                    >>. choice
+                        [
+                            semicolon
+                            |> attempt
+                            >>. space
+                            >>. choice
+                                [
+                                    keyword "set"
+                                    |> attempt
+                                    >>. semicolon
+                                    >>% AutoGetSet
+
+                                    preturn AutoGet
+                                ]
+
+                            functionBody
+                            |> attempt
+                            .>> space
+                            .>>. setFull
+                            |>> fun (get, setOpt) ->
+                                match setOpt with
+                                | Some (sparam, set) -> GetSet (get, sparam, set)
+                                | None -> Get get
+                        ]
+                    |> block
+                    <?> "get accessor"
+
+                    lambdaOperator
+                    |> attempt
+                    >>. space
+                    >>. position
+                    .>>. expression
+                    .>> space
+                    .>> semicolon
+                    |>> fun (pos, expr) -> Get [ pos, Return expr ]
+                ]
+                |> choice
+            let propValue =
+                space
+                >>. equalsExpr
+                |> attempt
+                |> opt
+            tuple5
+                selfId
+                propName
+                (typeAnnOpt .>> space)
+                propBody
+                propValue
+            |>> fun (selfid, name, vtype, accessors, pvalue) ->
+                {| Accessors = accessors
+                   PropName = name
+                   SelfIdentifier = selfid
+                   Value = pvalue
+                   ValueType = vtype |}
+                |> Property
 
 let memberDef members types =
     modifiers
@@ -896,7 +1013,7 @@ let classDef modfs =
                                 match param.Name with
                                 | None -> None
                                 | Some pname ->
-                                    {| Accessors = Auto AutoGet // TODO: Should be a get with a body.
+                                    {| Accessors = Get List.empty // TODO: Should be a get with a body.
                                        PropName = name pname pos
                                        SelfIdentifier = None
                                        Value = None

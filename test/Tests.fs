@@ -33,7 +33,7 @@ let main args =
                 "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>" ]
                 "MyModule", "blah.blah.blah", [ "system.reflection.Assembly" ], [ "Math" ]
                 "NoAccessModifiers", "My.Awesome.Project", List.empty, [ "MyModule"; "MyModule"; "MyInterface" ]
-                "PropertyTest", "", List.empty, [ "PropertyTest" ]
+                "PropertyTest", "", List.empty, [ "PropertyTest"; "IPropertyTest" ]
             ]
             |> Seq.map
                 (fun (sourceName, ns, usings, defs) ->
