@@ -70,6 +70,17 @@ let equal name expected actual =
 
 let isTrue msg value = equalM true value msg
 
+let empty col =
+    let msg =
+        let items = Seq.toArray col
+        sprintf
+            "The collection was expected to be empty, but actually contains %i elements:\n%s"
+            items.Length
+            (String.Join<_>(",\n", items))
+    col
+    |> Seq.isEmpty
+    |> isTrue msg
+
 let notEmpty col =
     Seq.isEmpty col
     |> not

@@ -70,6 +70,16 @@ let main args =
                                             |> GlobalType.getName
                                             |> string)
                                     |> Assert.isSuperSet defs)
+
+                            TestCase.psuccess
+                                "empty stacks"
+                                (fun _ state ->
+                                    [
+                                        Assert.empty state.Members
+                                        Assert.empty state.SelfIdentifiers
+                                        Assert.empty state.Validators
+                                    ]
+                                    |> Assert.list)
                         ]
                     |> testList sourceName)
             |> testList "success tests"
