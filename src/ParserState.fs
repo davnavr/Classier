@@ -7,18 +7,39 @@ open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Identifier
 open FParsec
 
-type ParserState<'Validator> =
-    { EntryPoint: EntryPoint option
-      Members: ImmutableSortedSet<Access * MemberDef> list
-      Namespace: FullIdentifier option
-      Params: ImmutableSortedSet<IdentifierStr> list // TODO: Differentiate between parameters and self-identifiers? Move this type into the module and create a union called ParamIdentifier
-      Validators: 'Validator list
-      SelfIdentifiers: IdentifierStr option list
-      Symbols: GlobalsTable }
-
 module ParserState =
-    type Validator = Validator of (ParserState<Validator> -> Access * MemberDef -> Result<ParserState<Validator>, string>)
-    type ParserState = ParserState<Validator>
+    [<CustomComparison>]
+    [<CustomEquality>]
+    type ParamIdentifier =
+        | ParamIdentifier of IdentifierStr
+        | SelfIdentifier of IdentifierStr
+
+        member private this.Identifier =
+            match this with
+            | ParamIdentifier id
+            | SelfIdentifier id -> id
+
+        override this.Equals obj =
+            match obj with
+            | :? ParamIdentifier as other ->
+                this.Identifier = other.Identifier
+            | _ -> false
+
+        override this.GetHashCode() = this.Identifier.GetHashCode()
+
+        interface System.IComparable with
+            member this.CompareTo obj =
+                let other = obj :?> ParamIdentifier
+                compare this.Identifier other.Identifier
+
+    type ParserState =
+        { EntryPoint: EntryPoint option
+          Members: ImmutableSortedSet<Access * MemberDef> list
+          Namespace: FullIdentifier option
+          Params: ImmutableSortedSet<ParamIdentifier> list
+          Validators: Validator list
+          Symbols: GlobalsTable }
+    and Validator = Validator of (ParserState -> Access * MemberDef -> Result<ParserState, string>)
 
     let private errEmptyStack = sprintf "The %s stack was unexpectedly empty"
 
@@ -50,7 +71,6 @@ module ParserState =
           Namespace = None
           Params = List.empty
           Validators = List.empty
-          SelfIdentifiers = List.empty
           Symbols = GlobalsTable.empty }
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
@@ -103,8 +123,6 @@ module ParserState =
 
     let replacePlaceholder mdef state = state // NOTE: Not implemented yet.
 
-    let pushSelfId selfid state = { state with SelfIdentifiers = selfid :: state.SelfIdentifiers }
-
     let newParams state = { state with Params = ImmutableSortedSet.Empty :: state.Params }
 
     [<AutoOpen>]
@@ -148,48 +166,12 @@ module ParserState =
             .>> tryPopMembers
             .>> tryPopValidators
 
-        // TODO: Create common functions for matching stacks.
-        let trySelfId: Parser<_, ParserState> =
-            getUserState
-            >>= fun state ->
-                state.SelfIdentifiers
-                |> List.tryHead
-                |> Option.flatten
-                |> Option.map preturn
-                |> Option.defaultValue ("self-identifier" |> errEmptyStack |> fail)
-        let tryPushSelfId selfid =
-            Some selfid
-            |> pushSelfId
-            |> updateUserState
-            >>% selfid
-        let tryPopSelfId: Parser<_, ParserState> =
-            getUserState
-            >>= fun state ->
-                    match state.SelfIdentifiers with
-                    | [] -> "self-identifier" |> errEmptyStack |> fail
-                    | _ -> setUserState { state with SelfIdentifiers = state.SelfIdentifiers.Tail }
-        let tryReplaceSelfId selfid =
-            getUserState
-            >>= fun state ->
-                state.SelfIdentifiers
-                |> List.tryHead
-                |> Option.map
-                    (fun current ->
-                        match current with
-                        | Some existing ->
-                            string existing
-                            |> sprintf "Cannot replace existing self-identifier '%s'"
-                            |> fail
-                        | None ->
-                            setUserState { state with SelfIdentifiers = Some selfid :: state.SelfIdentifiers.Tail })
-                |> Option.defaultValue ("self-identifier" |> errEmptyStack |> fail)
-
-        let tryPushParam param =
+        let tryPushParam idtype (param: IdentifierStr) =
             getUserState
             >>= fun state ->
                 match List.tryHead state.Params with
                 | Some paramSet ->
-                    match SortedSet.add param paramSet with
+                    match SortedSet.add (idtype param) paramSet with
                     | Some newSet ->
                         { state with Params = newSet :: state.Params.Tail }
                         |> setUserState

@@ -257,7 +257,7 @@ let implements =
     |> optList
     <?> "interface implementations"
 
-let paramIdentifier = identifierStr >>= tryPushParam
+let paramIdentifier = identifierStr >>= tryPushParam ParamIdentifier
 let param typeAnn =
     paramIdentifier
     .>>. typeAnn
@@ -634,8 +634,9 @@ let opName: Parser<_, ParserState> =
     |> anyOf
     |> many1Chars
 
-let selfId = 
-    paramIdentifier
+let selfIdStr = identifierStr >>= tryPushParam SelfIdentifier
+let selfId =
+    selfIdStr
     .>> space
     .>> period
     .>> space
@@ -644,7 +645,7 @@ let selfId =
     |> opt
 let selfIdAs =
     keyword "as"
-    >>. paramIdentifier
+    >>. selfIdStr
     .>> space
     <?> "self identifier"
     |> opt
@@ -816,7 +817,7 @@ let methodDef modfs =
                 let placeholder =
                     MemberDef.placeholderMethod
                         name
-                        selfId
+                        (selfId)
                         mparams
                 tryAddMember (Access.Public, placeholder)
                 >>. typeAnnOpt
@@ -1542,7 +1543,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> space
         |> many
 
-    (newMembers >> pushValidator typeValidator >> pushSelfId None >> newParams)
+    (newMembers >> pushValidator typeValidator >> newParams)
     |> updateUserState
     >>. space
     >>. namespaceDecl
@@ -1553,7 +1554,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>>. getUserState
     .>> tryPopMembers
     .>> tryPopValidators
-    .>> tryPopSelfId
     .>> tryPopParams
     |>> fun ((ns, uses), state) ->
         { EntryPoint = state.EntryPoint

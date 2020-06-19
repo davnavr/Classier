@@ -77,7 +77,6 @@ let main args =
                                     [
                                         Assert.empty state.Members
                                         Assert.empty state.Params
-                                        Assert.empty state.SelfIdentifiers
                                         Assert.empty state.Validators
                                     ]
                                     |> Assert.list)
