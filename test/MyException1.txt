@@ -1,5 +1,5 @@
 
-public class MyException1 extends System.Exception {
+public inheritable class MyException1 extends System.Exception {
     let myField = throw "test" /* please work */;
 
     public def doSomething () {

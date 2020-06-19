@@ -117,7 +117,7 @@ module ParserState =
                 popValidator
                 (errEmptyStack "validator")
 
-        let tryAddMember mdef =
+        let tryAddMember mdef = // TODO: preturn the mdef.
             getUserState
             >>= fun state ->
                 match List.tryHead state.Validators with

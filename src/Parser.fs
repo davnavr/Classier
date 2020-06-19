@@ -138,7 +138,6 @@ let modifiers =
         [
             "abstract"
             "extern"
-            "implicit"
             "inheritable"
             "inline"
             "mutator"
@@ -196,7 +195,7 @@ let private validateModifiers modfs validator initial =
             modf
             |> sprintf "The modifier '%s' is not valid here"
             |> fail
-let private noModifiers modfs msg =
+let private noModifiers modfs =
     validateModifiers
         modfs
         (fun _ _ -> Result.Error None)
@@ -663,6 +662,67 @@ let functionBody =
             .>> semicolon
         ]
         "function body"
+
+let ctorDef modfs =
+    let ctorHeader =
+        paramTuple typeAnnOpt
+        .>> space
+        <?> "constructor parameters"
+        >>= fun cparams ->
+            let placeholder =
+                { BaseCall = SuperCall List.empty
+                  Body = List.empty
+                  Parameters = cparams }
+                |> Ctor
+            tryAddMember (Access.Public, placeholder) >>% cparams
+    let ctorSelf =
+        [
+            keyword "as"
+            >>. identifierStr
+            |>> Some
+            .>> space
+            <?> "self identifier"
+
+            preturn None
+        ]
+        |> choice
+    let ctorBody ctorBase =
+        [
+            lambdaOperator
+            |> attempt
+            >>. space
+            >>. ctorBase
+            |>> fun bcall -> bcall, List.empty
+
+            ctorBase <|>% SuperCall List.empty
+            .>>. many (attempt statement .>> space)
+            |> block
+        ]
+        |> choice
+
+    keyword "new"
+    |> attempt
+    >>. noModifiers
+        modfs
+    >>. ctorHeader
+    .>>. ctorSelf
+    >>= fun (cparams, selfid) -> // TODO: Come up with a way to keep track of the current self identifier. This will help with not only ctorDef but also in Expression parsing if a new case called Self is added.
+        [
+            keyword "super" >>% SuperCall
+            keyword "this" >>% SelfCall
+        ]
+        |> choice
+        .>>. tupleExpr
+        |>> (fun (baseCall, baseArgs) -> baseCall baseArgs)
+        <?> "base call"
+        |> ctorBody
+        |>> fun (baseCall, body) ->
+            { BaseCall = baseCall
+              Body = body
+              Parameters = cparams }
+            |> Ctor
+    <?> "constructor definition"
+
 let functionDef modfs =
     let funcHeader =
         genericName
@@ -677,9 +737,7 @@ let functionDef modfs =
                    FunctionName = name |}
                 |> Function
             tryAddMember (Access.Public, placeholder) >>% (name, fparams)
-    noModifiers
-        modfs
-        "Modifiers are not valid on a function"
+    noModifiers modfs
     >>. tuple3
         funcHeader
         (typeAnnOpt .>> space)
@@ -940,9 +998,7 @@ let memberBlock members types =
 let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
 let interfaceDef modfs =
     keyword "interface"
-    >>. noModifiers
-        modfs
-        "Modifiers are not valid on an interface"
+    >>. noModifiers modfs
     >>. tuple3
         (genericTypeName TypeDef.placeholderInterface)
         (implements .>> space)
@@ -1048,7 +1104,7 @@ let classDef modfs =
         |>> fun (acc, ctorParams) ->
             fun body baseArgs ->
                 let ctor =
-                    { BaseCall = baseArgs
+                    { BaseCall = SuperCall baseArgs
                       Body = body
                       Parameters = ctorParams }
                 acc, ctor
@@ -1094,10 +1150,7 @@ let classDef modfs =
     ]
     |> choice
     |>> fun (rmembers, cmodf, name, ctor, (sclass, superCall), ilist, selfid, (body, cmembers)) ->
-        let primaryCtor =
-            superCall
-            |> SuperCall
-            |> ctor body
+        let primaryCtor = ctor body superCall
         Class
             {| ClassName = name
                Body = body
@@ -1117,6 +1170,7 @@ do
     classBodyRef :=
         memberBlock
             [
+                ctorDef
                 methodDef
                 propDef
             ]
@@ -1129,9 +1183,7 @@ do
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
 let moduleDef modfs =
     keyword "module"
-    >>. noModifiers
-        modfs
-        "Modifiers are not valid on aa module"
+    >>. noModifiers modfs
     >>. tuple2
         (genericTypeName TypeDef.placeholderModule)
         moduleBody
@@ -1179,6 +1231,9 @@ do
         infixOp "^" 36
         infixOp "&" 37
         infixOp "==" 38
+        infixOp "!=" 38
+        infixOp ">=" 39
+        infixOp "<=" 39
         infixOp "+" 40
         infixOp "-" 40
         infixOp "*" 50
