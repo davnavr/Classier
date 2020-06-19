@@ -797,10 +797,10 @@ let methodDef modfs =
                          | MethodImpl.Override -> true
                          | _ -> false
                        Method =
-                           { Body = ()
-                             Parameters = mparams
-                             ReturnType = retType }
-                           : Function<unit, TypeName>
+                          { Body = ()
+                            Parameters = mparams
+                            ReturnType = retType }
+                          : Function<unit, TypeName>
                        MethodName = name |}
                     |> AbMethod
                 tryAddMember (Access.Public, memdef)
@@ -833,6 +833,7 @@ let methodDef modfs =
                     |> Method
     .>> tryPopParams
     <?> "method definition"
+    |> attempt
 
 let propDef modfs =
     let propModf =
@@ -955,17 +956,14 @@ let propDef modfs =
                    ValueType = vtype |}
                 |> Property
     <?> "property definition"
+    |> attempt
 
 let memberDef members types =
     modifiers
     >>= fun modfs ->
         let memberDefs =
             Seq.map
-                (fun def ->
-                    modfs
-                    |> def
-                    |> attempt // TODO: Remove, as it stops parser like ctorDef from locking in when it should be known what the parser is.
-                    .>> space)
+                (fun def -> def modfs .>> space)
                 members
         [
             keyword "def"
