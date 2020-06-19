@@ -20,9 +20,9 @@ public module Math {
 
     public data class MyRecord (item1: string, item2: int, item3: Some.Fancy.Item);
 
-    public data class RecordWithMembers (_happy: boolean) {
+    public data class RecordWithMembers (happy: boolean) {
         public def myOtherMember () {
-          return _happy;
+          return happy;
         }
     }
 

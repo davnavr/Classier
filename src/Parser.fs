@@ -663,7 +663,34 @@ let functionBody =
             .>> semicolon
         ]
         "function body"
-let functionDef modfs = fail "func no impl"
+let functionDef modfs =
+    let funcHeader =
+        genericName
+        .>>. paramTupleList typeAnnOpt
+        .>> space
+        >>= fun (name, fparams) ->
+            let placeholder =
+                {| Function =
+                    { Body = List.empty
+                      Parameters = fparams
+                      ReturnType = None }
+                   FunctionName = name |}
+                |> Function
+            tryAddMember (Access.Public, placeholder) >>% (name, fparams)
+    noModifiers
+        modfs
+        "Modifiers are not valid on a function"
+    >>. tuple3
+        funcHeader
+        (typeAnnOpt .>> space)
+        functionBody
+    |>> fun ((name, fparams), retType, body) ->
+        Function
+            {| Function =
+                { Body = body
+                  Parameters = fparams
+                  ReturnType = retType }
+               FunctionName = name |}
 let methodDef modfs =
     let methodModf =
         validateModifiers
@@ -899,8 +926,9 @@ let classDef modfs =
             |> optList
         accessModifier Access.Private
         .>> space
+        |> opt
+        |>> Option.defaultValue Access.Public
         .>>. cparams
-        |> attempt
         <?> "primary constructor"
         |>> fun (acc, ctorParams) ->
             fun body baseArgs ->

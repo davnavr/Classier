@@ -1,18 +1,18 @@
 
 public class PropertyTest {
-    var _test;
+    var test;
 
     public def name: String {
         get {
-            _test
+            test
         }
 
         set(value) {
-            _test <- value;
+            test <- value;
         }
     }
 
     public def autoProperty { get; set; } = "Hello"
 
-    public def fancyGet => _test + "very fancy";
+    public def fancyGet => test + "very fancy";
 }

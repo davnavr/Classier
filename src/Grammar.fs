@@ -350,14 +350,6 @@ module MemberDef =
           Body = List.empty
           Parameters = cparams }
 
-    let placeholderFunc name fparams =
-        Function
-            {| Function =
-                { Body = List.empty
-                  Parameters = fparams
-                  ReturnType = None }
-               FunctionName = name |}
-
     let placeholderProp name =
         Property
             {| Accessors = Auto AutoGet
