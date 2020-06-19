@@ -19,7 +19,7 @@ let debugIt p =
         getUserState
         position
     >>= fun (result, state, pos) ->
-        preturn result // Put a breakpoint here!
+        preturn result
 
 let private tuple6 p1 p2 p3 p4 p5 p6 =
     tuple5 p1 p2 p3 p4 p5 .>>. p6
@@ -672,9 +672,8 @@ let ctorDef modfs =
         <?> "constructor parameters"
         >>= fun cparams ->
             let placeholder =
-                { BaseCall = SuperCall List.empty
-                  Body = List.empty
-                  Parameters = cparams }
+                cparams
+                |> MemberDef.placeholderCtor
                 |> Ctor
             tryAddMember (Access.Public, placeholder) >>% cparams
     let ctorBody ctorBase =
@@ -690,7 +689,6 @@ let ctorDef modfs =
             |> block
         ]
         |> choice
-
     keyword "new"
     |> attempt
     >>. noModifiers
@@ -966,7 +964,7 @@ let memberDef members types =
                 (fun def ->
                     modfs
                     |> def
-                    |> attempt
+                    |> attempt // TODO: Remove, as it stops parser like ctorDef from locking in when it should be known what the parser is.
                     .>> space)
                 members
         [
@@ -995,7 +993,7 @@ let memberBlock (members: seq<_>) types =
         ]
     |>> List.choose id
     .>>. (getUserState |>> getMembers)
-    |> memberSection
+    |> debugIt
 
 let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
 let interfaceDef modfs =
@@ -1118,13 +1116,19 @@ let classDef modfs =
         |>> Option.defaultValue Access.Public
         .>>. cparams
         <?> "primary constructor"
-        |>> fun (acc, ctorParams) ->
-            fun body baseArgs -> // TODO: Add the primary constructor to the member set.
+        >>= fun (acc, ctorParams) ->
+            let placeholder =
+                { BaseCall = SuperCall List.empty
+                  Body = List.empty
+                  Parameters = ctorParams }
+            let actual body baseArgs =
                 let ctor =
-                    { BaseCall = SuperCall baseArgs
-                      Body = body
-                      Parameters = ctorParams }
+                    { placeholder with
+                        BaseCall = SuperCall baseArgs
+                        Body = body }
                 acc, ctor
+            tryAddMember (acc, Ctor placeholder)
+            >>% actual
     let classBase =
         extends
         |> attempt
@@ -1132,15 +1136,19 @@ let classDef modfs =
         .>>. optList tupleExpr
         .>> space
     let def header label body =
-        tuple8
+        let actualBody =
+            tuple5
+                classCtor
+                classBase
+                (implements .>> space)
+                (selfIdAs |>> Option.defaultValue defaultSelfId)
+                body
+            |> memberSection
+        tuple4
             header
             classModf
             (genericTypeName TypeDef.placeholderClass)
-            classCtor
-            classBase
-            (implements .>> space)
-            (selfIdAs |>> Option.defaultValue defaultSelfId)
-            body
+            actualBody
         <?> label
     [
         [
@@ -1158,7 +1166,7 @@ let classDef modfs =
             classBody
     ]
     |> choice
-    |>> fun (rmembers, cmodf, name, ctor, (sclass, superCall), ilist, selfid, (body, cmembers)) ->
+    |>> fun (rmembers, cmodf, name, (ctor, (sclass, superCall), ilist, selfid, (body, cmembers))) ->
         let primaryCtor = ctor body superCall
         Class
             {| ClassName = name
@@ -1213,6 +1221,7 @@ do
                 interfaceDef
                 moduleDef
             ]
+        |> memberSection
         <?> "module block"
 
 do

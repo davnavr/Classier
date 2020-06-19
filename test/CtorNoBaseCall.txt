@@ -1,0 +1,6 @@
+
+public class NoBaseCall {
+  def new() {
+    throw null;
+  }
+}

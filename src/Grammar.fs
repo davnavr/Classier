@@ -341,7 +341,7 @@ module MemberDef =
     let emptyMemberSet = ImmutableSortedSet.Empty.WithComparer memberComparer
 
     let placeholderCtor cparams =
-        { BaseCall = ConstructorBase.SuperCall List.empty
+        { BaseCall = SuperCall List.empty
           Body = List.empty
           Parameters = cparams }
 

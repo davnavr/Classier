@@ -4,7 +4,7 @@ namespace test;
 public class Class1(arg1) {
   printfn(arg1.toString());
 
-  def Class1(arg1, arg2) {
+  def new(arg1, arg2) {
     this(arg1);
 
     // Any statement can be in here
