@@ -90,23 +90,12 @@ let main args =
                 "valid entry point"
                 (fun cu _ -> cu.EntryPoint.IsSome |> Assert.isTrue "The entry point is missing")
 
-            parseSource "DuplicateEntryPoint" // TODO: Create a failure tests list.
-            |> TestCase.pfailure
-                "duplicate entry point"
-                (fun msg err ->
-                    [
-                        Assert.hasSubstring "existing entry point" msg
-                        Assert.equal "line numbers" 9L err.Position.Line
-                        Assert.equal "column numbers" 5L err.Position.Column
-                    ]
-                    |> Assert.list)
-
             [
                 "BadOverloadCtor", "already", 3L, 5L
                 "BadOverloadInferredParamType", "exists", 8L, 5L
                 "BadOverloadReturnType", "already exists", 6L, 5L
                 "DuplicateEntryPoint", "existing entry point", 9L, 5L
-                "DuplicateParamNames", "'p1' already", 3L, 58L
+                "DuplicateParamNames", "'p1' already", 3L, 3L
                 "ParamConflictsWithSelfId", "'self' already exists", 6L, 5L
             ]
             |> Seq.collect

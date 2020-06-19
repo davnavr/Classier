@@ -316,8 +316,13 @@ module MemberDef =
     let memberComparer =
         { new System.Collections.Generic.IComparer<Access * MemberDef> with
             member _.Compare((_, m1), (_, m2)) =
-                let paramCompare = // TODO: Parameter comparison should be by parameter count and type, with Inferred type matching any other type.
-                    compare
+                let paramCompare =
+                    List.compareWith
+                        (fun p1 p2 ->
+                            match (p1.Type, p2.Type) with
+                            | (None, _)
+                            | (_, None) -> 0
+                            | (Some t1, Some t2) -> compare t1 t2)
                         (firstParams m1)
                         (firstParams m2)
                 match paramCompare with
@@ -335,7 +340,7 @@ module MemberDef =
 
     let emptyMemberSet = ImmutableSortedSet.Empty.WithComparer memberComparer
 
-    let placeholderCtor cparams = // TODO: Remove and just use the code.
+    let placeholderCtor cparams =
         { BaseCall = ConstructorBase.SuperCall List.empty
           Body = List.empty
           Parameters = cparams }

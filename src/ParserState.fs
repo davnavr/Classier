@@ -11,7 +11,7 @@ type ParserState<'Validator> =
     { EntryPoint: EntryPoint option
       Members: ImmutableSortedSet<Access * MemberDef> list
       Namespace: FullIdentifier option
-      Params: ImmutableSortedSet<IdentifierStr> list
+      Params: ImmutableSortedSet<IdentifierStr> list // TODO: Differentiate between parameters and self-identifiers?
       Validators: 'Validator list
       SelfIdentifiers: IdentifierStr option list
       Symbols: GlobalsTable }
@@ -204,5 +204,5 @@ module ParserState =
             getUserState
             >>= fun state ->
                 match state.Params with
-                | [] -> "parameters" |> errEmptyStack |> fail //Fatally
+                | [] -> "parameters" |> errEmptyStack |> fail
                 | _ -> setUserState { state with Params = state.Params.Tail }

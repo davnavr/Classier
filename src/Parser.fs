@@ -257,7 +257,6 @@ let implements =
     |> optList
     <?> "interface implementations"
 
-// TODO: Parameters should check for duplicates in the same tuple, and for conflicts with the current self identifier.
 let paramIdentifier = identifierStr >>= tryPushParam
 let param typeAnn =
     paramIdentifier
