@@ -107,7 +107,7 @@ let main args =
                 "BadOverloadReturnType", "already exists", 6L, 5L
                 "DuplicateEntryPoint", "existing entry point", 9L, 5L
                 "DuplicateParamNames", "'p1' already", 3L, 58L
-                "ParamConflictsWithSelfId", "'self' already exists", 6L, 33L
+                "ParamConflictsWithSelfId", "'self' already exists", 6L, 5L
             ]
             |> Seq.collect
                 (fun (source, err, lineNum, colNum) ->

@@ -204,5 +204,5 @@ module ParserState =
             getUserState
             >>= fun state ->
                 match state.Params with
-                | [] -> "parameters" |> errEmptyStack |> failFatally
+                | [] -> "parameters" |> errEmptyStack |> fail //Fatally
                 | _ -> setUserState { state with Params = state.Params.Tail }

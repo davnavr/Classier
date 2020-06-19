@@ -41,6 +41,7 @@ let period = skipChar '.' <?> "period"
 let rcurlybracket = skipChar '}' <?> "closing bracket"
 let rparen = skipChar ')' <?> "closing parenthesis"
 let semicolon = skipChar ';' <?> "semicolon"
+// TODO: Make a common function for lambdaOperator >>. (statementBlock <|> (expression .>> semicolon))
 let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
 let space =
@@ -791,7 +792,6 @@ let methodDef modfs =
                 genericName
                 (paramTupleList typeAnnExp .>> space)
                 (typeAnnExp <?> "method return type")
-            |> attempt
             >>= fun (name, mparams, retType) ->
                 let memdef =
                     {| IsMutator = mmodf.IsMutator
@@ -815,7 +815,6 @@ let methodDef modfs =
                 selfId
                 genericName
                 (paramTupleList typeAnnOpt)
-            |> attempt
             >>= fun (selfId, name, mparams) ->
                 let placeholder =
                     MemberDef.placeholderMethod
@@ -958,13 +957,18 @@ let propDef modfs =
                    Value = pvalue
                    ValueType = vtype |}
                 |> Property
+    <?> "property definition"
 
 let memberDef members types =
     modifiers
     >>= fun modfs ->
         let memberDefs =
             Seq.map
-                (fun def -> def modfs .>> space)
+                (fun def ->
+                    modfs
+                    |> def
+                    |> attempt
+                    .>> space)
                 members
         [
             keyword "def"
@@ -1353,13 +1357,15 @@ do
             [
                 strLit
 
-                paramTuple typeAnnOpt
+                updateUserState newParams
+                >>. paramTuple typeAnnOpt
                 .>> space
                 .>> lambdaOperator
                 |> attempt
                 .>> space
                 .>>. position
                 .>>. expression
+                .>> tryPopParams
                 <?> "anonymous function"
                 |>> fun ((parameters, pos), retVal) ->
                     { Body = [ pos, Return retVal ]
