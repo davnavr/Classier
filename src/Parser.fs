@@ -648,7 +648,6 @@ let selfId =
     |> attempt
     |> opt
 
-let emptyBody: Parser<Statement list option, _> = semicolon >>% None // TODO: Is this needed?
 let functionBody =
     choiceL
         [
@@ -673,7 +672,6 @@ let methodDef modfs =
                 match modf with
                 | "abstract" ->
                     match prev.ImplKind with
-                    | MethodImpl.Sealed
                     | MethodImpl.SealedOverride ->
                         badModfier "A 'sealed' method cannot also be 'abstract'"
                     | MethodImpl.Virtual ->
@@ -682,15 +680,13 @@ let methodDef modfs =
                 | "mutator" -> Result.Ok ({ prev with IsMutator = true }, isAbstract)
                 | "override" ->
                     match prev.ImplKind with
-                    | MethodImpl.Sealed ->
-                        Result.Ok ({ prev with ImplKind = MethodImpl.SealedOverride }, false)
                     | MethodImpl.Virtual ->
                         badModfier "A 'virtual' method makes the 'override' modifier redundant, since it already can be overriden"
                     | _ ->
                         Result.Ok ({ prev with ImplKind = MethodImpl.Override }, false)
                 | "sealed" ->
                     match prev.ImplKind with
-                    | MethodImpl.Sealed ->
+                    | MethodImpl.Default ->
                         badModfier "The 'sealed' modifier is redundant, since methods cannot be overriden by default"
                     | MethodImpl.Virtual ->
                         badModfier "The method cannot be 'sealed' since it is already 'virtual'"
@@ -701,9 +697,8 @@ let methodDef modfs =
                     match prev.ImplKind with
                     | MethodImpl.Override ->
                         badModfier "An overriden method cannot be 'virtual'"
-                    | MethodImpl.Sealed
                     | MethodImpl.SealedOverride ->
-                        badModfier "A sealed method cannot be 'virutal', since it cannot be overriden"
+                        badModfier "A sealed method cannot be 'virtual', since it cannot be overriden"
                     | _ when isAbstract -> badModfier "An abstract method already implies that the method is 'virtual'"
                     | _ -> Result.Ok ({ prev with ImplKind = MethodImpl.Virtual }, false)
                 | _ -> Result.Error None)
@@ -760,6 +755,7 @@ let methodDef modfs =
                        Modifiers = mmodf
                        SelfIdentifier = selfId |}
                     |> Method
+    <?> "method definition"
 
 let propDef modfs = // TODO: Use Statement list option for methodDef, propDef, functionDef, etc. to represent no body for abstract methods and auto properties.
     fail "prop no impl"
@@ -816,13 +812,20 @@ let interfaceDef modfs =
                Members = members
                SuperInterfaces = ilist |}
 do
+    let members =
+        [
+            methodDef
+        ]
+        |> Seq.map
+            (fun def ->
+                fun (rest: ImmutableList<_>) ->
+                    "abstract"
+                    |> rest.Add
+                    |> def)
     interfaceMembersRef :=
         accessModifier Access.Internal
         >>. memberDef
-            [
-                // TODO: Instead of empty body, use (fail "message"), since the methodDef and propDef parsers should be checking for empty bodies.
-                (fun _ -> fail "interface member no impl")
-            ]
+            members
             [
                 interfaceDef
             ]

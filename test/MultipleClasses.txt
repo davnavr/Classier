@@ -48,7 +48,7 @@ public class Class3 implements Interface1 {
 }
 
 public class Class4(arg4) extends Class2(arg4 + 5) implements Interface1 {
-  public sealed override def myVirtMethod() => 2;
+  public override sealed def myVirtMethod() => 2;
 }
 
 public class Class5 extends Class3 {

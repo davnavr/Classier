@@ -221,8 +221,8 @@ type TypeDef<'Member> =
 
 [<RequireQualifiedAccess>]
 type MethodImpl =
+    | Default
     | Override
-    | Sealed
     | SealedOverride
     | Virtual
 
@@ -231,7 +231,7 @@ type MethodModifiers =
       IsMutator: bool }
 
     static member Default =
-        { ImplKind = MethodImpl.Sealed
+        { ImplKind = MethodImpl.Default
           IsMutator = false }
 
 type PropertyAutoAccessors =

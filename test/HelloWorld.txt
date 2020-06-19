@@ -1,7 +1,7 @@
 
 use System.Console;
 
-main (args) {
+main (args: Array<String>) {
   "Hello there!" |> System.Console.WriteLine();
   0
 }

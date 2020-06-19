@@ -1,11 +1,11 @@
 
 use java.lang.System;
 
-main (args) {
+main (args: Array<java.lang.String>) {
   out.println("Greetings.");
   0
 }
 
-main (args) {
+main () {
   -1
 }
