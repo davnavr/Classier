@@ -1,0 +1,6 @@
+
+public class HelloWorld private (myArg: int) {
+    def new(myArg: int) {
+        System.Console.WriteLine("Hello to the world!");
+    }
+}

@@ -100,7 +100,28 @@ let main args =
                     ]
                     |> Assert.list)
 
-            // TODO: Add test that ensures the member stack, validator stack, and self-identifier stacks are empty.
+            [
+                "BadOverloadCtor", "already", 3L, 5L
+                "BadOverloadInferredParamType", "exists", 8L, 5L
+                "BadOverloadReturnType", "already exists", 6L, 5L
+                "DuplicateEntryPoint", "existing entry point", 9L, 5L
+            ]
+            |> Seq.collect
+                (fun (source, err, lineNum, colNum) ->
+                    parseSource source
+                    |> TestCase.ofResult
+                        [
+                            TestCase.pfailure
+                                source
+                                (fun msg pErr ->
+                                    [
+                                        Assert.hasSubstring err msg
+                                        Assert.equal "line number" lineNum pErr.Position.Line
+                                        Assert.equal "column number" colNum pErr.Position.Column
+                                    ]
+                                    |> Assert.list)
+                        ])
+            |> testList "failure tests"
         ]
         |> testList "parser tests"
     ]

@@ -316,7 +316,7 @@ module MemberDef =
     let memberComparer =
         { new System.Collections.Generic.IComparer<Access * MemberDef> with
             member _.Compare((_, m1), (_, m2)) =
-                let paramCompare =
+                let paramCompare = // TODO: Parameter comparison should be by parameter count and type, with Inferred type matching any other type.
                     compare
                         (firstParams m1)
                         (firstParams m2)

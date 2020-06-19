@@ -150,7 +150,7 @@ module ParserState =
                 state.SelfIdentifiers
                 |> List.tryHead
                 |> Option.flatten
-                |> Option.map (fun current -> preturn current)
+                |> Option.map preturn
                 |> Option.defaultValue ("self-identifier" |> errEmptyStack |> fail)
         let tryPushSelfId selfid =
             Some selfid

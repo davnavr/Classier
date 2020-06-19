@@ -1,0 +1,8 @@
+
+public class BadOverload1 {
+    public def method1 (p1: int): int {
+    }
+
+    public def method1 (p1: int): long {
+    }
+}

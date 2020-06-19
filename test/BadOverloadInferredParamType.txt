@@ -1,0 +1,10 @@
+
+class BadOverload2 {
+    def sayHello (to: String) {
+        let lambda = (a) => "this is \u7253 the return" + a;
+        lambda ("test");
+    }
+
+    def sayHello (to) {
+    }
+}

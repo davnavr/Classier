@@ -18,7 +18,10 @@ let psuccess name test =
 let pfailure name =
     presult
         name
-        (fun _ _ -> Assert.fail "Unexpected success")
+        (fun _ _ ->
+            name
+            |> sprintf "Unexpected success for '%s'"
+            |> Assert.fail)
 
 let ofResult tests result =
     Seq.map
