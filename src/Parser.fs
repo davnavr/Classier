@@ -247,9 +247,7 @@ let identifierFull =
 let extends =
     keyword "extends"
     >>. identifierFull
-    |>> OptIdentifier.Complete
     |> opt
-    |>> Option.defaultValue OptIdentifier.EmptyIdentifier
 let implements =
     keyword "implements"
     >>. sepBy1
@@ -1465,17 +1463,16 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> opt
         <?> "namespace declaration"
         >>= fun names ->
-            let ns =
-                names
-                |> Option.map (Identifier.ofStrSeq)
-                |> Option.flatten
-                |> Option.map OptIdentifier.Complete
-                |> Option.defaultValue OptIdentifier.EmptyIdentifier
-            GlobalsTable.addNamespace ns
+            let nsName =
+                Option.bind
+                    Identifier.ofStrSeq
+                    names
+            GlobalsTable.addNamespace
+                (Namespace.fullId nsName)
             |> updateSymbols
-            >> setNamespace ns
+            >> setNamespace nsName
             |> updateUserState
-            >>% ns
+            >>% nsName
     let useStatements =
         skipString "use"
         >>. space1

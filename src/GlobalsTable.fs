@@ -4,11 +4,14 @@ open System.Collections.Immutable
 open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.Namespace
 
 /// Stores the namespaces and types declared in compilation units.
-type GlobalsTable = GlobalsTable of ImmutableSortedDictionary<OptIdentifier, ImmutableSortedSet<GlobalTypeSymbol>>
+type GlobalsTable<'Namespace> = GlobalsTable of ImmutableSortedDictionary<'Namespace, ImmutableSortedSet<GlobalTypeSymbol>>
 
 module GlobalsTable =
+    type GlobalsTable = GlobalsTable<Namespace>
+
     let private emptySymbols =
         let compareType one two =
             match compare (getName one) (getName two) with
@@ -34,9 +37,7 @@ module GlobalsTable =
                       | result -> result }
         ImmutableSortedSet.Empty.WithComparer typeComparer
 
-    // TODO: Add a 'bind' function or whatever it is called.
-
-    let empty = GlobalsTable ImmutableSortedDictionary.Empty
+    let empty: GlobalsTable = GlobalsTable ImmutableSortedDictionary.Empty
 
     let getNamespaces (GlobalsTable table) = table.Keys
 
@@ -46,11 +47,12 @@ module GlobalsTable =
         match types with
         | null -> emptySymbols
         | _ -> types
-    
+
     let addType (tsymbol: GlobalTypeSymbol) globals =
         let (GlobalsTable table) = globals
-        let ns = tsymbol.Namespace
-
+        let ns =
+            tsymbol.Namespace
+            |> Namespace.fullId
         globals
         |> getTypes ns
         |> SortedSet.add tsymbol

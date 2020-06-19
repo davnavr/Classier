@@ -2,6 +2,7 @@
 
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.GlobalsTable
 open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Identifier
 open FParsec
@@ -9,7 +10,7 @@ open FParsec
 type ParserState<'Validator> =
     { EntryPoint: EntryPoint option
       Members: ImmutableSortedSet<Access * MemberDef> list
-      Namespace: OptIdentifier
+      Namespace: FullIdentifier option
       Validators: 'Validator list
       SelfIdentifiers: IdentifierStr option list
       Symbols: GlobalsTable }
@@ -45,7 +46,7 @@ module ParserState =
     let defaultState: ParserState =
         { EntryPoint = None
           Members = List.empty
-          Namespace = OptIdentifier.EmptyIdentifier
+          Namespace = None
           Validators = List.empty
           SelfIdentifiers = List.empty
           Symbols = GlobalsTable.empty }

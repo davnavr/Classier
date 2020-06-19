@@ -44,6 +44,7 @@ let main args =
                                 "correct namespace"
                                 (fun cu _ ->
                                     cu.Namespace
+                                    |> Namespace.fullId
                                     |> string
                                     |> Assert.equal "namespaces" ns)
 
@@ -60,7 +61,7 @@ let main args =
                                     let expectedNs =
                                         state.Symbols
                                         |> GlobalsTable.getNamespaces
-                                        |> Seq.find (fun tableNs -> string tableNs = ns)
+                                        |> Seq.find (fun tablens -> string tablens = ns)
                                     state.Symbols
                                     |> GlobalsTable.getTypes expectedNs
                                     |> Seq.map

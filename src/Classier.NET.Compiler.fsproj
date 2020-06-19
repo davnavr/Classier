@@ -15,6 +15,7 @@
     <Compile Include="TypeSystem.fs" />
     <Compile Include="Generic.fs" />
     <Compile Include="Grammar.fs" />
+    <Compile Include="Namespace.fs" />
     <Compile Include="Extern.fs" />
     <Compile Include="GlobalType.fs" />
     <Compile Include="GlobalsTable.fs" />

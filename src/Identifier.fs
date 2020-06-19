@@ -35,18 +35,6 @@ type FullIdentifier<'Generic> =
         let (FullIdentifier ids) = this
         String.Join('.', ids)
 
-[<StructuralComparison>]
-[<StructuralEquality>]
-type OptIdentifier<'Generic> =
-    // TODO: Come up with better case names.
-    | Complete of FullIdentifier<'Generic>
-    | EmptyIdentifier
-
-    override this.ToString() =
-        match this with
-        | Complete fullId -> string fullId
-        | EmptyIdentifier -> String.Empty
-
 let private nameRegex = "^[A-Za-z][A-Za-z_0-9]*$" |> Regex
 
 let defaultSelfId = IdentifierStr "this"

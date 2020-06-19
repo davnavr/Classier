@@ -21,7 +21,7 @@ and GenericVariance =
 and GenericParam =
     { Name: IdentifierStr
       RequiredInterfaces: FullIdentifier<Generic> list
-      RequiredSuperClass: OptIdentifier<Generic>
+      RequiredSuperClass: FullIdentifier<Generic> option
       Variance: GenericVariance }
 
     override this.ToString() = string this.Name
@@ -29,7 +29,7 @@ and GenericParam =
 let gparam str =
     { Name = str
       RequiredInterfaces = List.empty
-      RequiredSuperClass = OptIdentifier.EmptyIdentifier
+      RequiredSuperClass = None
       Variance = NoVariance }
     |> GenericParam
 

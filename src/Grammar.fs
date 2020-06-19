@@ -6,7 +6,6 @@ open Classier.NET.Compiler.Identifier
 
 type FullIdentifier = Identifier.FullIdentifier<Generic.Generic>
 type Identifier = Identifier.Identifier<Generic.Generic>
-type OptIdentifier = Identifier.OptIdentifier<Generic.Generic>
 type private Position = FParsec.Position
 type TypeName = TypeSystem.TypeName<Generic.Generic>
 
@@ -209,7 +208,7 @@ type TypeDef<'Member> =
            Members: ImmutableSortedSet<'Member>
            PrimaryCtor: Access * Constructor
            SelfIdentifier: IdentifierStr
-           SuperClass: OptIdentifier |}
+           SuperClass: FullIdentifier option |}
     | Interface of
         {| InterfaceName: Name
            Members: ImmutableSortedSet<'Member>
@@ -364,7 +363,7 @@ module internal TypeDef =
                Members = MemberDef.emptyMemberSet
                PrimaryCtor = Access.Public, (MemberDef.placeholderCtor List.empty)
                SelfIdentifier = IdentifierStr "this"
-               SuperClass = OptIdentifier.EmptyIdentifier |}
+               SuperClass = None |}
 
     let placeholderInterface name =
         Interface
@@ -380,6 +379,6 @@ module internal TypeDef =
 
 type CompilationUnit =
     { EntryPoint: EntryPoint option
-      Namespace: OptIdentifier
+      Namespace: FullIdentifier option
       Usings: FullIdentifier list
       Types: seq<Access * TypeDef> }
