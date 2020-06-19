@@ -257,8 +257,9 @@ let implements =
     <?> "interface implementations"
 
 // TODO: Parameters should check for duplicates in the same tuple, and for conflicts with the current self identifier.
+let paramIdentifier = identifierStr >>= tryPushParam
 let param typeAnn =
-    identifierStr
+    paramIdentifier
     .>>. typeAnn
     <?> "parameter"
     |>> fun (name, ptype) ->
@@ -461,13 +462,7 @@ do
             ]
             "type name"
     typeNameRef :=
-        sepBy1
-            simpleType
-            (pchar '|' |> separator |> attempt)
-        |>> (fun tlist ->
-            match tlist with
-            | [ one ] -> one
-            | _ -> Union tlist)
+        simpleType
         .>>. opt
             (space
             >>. lambdaOperator
@@ -640,12 +635,18 @@ let opName: Parser<_, ParserState> =
     |> many1Chars
 
 let selfId = 
-    identifierStr
+    paramIdentifier
     .>> space
     .>> period
     .>> space
     <?> "self identifier"
     |> attempt
+    |> opt
+let selfIdAs =
+    keyword "as"
+    >>. paramIdentifier
+    .>> space
+    <?> "self identifier"
     |> opt
 
 let functionBody =
@@ -676,17 +677,6 @@ let ctorDef modfs =
                   Parameters = cparams }
                 |> Ctor
             tryAddMember (Access.Public, placeholder) >>% cparams
-    let ctorSelf =
-        [
-            keyword "as"
-            >>. identifierStr
-            |>> Some
-            .>> space
-            <?> "self identifier"
-
-            preturn None
-        ]
-        |> choice
     let ctorBody ctorBase =
         [
             lambdaOperator
@@ -705,8 +695,9 @@ let ctorDef modfs =
     |> attempt
     >>. noModifiers
         modfs
+    >>. updateUserState newParams
     >>. ctorHeader
-    .>>. ctorSelf
+    .>>. selfIdAs
     >>= fun (cparams, selfid) -> // TODO: Come up with a way to keep track of the current self identifier. This will help with not only ctorDef but also in Expression parsing if a new case called Self is added.
         [
             keyword "super" >>% SuperCall
@@ -722,6 +713,7 @@ let ctorDef modfs =
               Body = body
               Parameters = cparams }
             |> Ctor
+    .>> tryPopParams
     <?> "constructor definition"
 
 let functionDef modfs =
@@ -739,10 +731,12 @@ let functionDef modfs =
                 |> Function
             tryAddMember (Access.Public, placeholder) >>% (name, fparams)
     noModifiers modfs
+    .>> updateUserState newParams
     >>. tuple3
         funcHeader
         (typeAnnOpt .>> space)
         functionBody
+    .>> tryPopParams
     |>> fun ((name, fparams), retType, body) ->
         Function
             {| Function =
@@ -790,6 +784,7 @@ let methodDef modfs =
                 | _ -> Result.Error None)
             (MethodModifiers.Default, false)
     methodModf
+    .>> updateUserState newParams
     >>= fun (mmodf, isAbstract) ->
         if isAbstract then
             tuple3
@@ -840,6 +835,7 @@ let methodDef modfs =
                        Modifiers = mmodf
                        SelfIdentifier = selfId |}
                     |> Method
+    .>> tryPopParams
     <?> "method definition"
 
 let propDef modfs =
@@ -894,11 +890,13 @@ let propDef modfs =
                 let setFull =
                     keyword "set"
                     |> attempt
+                    >>. updateUserState newParams
                     >>. lparen
                     >>. space
                     >>. param typeAnnOpt
                     .>> space
                     .>> rparen
+                    .>> tryPopParams
                     .>> space
                     .>>. functionBody
                     |> opt
@@ -1130,14 +1128,6 @@ let classDef modfs =
         .>> space
         .>>. optList tupleExpr
         .>> space
-    let classSelfId =
-        keyword "as"
-        |> attempt
-        >>. identifierStr
-        .>> space
-        |> opt
-        <?> "self identifier"
-        |>> Option.defaultValue defaultSelfId
     let def header label body =
         tuple8
             header
@@ -1146,7 +1136,7 @@ let classDef modfs =
             classCtor
             classBase
             (implements .>> space)
-            classSelfId
+            (selfIdAs |>> Option.defaultValue defaultSelfId)
             body
         <?> label
     [
@@ -1511,10 +1501,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                         preturn (pos, state)
                 .>> space
             let mainParams =
-                typeName
-                |> typeAnn
-                |> paramTuple
+                updateUserState newParams
+                >>. paramTuple typeAnnExp
                 .>> space
+                .>> tryPopParams
             tuple3
                 mainDef
                 mainParams
@@ -1540,7 +1530,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> space
         |> many
 
-    (newMembers >> pushValidator typeValidator >> pushSelfId None)
+    (newMembers >> pushValidator typeValidator >> pushSelfId None >> newParams)
     |> updateUserState
     >>. space
     >>. namespaceDecl
@@ -1552,6 +1542,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>> tryPopMembers
     .>> tryPopValidators
     .>> tryPopSelfId
+    .>> tryPopParams
     |>> fun ((ns, uses), state) ->
         { EntryPoint = state.EntryPoint
           Namespace = ns

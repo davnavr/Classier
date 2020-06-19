@@ -11,6 +11,7 @@ type ParserState<'Validator> =
     { EntryPoint: EntryPoint option
       Members: ImmutableSortedSet<Access * MemberDef> list
       Namespace: FullIdentifier option
+      Params: ImmutableSortedSet<IdentifierStr> list
       Validators: 'Validator list
       SelfIdentifiers: IdentifierStr option list
       Symbols: GlobalsTable }
@@ -47,6 +48,7 @@ module ParserState =
         { EntryPoint = None
           Members = List.empty
           Namespace = None
+          Params = List.empty
           Validators = List.empty
           SelfIdentifiers = List.empty
           Symbols = GlobalsTable.empty }
@@ -103,6 +105,8 @@ module ParserState =
 
     let pushSelfId selfid state = { state with SelfIdentifiers = selfid :: state.SelfIdentifiers }
 
+    let newParams state = { state with Params = ImmutableSortedSet.Empty :: state.Params }
+
     [<AutoOpen>]
     module StateManagement =
         let tryUpdateState f msg =
@@ -112,6 +116,7 @@ module ParserState =
                 | Some newState -> setUserState newState
                 | None -> fail msg
 
+        // TODO: Make the functions below regular functions in the ParserState module that do not return Parser<_,_>. Use tryUpdateState to call these new functions
         let tryPopMembers: Parser<_, ParserState> =
             tryUpdateState
                 popMembers
@@ -178,3 +183,26 @@ module ParserState =
                         | None ->
                             setUserState { state with SelfIdentifiers = Some selfid :: state.SelfIdentifiers.Tail })
                 |> Option.defaultValue ("self-identifier" |> errEmptyStack |> fail)
+
+        let tryPushParam param =
+            getUserState
+            >>= fun state ->
+                match List.tryHead state.Params with
+                | Some paramSet ->
+                    match SortedSet.add param paramSet with
+                    | Some newSet ->
+                        { state with Params = newSet :: state.Params.Tail }
+                        |> setUserState
+                        >>% param
+                    | None ->
+                        param
+                        |> string
+                        |> sprintf "A parameter with the name '%s' already exists"
+                        |> fail
+                | None -> "parameter" |> errEmptyStack |> fail
+        let tryPopParams: Parser<_, ParserState> =
+            getUserState
+            >>= fun state ->
+                match state.Params with
+                | [] -> "parameters" |> errEmptyStack |> failFatally
+                | _ -> setUserState { state with Params = state.Params.Tail }

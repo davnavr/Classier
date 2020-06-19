@@ -7,7 +7,7 @@ open Classier.NET.Compiler.Grammar
 [<NoComparison>]
 [<CustomEquality>]
 type Local =
-    { Name: string
+    { Name: string // TODO: Use IdentifierStr
       Type: TypeName }
 
     override this.Equals obj =

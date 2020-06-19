@@ -76,6 +76,7 @@ let main args =
                                 (fun _ state ->
                                     [
                                         Assert.empty state.Members
+                                        Assert.empty state.Params
                                         Assert.empty state.SelfIdentifiers
                                         Assert.empty state.Validators
                                     ]
@@ -105,6 +106,8 @@ let main args =
                 "BadOverloadInferredParamType", "exists", 8L, 5L
                 "BadOverloadReturnType", "already exists", 6L, 5L
                 "DuplicateEntryPoint", "existing entry point", 9L, 5L
+                "DuplicateParamNames", "'p1' already", 3L, 58L
+                "ParamConflictsWithSelfId", "'self' already exists", 6L, 33L
             ]
             |> Seq.collect
                 (fun (source, err, lineNum, colNum) ->
