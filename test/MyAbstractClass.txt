@@ -22,9 +22,9 @@ internal abstract class MyAbstractClass {
             no
         };
 
-  public abstract def noBody (iUsedToKnow);
+  public abstract def noBody (iUsedToKnow: some.valid.Type): ();
 
-  private inline def doesSomething () {
+  private def doesSomething () {
     let myCurriedResult = this.noBody (45.6) (blah);
 
     if (iExist) {

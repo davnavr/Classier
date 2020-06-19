@@ -709,7 +709,7 @@ let methodDef modfs =
             tuple3
                 genericName
                 (paramTupleList typeAnnExp .>> space)
-                typeAnnExp
+                (typeAnnExp <?> "method return type")
             |> attempt
             >>= fun (name, mparams, retType) ->
                 let memdef =
@@ -815,6 +815,7 @@ do
     let members =
         [
             methodDef
+            propDef
         ]
         |> Seq.map
             (fun def ->
