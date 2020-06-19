@@ -230,7 +230,7 @@ let genericArgs =
 let identifierStr =
     asciiLetter
     .>>. manyChars (asciiLetter <|> pchar '_' <|> digit)
-    |>> String.Concat
+    |>> (String.Concat >> IdentifierStr)
 let identifier =
     identifierStr
     .>> space
@@ -247,7 +247,9 @@ let identifierFull =
 let extends =
     keyword "extends"
     >>. identifierFull
+    |>> OptIdentifier.Complete
     |> opt
+    |>> Option.defaultValue OptIdentifier.EmptyIdentifier
 let implements =
     keyword "implements"
     >>. sepBy1
@@ -256,13 +258,14 @@ let implements =
     |> optList
     <?> "interface implementations"
 
+// TODO: Parameters should check for duplicates in the same tuple, and for conflicts with the current self identifier.
 let param typeAnn =
     identifierStr
     .>>. typeAnn
     <?> "parameter"
     |>> fun (name, ptype) ->
         { Name =
-            match name with
+            match string name with
             | "_" -> None
             | _ -> Some name
           Type = ptype }
@@ -841,7 +844,7 @@ let methodDef modfs =
                     |> Method
     <?> "method definition"
 
-let propDef modfs = // TODO: Use Statement list option for methodDef, propDef, functionDef, etc. to represent no body for abstract methods and auto properties.
+let propDef modfs =
     let propModf =
         validateModifiers
             modfs
@@ -980,7 +983,7 @@ let memberDef members types =
             |> choice
         ]
         |> choice
-let memberBlock members types =
+let memberBlock (members: seq<_>) types =
     blockChoice
         [
             statement
@@ -1036,7 +1039,7 @@ do
         |> block
         <?> "interface body"
 
-let private classBody, private classBodyRef = createParserForwardedToRef<_, _>() // TODO: Handle secondary constructors, and add the primary constructor to the member set.
+let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
 let classDef modfs =
     let dataMembers =
         keyword "data"
@@ -1044,21 +1047,29 @@ let classDef modfs =
         |>> fun pos ->
             fun values ->
                 let name str pos =
-                    Name.OfString str pos
-                    |> Option.get
+                    { Identifier = Identifier.ofStr str
+                      Position = pos }
                 let selfid = "this__"
                 seq {
                     Method
                         {| Method =
                             { Body = List.empty // TODO: Create a body here.
-                              Parameters = [ [ "obj" |> Some |> Param<_>.Create None ] ]
+                              Parameters =
+                                [
+                                    [
+                                        "obj"
+                                        |> IdentifierStr 
+                                        |> Some
+                                        |> Param<_>.Create None
+                                    ]
+                                ]
                               ReturnType =
                                 PrimitiveType.Boolean
                                 |> TypeName.Primitive
                                 |> Some }
-                           MethodName = name "equals" pos
+                           MethodName = "equals" |> IdentifierStr |> Name.OfStr pos
                            Modifiers = MethodModifiers.Default
-                           SelfIdentifier = Some selfid |}
+                           SelfIdentifier = IdentifierStr selfid |> Some |}
 
                     yield!
                         values
@@ -1067,8 +1078,15 @@ let classDef modfs =
                                 match param.Name with
                                 | None -> None
                                 | Some pname ->
-                                    {| Accessors = Get List.empty // TODO: Should be a get with a body.
-                                       PropName = name pname pos
+                                    {| Accessors =
+                                         pname
+                                         |> Identifier.ofStr
+                                         |> IdentifierRef
+                                         |> Return
+                                         |> Expression.withPos pos
+                                         |> List.singleton
+                                         |> Get
+                                       PropName = Name.OfStr pos pname
                                        SelfIdentifier = None
                                        Value = None
                                        ValueType = param.Type |}
@@ -1102,7 +1120,7 @@ let classDef modfs =
         .>>. cparams
         <?> "primary constructor"
         |>> fun (acc, ctorParams) ->
-            fun body baseArgs ->
+            fun body baseArgs -> // TODO: Add the primary constructor to the member set.
                 let ctor =
                     { BaseCall = SuperCall baseArgs
                       Body = body
@@ -1121,7 +1139,7 @@ let classDef modfs =
         .>> space
         |> opt
         <?> "self identifier"
-        |>> Option.defaultValue "this"
+        |>> Option.defaultValue defaultSelfId
     let def header label body =
         tuple8
             header
@@ -1449,8 +1467,10 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         >>= fun names ->
             let ns =
                 names
-                |> Option.defaultValue []
-                |> Identifier.ofStrings
+                |> Option.map (Identifier.ofStrSeq)
+                |> Option.flatten
+                |> Option.map OptIdentifier.Complete
+                |> Option.defaultValue OptIdentifier.EmptyIdentifier
             GlobalsTable.addNamespace ns
             |> updateSymbols
             >> setNamespace ns
@@ -1523,7 +1543,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> space
         |> many
 
-    (newMembers >> pushValidator typeValidator)
+    (newMembers >> pushValidator typeValidator >> pushSelfId None)
     |> updateUserState
     >>. space
     >>. namespaceDecl
@@ -1534,6 +1554,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>>. getUserState
     .>> tryPopMembers
     .>> tryPopValidators
+    .>> tryPopSelfId
     |>> fun ((ns, uses), state) ->
         { EntryPoint = state.EntryPoint
           Namespace = ns

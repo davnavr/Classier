@@ -10,7 +10,7 @@ type GlobalType =
     | ExternType of ExternType
 
 type GlobalTypeSymbol =
-    { Namespace: FullIdentifier
+    { Namespace: OptIdentifier
       Type: GlobalType }
 
 let getName gtype =

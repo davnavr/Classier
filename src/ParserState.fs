@@ -1,16 +1,17 @@
 ﻿namespace Classier.NET.Compiler
 
-open System.Collections.Generic
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.GlobalType
+open Classier.NET.Compiler.Identifier
 open FParsec
 
 type ParserState<'Validator> =
     { EntryPoint: EntryPoint option
       Members: ImmutableSortedSet<Access * MemberDef> list
-      Namespace: FullIdentifier
+      Namespace: OptIdentifier
       Validators: 'Validator list
+      SelfIdentifiers: IdentifierStr option list
       Symbols: GlobalsTable }
 
 module ParserState =
@@ -44,8 +45,9 @@ module ParserState =
     let defaultState: ParserState =
         { EntryPoint = None
           Members = List.empty
-          Namespace = FullIdentifier.Empty
+          Namespace = OptIdentifier.EmptyIdentifier
           Validators = List.empty
+          SelfIdentifiers = List.empty
           Symbols = GlobalsTable.empty }
 
     let updateSymbols f state = { state with Symbols = f state.Symbols }
@@ -96,7 +98,9 @@ module ParserState =
                 dupMsg)
         |> Validator
 
-    let replacePlaceholder mdef state = state // NOTE: Not implemented yet
+    let replacePlaceholder mdef state = state // NOTE: Not implemented yet.
+
+    let pushSelfId selfid state = { state with SelfIdentifiers = selfid :: state.SelfIdentifiers }
 
     [<AutoOpen>]
     module StateManagement =
@@ -137,3 +141,39 @@ module ParserState =
             >>. p
             .>> tryPopMembers
             .>> tryPopValidators
+
+        // TODO: Create common functions for matching stacks.
+        let trySelfId: Parser<_, ParserState> =
+            getUserState
+            >>= fun state ->
+                state.SelfIdentifiers
+                |> List.tryHead
+                |> Option.flatten
+                |> Option.map (fun current -> preturn current)
+                |> Option.defaultValue ("self-identifier" |> errEmptyStack |> fail)
+        let tryPushSelfId selfid =
+            Some selfid
+            |> pushSelfId
+            |> updateUserState
+            >>% selfid
+        let tryPopSelfId: Parser<_, ParserState> =
+            getUserState
+            >>= fun state ->
+                    match state.SelfIdentifiers with
+                    | [] -> "self-identifier" |> errEmptyStack |> fail
+                    | _ -> setUserState { state with SelfIdentifiers = state.SelfIdentifiers.Tail }
+        let tryReplaceSelfId selfid =
+            getUserState
+            >>= fun state ->
+                state.SelfIdentifiers
+                |> List.tryHead
+                |> Option.map
+                    (fun current ->
+                        match current with
+                        | Some existing ->
+                            string existing
+                            |> sprintf "Cannot replace existing self-identifier '%s'"
+                            |> fail
+                        | None ->
+                            setUserState { state with SelfIdentifiers = Some selfid :: state.SelfIdentifiers.Tail })
+                |> Option.defaultValue ("self-identifier" |> errEmptyStack |> fail)

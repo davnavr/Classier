@@ -78,7 +78,7 @@ let main args =
                 "valid entry point"
                 (fun cu _ -> cu.EntryPoint.IsSome |> Assert.isTrue "The entry point is missing")
 
-            parseSource "DuplicateEntryPoint"
+            parseSource "DuplicateEntryPoint" // TODO: Create a failure tests list.
             |> TestCase.pfailure
                 "duplicate entry point"
                 (fun msg err ->
@@ -88,6 +88,8 @@ let main args =
                         Assert.equal "column numbers" 5L err.Position.Column
                     ]
                     |> Assert.list)
+
+            // TODO: Add test that ensures the member stack, validator stack, and self-identifier stacks are empty.
         ]
         |> testList "parser tests"
     ]

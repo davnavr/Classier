@@ -1,11 +1,12 @@
 ﻿module Classier.NET.Compiler.Grammar
 
 open System
-open System.Collections.Generic
 open System.Collections.Immutable
+open Classier.NET.Compiler.Identifier
 
 type FullIdentifier = Identifier.FullIdentifier<Generic.Generic>
 type Identifier = Identifier.Identifier<Generic.Generic>
+type OptIdentifier = Identifier.OptIdentifier<Generic.Generic>
 type private Position = FParsec.Position
 type TypeName = TypeSystem.TypeName<Generic.Generic>
 
@@ -62,18 +63,14 @@ type Name =
     { Identifier: Identifier
       Position: Position }
 
-    static member OfString str pos =
-        match Identifier.ofString str with
-        | Some id ->
-            { Identifier = id
-              Position = pos }
-            |> Some
-        | None -> None
+    static member OfStr pos str =
+        { Identifier = Identifier.ofStr str
+          Position = pos }
 
     override this.ToString() = this.Identifier.ToString()
 
 type Param<'Type> =
-    { Name: string option
+    { Name: IdentifierStr option
       Type: 'Type }
 
     static member Create ptype name =
@@ -84,7 +81,7 @@ type Param<'Type> =
         let name =
             match this.Name with
             | None -> "_"
-            | Some pname -> pname
+            | Some pname -> string pname
         this.Type.ToString()
         |> sprintf "%s%s" name
 
@@ -101,7 +98,7 @@ type Pattern<'Expr> =
     | Constant of 'Expr
     | Default
     | TuplePattern of InfParam list
-    | VarPattern of string * TypeName option
+    | VarPattern of IdentifierStr * TypeName option
 
 [<RequireQualifiedAccess>]
 type Local<'Expr> =
@@ -121,7 +118,7 @@ type Try<'Expr, 'Stat> =
       Handlers: MatchCase<'Expr, 'Stat> list
       Finally: 'Stat list }
 
-type Statement<'Expr> =
+type Statement<'Expr> = // TODO: Make if, while, match, throw, and try only be expressions.
     | Empty
     | IfStatement of If<'Expr, Position * Statement<'Expr>>
     /// An expression whose result is evaluated then discarded.
@@ -181,6 +178,9 @@ type Match = Match<Expression>
 type Try = Try<Expression>
 type Function<'Body, 'Type> = Function<Expression, 'Body, 'Type>
 
+module Expression =
+    let withPos pos expr = pos, expr
+
 type EntryPoint =
     { Body: Statement list
       Origin: Position
@@ -208,8 +208,8 @@ type TypeDef<'Member> =
            Interfaces: FullIdentifier list
            Members: ImmutableSortedSet<'Member>
            PrimaryCtor: Access * Constructor
-           SelfIdentifier: string
-           SuperClass: FullIdentifier option |}
+           SelfIdentifier: IdentifierStr
+           SuperClass: OptIdentifier |}
     | Interface of
         {| InterfaceName: Name
            Members: ImmutableSortedSet<'Member>
@@ -261,11 +261,11 @@ type MemberDef =
         {| Method: InfFunction
            MethodName: Name
            Modifiers: MethodModifiers
-           SelfIdentifier: string option |}
+           SelfIdentifier: IdentifierStr option |}
     | Property of
         {| Accessors: PropertyAccessors
            PropName: Name
-           SelfIdentifier: string option
+           SelfIdentifier: IdentifierStr option
            Value: Expression option
            ValueType: TypeName option |}
     | Type of TypeDef<Access * MemberDef>
@@ -363,8 +363,8 @@ module internal TypeDef =
                Interfaces = List.empty
                Members = MemberDef.emptyMemberSet
                PrimaryCtor = Access.Public, (MemberDef.placeholderCtor List.empty)
-               SelfIdentifier = "this"
-               SuperClass = None |}
+               SelfIdentifier = IdentifierStr "this"
+               SuperClass = OptIdentifier.EmptyIdentifier |}
 
     let placeholderInterface name =
         Interface
@@ -380,6 +380,6 @@ module internal TypeDef =
 
 type CompilationUnit =
     { EntryPoint: EntryPoint option
-      Namespace: FullIdentifier
+      Namespace: OptIdentifier
       Usings: FullIdentifier list
       Types: seq<Access * TypeDef> }

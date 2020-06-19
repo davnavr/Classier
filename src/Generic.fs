@@ -19,21 +19,21 @@ and GenericVariance =
     | Covariant
     | Contravariant
 and GenericParam =
-    { Name: string
+    { Name: IdentifierStr
       RequiredInterfaces: FullIdentifier<Generic> list
-      RequiredSuperClass: FullIdentifier<Generic> option
+      RequiredSuperClass: OptIdentifier<Generic>
       Variance: GenericVariance }
 
-    override this.ToString() = this.Name
+    override this.ToString() = string this.Name
 
 let gparam str =
     { Name = str
       RequiredInterfaces = List.empty
-      RequiredSuperClass = None
+      RequiredSuperClass = OptIdentifier.EmptyIdentifier
       Variance = NoVariance }
     |> GenericParam
 
 let garg strs =
-    Identifier.ofStrings strs
+    (invalidOp "Neet to get a full name here")
     |> TypeName.Identifier
     |> GenericArg
