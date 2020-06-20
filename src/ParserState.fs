@@ -61,7 +61,7 @@ module ParserState =
         match List.tryHead state.Members with
         | Some members ->
             members
-            |> SortedSet.add(acc, mdef)
+            |> SortedSet.tryAdd(acc, mdef)
             |> Option.map
                 (fun next -> Result.Ok { state with Members = next :: state.Members.Tail })
             |> Option.defaultWith dup
@@ -126,7 +126,16 @@ module ParserState =
                 dupMsg)
         |> Validator
 
-    let replacePlaceholder mdef state = state // NOTE: Not implemented yet.
+    let replacePlaceholder mdef state =
+        let members = getMembers state
+        match members with
+        | SortedSet.Contains mdef ->
+            let newMembers =
+                members
+                |> SortedSet.remove mdef
+                |> SortedSet.add mdef
+            { state with Members = newMembers :: state.Members.Tail }
+        | _ -> state
 
     let newParams state = { state with Params = ImmutableSortedSet.Empty :: state.Params }
 
@@ -188,7 +197,7 @@ module ParserState =
             >>= fun state ->
                 match List.tryHead state.Params with
                 | Some paramSet ->
-                    match SortedSet.add (idtype param) paramSet with
+                    match SortedSet.tryAdd (idtype param) paramSet with
                     | Some newSet ->
                         { state with Params = newSet :: state.Params.Tail }
                         |> setUserState

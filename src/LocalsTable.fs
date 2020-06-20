@@ -41,7 +41,7 @@ let addLocal local (LocalsTable table) =
     |> Option.map
         (fun locals ->
             locals
-            |> SortedSet.add local
+            |> SortedSet.tryAdd local
             |> Option.map
                 (fun newSet ->
                     (newSet :: table.Tail)

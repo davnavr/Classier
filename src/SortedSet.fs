@@ -9,13 +9,11 @@ module SortedSet =
         then Some ()
         else None
 
-    let add item (set: ImmutableSortedSet<_>) =
+    let add item (set: ImmutableSortedSet<_>) = set.Add item
+
+    let tryAdd item (set: ImmutableSortedSet<_>) =
         match set with
         | Contains item -> None
-        | _ -> set.Add item |> Some
+        | _ -> set |> add item |> Some
 
-    let getEquivalent item (set: ImmutableSortedSet<_>) =
-        let mutable value = item
-        if set.TryGetValue(item, &value)
-        then Some value
-        else None
+    let remove item (set: ImmutableSortedSet<_>) = set.Remove item

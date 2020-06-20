@@ -42,11 +42,9 @@ module GlobalsTable =
     let getNamespaces (GlobalsTable table) = table.Keys
 
     let getTypes ns (GlobalsTable table) =
-        let mutable types = null
-        table.TryGetValue(ns, &types) |> ignore
-        match types with
-        | null -> emptySymbols
-        | _ -> types
+        match table.TryGetValue ns with
+        | (true, symbols) -> symbols
+        | (false, _) -> emptySymbols
 
     let addType (tsymbol: GlobalTypeSymbol) globals =
         let (GlobalsTable table) = globals
@@ -55,7 +53,7 @@ module GlobalsTable =
             |> Namespace.fullId
         globals
         |> getTypes ns
-        |> SortedSet.add tsymbol
+        |> SortedSet.tryAdd tsymbol
         |> Option.map (fun types -> table.SetItem(ns, types) |> GlobalsTable)
 
     /// Adds a namespace to the symbol table.

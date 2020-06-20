@@ -41,7 +41,6 @@ let period = skipChar '.' <?> "period"
 let rcurlybracket = skipChar '}' <?> "closing bracket"
 let rparen = skipChar ')' <?> "closing parenthesis"
 let semicolon = skipChar ';' <?> "semicolon"
-// TODO: Make a common function for lambdaOperator >>. (statementBlock <|> (expression .>> semicolon))
 let lambdaOperator = skipString "=>" |> attempt <?> "lambda operator"
 
 let space =
@@ -1514,6 +1513,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> Seq.map (fun def -> def modfs)
                 |> choice)
+            |>> Type
         let entrypoint =
             let mainDef =
                 position
