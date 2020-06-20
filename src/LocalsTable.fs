@@ -3,11 +3,12 @@
 open System.Collections.Generic
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.Identifier
 
 [<NoComparison>]
 [<CustomEquality>]
 type Local =
-    { Name: string // TODO: Use IdentifierStr
+    { Name: IdentifierStr
       Type: TypeName }
 
     override this.Equals obj =
@@ -23,7 +24,7 @@ type LocalsTable = LocalsTable of ImmutableSortedSet<Local> list
 let private emptyScope =
     { new IComparer<Local> with
           member _.Compare(l1, l2) =
-              l1.Name.CompareTo(l2.Name) }
+              compare l1.Name l2.Name }
     |> ImmutableSortedSet.Empty.WithComparer
 
 let empty = LocalsTable List.empty
@@ -31,14 +32,18 @@ let empty = LocalsTable List.empty
 let enterScope (LocalsTable table) = emptyScope :: table |> LocalsTable
 let exitScope (LocalsTable table) =
     match table with
-    | [] -> List.empty
-    | _ -> table.Tail
-    |> LocalsTable
+    | [] -> None
+    | _ -> LocalsTable table.Tail |> Some
 
 let addLocal local (LocalsTable table) =
-    match table with
-    | [] -> table
-    | _ ->
-        // TODO: Maybe return None if it already exists in the scope?
-        table.Head.Add(local) :: table.Tail
-    |> LocalsTable
+    table
+    |> List.tryHead
+    |> Option.map
+        (fun locals ->
+            locals
+            |> SortedSet.add local
+            |> Option.map
+                (fun newSet ->
+                    (newSet :: table.Tail)
+                    |> LocalsTable))
+    |> Option.flatten

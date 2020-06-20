@@ -65,5 +65,8 @@ public class Class5 extends Class3 as self {
 }
 
 public class Class6 private (arg6) extends Class4(arg6, arg6) {
-  
+  let bigLambda = (a, b, c) => {
+    do.fancy.things(a, b);
+    return c;
+  };
 }

@@ -22,7 +22,7 @@ public class FancyClass() implements IDisposable as this {
         }
     }
 
-    override def toString() {
+    override def toString() => {
         "hello there!"
-    }
+    };
 }

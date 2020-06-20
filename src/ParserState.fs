@@ -43,6 +43,11 @@ module ParserState =
 
     let private errEmptyStack = sprintf "The %s stack was unexpectedly empty"
 
+    let private popStack stack action state =
+        match stack state with
+        | [] -> None
+        | items -> action items |> Some
+
     let newMembers state = { state with Members = MemberDef.emptyMemberSet :: state.Members }
     let popMembers state =
         match state.Members with

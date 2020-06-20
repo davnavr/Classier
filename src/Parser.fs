@@ -289,6 +289,20 @@ let equalsExpr =
     >>. space
     >>. expression
 
+let lambdaBlock =
+    lambdaOperator
+    |> attempt
+    >>. space
+    >>. choice
+        [
+            tuple2
+                position
+                (expression |>> Return)
+            |>> List.singleton
+
+            statementBlock
+        ]
+
 let tupleExpr =
     lparen
     |> attempt
@@ -330,18 +344,7 @@ let matchCases =
         |> choice
     sepBy1 matchPattern (separator comma |> attempt)
     .>> space
-    .>> lambdaOperator
-    |> attempt
-    .>> space
-    .>>. choice
-        [
-            tuple2
-                position
-                expression
-            |>> fun (pos, expr) -> [ pos, Return expr ]
-
-            statementBlock
-        ]
+    .>>. lambdaBlock
     .>> space
     .>> semicolon
     |>> (fun (patterns, body) -> { Body = body; Patterns = patterns })
@@ -654,13 +657,8 @@ let functionBody =
     choiceL
         [
             statementBlock
-            
-            lambdaOperator
-            |> attempt
-            >>. space
-            >>. position
-            .>>. expression
-            |>> fun (pos, e) -> [ pos, Return e ]
+
+            lambdaBlock
             .>> space
             .>> semicolon
         ]
@@ -934,14 +932,11 @@ let propDef modfs =
                     |> block
                     <?> "get accessor"
 
-                    lambdaOperator
+                    lambdaBlock
+                    |>> Get
                     |> attempt
-                    >>. space
-                    >>. position
-                    .>>. expression
                     .>> space
                     .>> semicolon
-                    |>> fun (pos, expr) -> Get [ pos, Return expr ]
                 ]
                 |> choice
             let propValue =
@@ -1382,15 +1377,12 @@ do
                 updateUserState newParams
                 >>. paramTuple typeAnnOpt
                 .>> space
-                .>> lambdaOperator
+                .>>. lambdaBlock
                 |> attempt
-                .>> space
-                .>>. position
-                .>>. expression
                 .>> tryPopParams
                 <?> "anonymous function"
-                |>> fun ((parameters, pos), retVal) ->
-                    { Body = [ pos, Return retVal ]
+                |>> fun (parameters, body) ->
+                    { Body = body
                       Parameters = [ parameters ]
                       ReturnType = None }
                     |> AnonFunc
