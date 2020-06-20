@@ -1434,7 +1434,17 @@ do
                 |>> (bool.Parse >> BoolLit)
                 <?> "boolean literal"
 
-                identifier |>> IdentifierRef
+                identifier
+                .>>. getUserState
+                |>> fun (id, state) ->
+                    match getSelfId state with
+                    | Some self ->
+                        match id.Generics with
+                        | [] when id.Name = self -> SelfRef
+                        | _ -> IdentifierRef id
+                    | None ->
+                        IdentifierRef id
+
                 numLit |>> NumLit
             ]
         .>> space

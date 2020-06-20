@@ -125,6 +125,18 @@ module ParserState =
 
     let newParams state = { state with Params = ImmutableSortedSet.Empty :: state.Params }
 
+    let getSelfId state =
+        match state.Params with
+        | [] -> None
+        | _ ->
+            state.Params
+            |> Seq.tryPick
+                (Seq.tryPick
+                    (fun paramid ->
+                        match paramid with
+                        | ParamIdentifier _ -> None
+                        | SelfIdentifier self -> Some self))
+
     [<AutoOpen>]
     module StateManagement =
         let tryUpdateState f msg =
@@ -195,12 +207,7 @@ module ParserState =
                 match state.Params with
                 | [] -> "parameters" |> errEmptyStack |> fail
                 | _ ->
-                    state.Params
-                    |> Seq.tryPick
-                        (Seq.tryPick
-                            (fun paramid ->
-                                match paramid with
-                                | ParamIdentifier _ -> None
-                                | SelfIdentifier self -> Some self))
+                    state
+                    |> getSelfId
                     |> Option.map preturn
                     |> Option.defaultValue (fail "A self-identifier could not be found.")
