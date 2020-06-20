@@ -9,6 +9,8 @@ module SortedSet =
         then Some ()
         else None
 
+    let length (set: ImmutableSortedSet<_>) = set.Count
+
     let add item (set: ImmutableSortedSet<_>) = set.Add item
 
     let tryAdd item (set: ImmutableSortedSet<_>) =

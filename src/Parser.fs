@@ -1036,7 +1036,7 @@ do
         <?> "interface body"
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
-let classDef modfs =
+let classDef modfs = // TODO: Do not add a default ctor if primary ctor is omitted and at least one secondary ctor is defined.
     let dataMembers =
         keyword "data"
         >>. position
@@ -1568,14 +1568,16 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     .>>. useStatements
     .>> definitions
     .>> eof
+    .>>. position
     .>>. getUserState
     .>> tryPopMembers
     .>> tryPopValidators
     .>> tryPopParams
-    |>> fun ((ns, uses), state) ->
+    |>> fun (((ns, uses), pos), state) -> // TODO: Clean up parameters.
         { EntryPoint = state.EntryPoint
           Namespace = ns
           Usings = uses
+          Source = pos.StreamName
           Types =
             state
             |> ParserState.getMembers

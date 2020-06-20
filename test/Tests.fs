@@ -24,16 +24,16 @@ let main args =
     [
         [
             [
-                "FancyClass", "", [ "System" ], [ "FancyClass" ]
+                "FancyClass", "", [ "System" ], [ "FancyClass", 4 ]
                 "HelloWorld", "", [ "System.Console" ], List.empty
-                "MethodOverloading", "", List.empty, [ "OverloadingExample" ]
-                "MultipleClasses", "test", List.empty, [ "Class1"; "Class2"; "Interface1"; "Class3"; "Class4"; "Class5"; "Class6" ]
-                "MyAbstractClass", "this.is.my.space", [ "java.lang"; "java.util" ], [ "MyAbstractClass" ]
-                "MyException1", "", List.empty, [ "MyException1" ]
-                "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>" ]
-                "MyModule", "blah.blah.blah", [ "system.reflection.Assembly" ], [ "Math" ]
-                "NoAccessModifiers", "My.Awesome.Project", List.empty, [ "MyModule"; "MyModule"; "MyInterface" ]
-                "PropertyTest", "", List.empty, [ "PropertyTest"; "IPropertyTest" ]
+                "MethodOverloading", "", List.empty, [ "OverloadingExample", 6 ]
+                "MultipleClasses", "test", List.empty, [ "Class1", 3; "Class2", 3; "Interface1", 1; "Class3", 2; "Class4", 2; "Class5", 2; "Class6", 1 ]
+                "MyAbstractClass", "this.is.my.space", [ "java.lang"; "java.util" ], [ "MyAbstractClass", 4 ]
+                "MyException1", "", List.empty, [ "MyException1", 3 ]
+                "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>", 3 ]
+                "MyModule", "blah.blah.blah", [ "system.reflection.Assembly" ], [ "Math", 5 ]
+                "NoAccessModifiers", "My.Awesome.Project", List.empty, [ "MyModule", 2; "MyModule", 1; "MyInterface", 1 ]
+                "PropertyTest", "", List.empty, [ "PropertyTest", 5; "IPropertyTest", 1 ]
             ]
             |> Seq.map
                 (fun (sourceName, ns, usings, defs) ->
@@ -62,6 +62,7 @@ let main args =
                                         state.Symbols
                                         |> GlobalsTable.getNamespaces
                                         |> Seq.find (fun tablens -> string tablens = ns)
+                                    let expectedTypes = Seq.map fst defs
                                     state.Symbols
                                     |> GlobalsTable.getTypes expectedNs
                                     |> Seq.map
@@ -69,7 +70,17 @@ let main args =
                                             gtype.Type
                                             |> GlobalType.getName
                                             |> string)
-                                    |> Assert.isSuperSet defs)
+                                    |> Assert.isSuperSet expectedTypes)
+
+                            TestCase.psuccess
+                                "member count"
+                                (fun cu _ ->
+                                    cu.Types
+                                    |> Seq.map (snd >> TypeDef.getMembers >> SortedSet.length)
+                                    |> List.ofSeq
+                                    |> Assert.equal
+                                        "member counts"
+                                        (List.map snd defs))
 
                             TestCase.psuccess
                                 "empty stacks"

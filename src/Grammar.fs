@@ -361,7 +361,7 @@ module MemberDef =
 type Member = Access * MemberDef
 type TypeDef = TypeDef<Member>
 
-module internal TypeDef =
+module TypeDef =
     let placeholderClass name =
         Class
             {| ClassName = name
@@ -385,8 +385,15 @@ module internal TypeDef =
                ModuleName = name
                Members = MemberDef.emptyMemberSet |}
 
+    let getMembers tdef =
+        match tdef with
+        | Class cdef -> cdef.Members
+        | Interface idef -> idef.Members
+        | Module mdef -> mdef.Members
+
 type CompilationUnit =
     { EntryPoint: EntryPoint option
       Namespace: FullIdentifier option
       Usings: FullIdentifier list
+      Source: string
       Types: seq<Access * TypeDef> }
