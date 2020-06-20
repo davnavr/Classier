@@ -992,7 +992,6 @@ let memberBlock (members: seq<_>) types =
         ]
     |>> List.choose id
     .>>. (getUserState |>> getMembers)
-    |> debugIt
 
 let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
 let interfaceDef modfs =
@@ -1563,17 +1562,15 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     (newMembers >> pushValidator typeValidator >> newParams)
     |> updateUserState
     >>. space
-    >>. namespaceDecl
-    .>> space
-    .>>. useStatements
-    .>> definitions
-    .>> eof
-    .>>. position
-    .>>. getUserState
+    >>. tuple4
+        (namespaceDecl .>> space)
+        (useStatements .>> definitions .>> eof)
+        position
+        getUserState
     .>> tryPopMembers
     .>> tryPopValidators
     .>> tryPopParams
-    |>> fun (((ns, uses), pos), state) -> // TODO: Clean up parameters.
+    |>> fun (ns, uses, pos, state) ->
         { EntryPoint = state.EntryPoint
           Namespace = ns
           Usings = uses

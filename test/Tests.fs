@@ -27,13 +27,13 @@ let main args =
                 "FancyClass", "", [ "System" ], [ "FancyClass", 4 ]
                 "HelloWorld", "", [ "System.Console" ], List.empty
                 "MethodOverloading", "", List.empty, [ "OverloadingExample", 6 ]
-                "MultipleClasses", "test", List.empty, [ "Class1", 3; "Class2", 3; "Interface1", 1; "Class3", 2; "Class4", 2; "Class5", 2; "Class6", 1 ]
+                "MultipleClasses", "test", List.empty, [ "Class1", 3; "Class2", 3; "Class3", 2; "Class4", 2; "Class5", 2; "Class6", 1; "Interface1", 1 ]
                 "MyAbstractClass", "this.is.my.space", [ "java.lang"; "java.util" ], [ "MyAbstractClass", 4 ]
                 "MyException1", "", List.empty, [ "MyException1", 3 ]
                 "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>", 3 ]
                 "MyModule", "blah.blah.blah", [ "system.reflection.Assembly" ], [ "Math", 5 ]
                 "NoAccessModifiers", "My.Awesome.Project", List.empty, [ "MyModule", 2; "MyModule", 1; "MyInterface", 1 ]
-                "PropertyTest", "", List.empty, [ "PropertyTest", 5; "IPropertyTest", 1 ]
+                "PropertyTest", "", List.empty, [ "IPropertyTest", 1; "PropertyTest", 5  ]
             ]
             |> Seq.map
                 (fun (sourceName, ns, usings, defs) ->
