@@ -60,8 +60,8 @@ public class Class4(arg4) extends Class2(arg4 + 5) implements Interface1 {
   public override sealed def myVirtMethod() => 2;
 }
 
-public class Class5 extends Class3 {
-  
+public class Class5 extends Class3 as self {
+  public def new (thing1) => self();
 }
 
 public class Class6 private (arg6) extends Class4(arg6, arg6) {

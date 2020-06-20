@@ -697,10 +697,15 @@ let ctorDef modfs =
     >>. updateUserState newParams
     >>. ctorHeader
     .>>. selfIdAs
-    >>= fun (cparams, selfid) -> // TODO: Come up with a way to keep track of the current self identifier. This will help with not only ctorDef but also in Expression parsing if a new case called Self is added.
+    .>>. trySelfId
+    >>= fun ((cparams, selfid), currentSelf) ->
         [
             keyword "super" >>% SuperCall
-            keyword "this" >>% SelfCall
+
+            currentSelf
+            |> string
+            |> keyword
+            >>% SelfCall
         ]
         |> choice
         .>>. tupleExpr
@@ -710,7 +715,8 @@ let ctorDef modfs =
         |>> fun (baseCall, body) ->
             { BaseCall = baseCall
               Body = body
-              Parameters = cparams }
+              Parameters = cparams
+              SelfIdentifier = selfid }
             |> Ctor
     .>> tryPopParams
     <?> "constructor definition"
@@ -1042,9 +1048,6 @@ let classDef modfs =
         >>. position
         |>> fun pos ->
             fun values ->
-                let name str pos =
-                    { Identifier = Identifier.ofStr str
-                      Position = pos }
                 let selfid = "this__"
                 seq {
                     Method
@@ -1119,8 +1122,9 @@ let classDef modfs =
             let placeholder =
                 { BaseCall = SuperCall List.empty
                   Body = List.empty
-                  Parameters = ctorParams }
-            let actual body baseArgs =
+                  Parameters = ctorParams
+                  SelfIdentifier = None }
+            let actual body baseArgs = // TODO: Don't forget to replace it in the member set when the actual primary ctor is retrieved.
                 let ctor =
                     { placeholder with
                         BaseCall = SuperCall baseArgs
@@ -1134,14 +1138,25 @@ let classDef modfs =
         .>> space
         .>>. optList tupleExpr
         .>> space
+    let classSelf =
+        selfIdAs
+        >>= fun selfid ->
+            match selfid with
+            | Some self -> preturn self
+            | None ->
+                tryPushParam
+                    SelfIdentifier
+                    defaultSelfId
     let def header label body =
         let actualBody =
-            tuple5
+            updateUserState newParams
+            >>. tuple5
                 classCtor
                 classBase
                 (implements .>> space)
-                (selfIdAs |>> Option.defaultValue defaultSelfId)
+                classSelf
                 body
+            .>> tryPopParams
             |> memberSection
         tuple4
             header

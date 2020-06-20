@@ -182,9 +182,25 @@ module ParserState =
                         |> sprintf "A parameter with the name '%s' already exists"
                         |> fail
                 | None -> "parameter" |> errEmptyStack |> fail
-        let tryPopParams: Parser<_, ParserState> =
+        let tryPopParams =
             getUserState
             >>= fun state ->
                 match state.Params with
                 | [] -> "parameters" |> errEmptyStack |> fail
                 | _ -> setUserState { state with Params = state.Params.Tail }
+
+        let trySelfId =
+            getUserState
+            >>= fun state ->
+                match state.Params with
+                | [] -> "parameters" |> errEmptyStack |> fail
+                | _ ->
+                    state.Params
+                    |> Seq.tryPick
+                        (Seq.tryPick
+                            (fun paramid ->
+                                match paramid with
+                                | ParamIdentifier _ -> None
+                                | SelfIdentifier self -> Some self))
+                    |> Option.map preturn
+                    |> Option.defaultValue (fail "A self-identifier could not be found.")

@@ -192,7 +192,8 @@ type ConstructorBase =
 type Constructor =
     { BaseCall: ConstructorBase
       Body: Statement list
-      Parameters: InfParam list }
+      Parameters: InfParam list
+      SelfIdentifier: IdentifierStr option }
 
 type ClassInheritance =
     | MustInherit
@@ -343,7 +344,8 @@ module MemberDef =
     let placeholderCtor cparams =
         { BaseCall = SuperCall List.empty
           Body = List.empty
-          Parameters = cparams }
+          Parameters = cparams
+          SelfIdentifier = None }
 
     let internal placeholderMethod name selfid mparams =
         Method
