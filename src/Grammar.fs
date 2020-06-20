@@ -201,6 +201,7 @@ type ClassInheritance =
     | CanInherit
     | Sealed
 
+/// TODO: Differentiate between abstract types and non-abstract types, and abstract members and non-abstract members.
 type TypeDef<'Member> =
     | Class of
         {| ClassName: Name
@@ -208,7 +209,7 @@ type TypeDef<'Member> =
            Inheritance: ClassInheritance
            Interfaces: FullIdentifier list
            Members: ImmutableSortedSet<'Member>
-           PrimaryCtor: Access * Constructor
+           PrimaryCtor: (Access * Constructor) option
            SelfIdentifier: IdentifierStr
            SuperClass: FullIdentifier option |}
     | Interface of
@@ -272,6 +273,9 @@ type MemberDef =
     | Type of TypeDef<Access * MemberDef>
 
 module MemberDef =
+    let withAccess<'Member> (acc: Access) (mdef: 'Member) = acc, mdef
+    let defaultAccess<'Member> = withAccess<'Member> Access.Public
+
     let name mdef =
         match mdef with
         | AbMethod mdef -> Some mdef.MethodName
@@ -348,6 +352,8 @@ module MemberDef =
           Parameters = cparams
           SelfIdentifier = None }
 
+    let emptyCtor = placeholderCtor List.empty
+
     let internal placeholderMethod name selfid mparams =
         Method
             {| Method =
@@ -369,7 +375,7 @@ module TypeDef =
                Inheritance = ClassInheritance.Sealed
                Interfaces = List.empty
                Members = MemberDef.emptyMemberSet
-               PrimaryCtor = Access.Public, (MemberDef.placeholderCtor List.empty)
+               PrimaryCtor = None
                SelfIdentifier = IdentifierStr "this"
                SuperClass = None |}
 

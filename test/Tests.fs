@@ -27,7 +27,7 @@ let main args =
                 "FancyClass", "", [ "System" ], [ "FancyClass", 4 ]
                 "HelloWorld", "", [ "System.Console" ], List.empty
                 "MethodOverloading", "", List.empty, [ "OverloadingExample", 6 ]
-                "MultipleClasses", "test", List.empty, [ "Class1", 3; "Class2", 3; "Class3", 2; "Class4", 2; "Class5", 2; "Class6", 1; "Interface1", 1 ]
+                "MultipleClasses", "test", List.empty, [ "Class1", 3; "Class2", 3; "Class3", 2; "Class4", 2; "Class5", 1; "Class6", 1; "Interface1", 1 ]
                 "MyAbstractClass", "this.is.my.space", [ "java.lang"; "java.util" ], [ "MyAbstractClass", 4 ]
                 "MyException1", "", List.empty, [ "MyException1", 3 ]
                 "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>", 3 ]

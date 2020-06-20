@@ -27,9 +27,6 @@ let private tuple6 p1 p2 p3 p4 p5 p6 =
 let private tuple7 p1 p2 p3 p4 p5 p6 p7 =
     tuple6 p1 p2 p3 p4 p5 p6 .>>. p7
     |>> (fun ((a, b, c, d, e, f), g) -> a, b, c, d, e, f, g)
-let private tuple8 p1 p2 p3 p4 p5 p6 p7 p8 =
-    tuple7 p1 p2 p3 p4 p5 p6 p7 .>>. p8
-    |>> (fun ((a, b, c, d, e, f, g), h) -> a, b, c, d, e, f, g, h)
 
 let colon = skipChar ':'
 let comma = skipChar ','
@@ -746,6 +743,7 @@ let functionDef modfs =
                   Parameters = fparams
                   ReturnType = retType }
                FunctionName = name |}
+// TODO: Create parser for operators.
 let methodDef modfs =
     let methodModf =
         validateModifiers
@@ -1035,7 +1033,7 @@ do
         <?> "interface body"
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
-let classDef modfs = // TODO: Do not add a default ctor if primary ctor is omitted and at least one secondary ctor is defined.
+let classDef modfs =
     let dataMembers =
         keyword "data"
         >>. position
@@ -1101,22 +1099,15 @@ let classDef modfs = // TODO: Do not add a default ctor if primary ctor is omitt
                 | _ -> Result.Error None)
             Sealed
     let classCtor =
-        let cparams =
-            paramTuple typeAnnOpt
-            .>> space
-            |> optList
         accessModifier Access.Private
         .>> space
         |> opt
         |>> Option.defaultValue Access.Public
-        .>>. cparams
+        .>>. paramTuple typeAnnOpt
+        .>> space
         <?> "primary constructor"
         >>= fun (acc, ctorParams) ->
-            let placeholder =
-                { BaseCall = SuperCall List.empty
-                  Body = List.empty
-                  Parameters = ctorParams
-                  SelfIdentifier = None }
+            let placeholder = MemberDef.placeholderCtor ctorParams
             let actual body baseArgs = // TODO: Don't forget to replace it in the member set when the actual primary ctor is retrieved.
                 let ctor =
                     { placeholder with
@@ -1125,11 +1116,12 @@ let classDef modfs = // TODO: Do not add a default ctor if primary ctor is omitt
                 acc, ctor
             tryAddMember (acc, Ctor placeholder)
             >>% actual
+        |> opt
     let classBase =
         extends
         |> attempt
         .>> space
-        .>>. optList tupleExpr
+        .>>. opt tupleExpr
         .>> space
     let classSelf =
         selfIdAs
@@ -1173,23 +1165,68 @@ let classDef modfs = // TODO: Do not add a default ctor if primary ctor is omitt
             classBody
     ]
     |> choice
-    |>> fun (rmembers, cmodf, name, (ctor, (sclass, superCall), ilist, selfid, (body, cmembers))) ->
-        let primaryCtor = ctor body superCall
-        Class
+    |>> fun (rmembers, cmodf, name, (ctorGen, (sclass, scall), ilist, selfid, (body, cmembers))) ->
+        let def (members) pctor =
             {| ClassName = name
                Body = body
                Inheritance = cmodf
                Interfaces = ilist
                Members =
-                 match rmembers with
-                 | Some recordMems ->
-                    (snd primaryCtor).Parameters
-                    |> recordMems
-                    |> cmembers.Union
-                 | None -> cmembers
-               PrimaryCtor = primaryCtor
+                 match pctor with
+                 | Some (acc, ctor) ->
+                    let ctorDef =
+                        ctor
+                        |> Ctor
+                        |> MemberDef.withAccess acc
+                    SortedSet.add ctorDef members
+                 | None -> members
+               PrimaryCtor = pctor
                SelfIdentifier = selfid
                SuperClass = sclass |}
+            |> Class
+        let noCtor =
+            Seq.forall
+                (fun (_, mdef)->
+                    match mdef with
+                    | Ctor _ -> false
+                    | _ -> true)
+        match (ctorGen, cmembers, scall) with
+        | (Some ctor, _, _) ->
+            let primaryCtor =
+                scall
+                |> Option.defaultValue List.empty
+                |> ctor body
+            let members =
+                match rmembers with
+                | Some recordMems ->
+                   (snd primaryCtor).Parameters
+                   |> recordMems
+                   |> cmembers.Union
+                | None -> cmembers
+            def
+                members
+                (Some primaryCtor)
+        | (None, _, Some args) ->
+            { MemberDef.emptyCtor with
+                BaseCall = SuperCall args
+                Body = body }
+            |> MemberDef.defaultAccess
+            |> Some
+            |> def cmembers
+        | (None, _, _) when (noCtor cmembers) ->
+            { MemberDef.emptyCtor with
+                BaseCall =
+                    match scall with
+                    | Some args -> args
+                    | None -> List.empty
+                    |> SuperCall
+                Body = body }
+            |> MemberDef.defaultAccess
+            |> Some
+            |> def cmembers
+        | (None, _, _) ->
+            def cmembers None
+
 do
     classBodyRef :=
         memberBlock
