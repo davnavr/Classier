@@ -15,6 +15,7 @@
     <Compile Include="TypeSystem.fs" />
     <Compile Include="Generic.fs" />
     <Compile Include="Grammar\Aliases.fs" />
+    <Compile Include="Grammar\Name.fs" />
     <Compile Include="Grammar\Numeric.fs" />
     <Compile Include="Grammar\Param.fs" />
     <Compile Include="Grammar\Grammar.fs" />

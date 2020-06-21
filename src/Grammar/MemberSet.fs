@@ -58,7 +58,7 @@ module MemberSet =
             (fun idef -> idef.InterfaceName)
             (function
             | AMethod mdef -> mdef.MethodName
-            | AProperty pdef -> pdef.PropName)
+            | AProperty pdef -> Name.asGeneric pdef.PropName)
 
     let moduleSet =
         memberSet
@@ -69,7 +69,7 @@ module MemberSet =
                 match tdef with
                 | Class cdef -> cdef.ClassName
                 | Interface idef -> idef.InterfaceName
-                | Module mdef -> mdef.ModuleName
+                | Module mdef -> Name.asGeneric mdef.ModuleName
                 |> IdentifierName)
             (function
             | Function fdef -> IdentifierName fdef.FunctionName

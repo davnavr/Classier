@@ -7,7 +7,7 @@ open Classier.NET.Compiler.Extern
 [<NoComparison>]
 type GlobalType =
     | DefinedType of TypeDef
-    | ExternType of ExternType
+    | ExternType of EType
 
 type GlobalTypeSymbol =
     { Namespace: FullIdentifier option

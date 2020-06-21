@@ -13,16 +13,6 @@ type Access =
     | Protected
     | Private
 
-type Name =
-    { Identifier: Identifier
-      Position: Position }
-
-    static member OfStr pos str =
-        { Identifier = Identifier.ofStr str
-          Position = pos }
-
-    override this.ToString() = this.Identifier.ToString()
-
 type If<'Expr, 'Stat> =
     { Condition: 'Expr
       Choice1: 'Stat list

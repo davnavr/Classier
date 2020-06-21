@@ -13,7 +13,7 @@ type TypeOrMember<'Type, 'Member> =
     | Member of 'Member
 
 type Class =
-    { ClassName: Name
+    { ClassName: GenericName
       Body: Statement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier list
@@ -23,13 +23,13 @@ type Class =
       SuperClass: FullIdentifier option }
 
 type Interface =
-    { InterfaceName: Name
+    { InterfaceName: GenericName
       Members: ImmutableSortedSet<TypeOrMember<Interface, AbstractMember>>
       SuperInterfaces: FullIdentifier list }
 
 type Module<'Type> =
     { Body: Statement list
-      ModuleName: Name
+      ModuleName: SimpleName
       Members: ImmutableSortedSet<TypeOrMember<'Type, StaticMember>>}
 
 type TypeDef =
@@ -37,3 +37,8 @@ type TypeDef =
     | Interface of Interface
     | Module of Module
 and Module = Module<TypeDef>
+
+type EntryPoint =
+    { Body: Statement list
+      Origin: Position
+      Parameters: ExpParam list }

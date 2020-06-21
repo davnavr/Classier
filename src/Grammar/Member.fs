@@ -37,7 +37,7 @@ type MethodModifiers =
 
 type Method =
     { Method: InfFunction
-      MethodName: Name
+      MethodName: GenericName
       Modifiers: MethodModifiers
       SelfIdentifier: IdentifierStr option }
 
@@ -49,14 +49,14 @@ type PropAccessors =
 
 type Property =
     { Accessors: PropAccessors
-      PropName: Name
+      PropName: SimpleName
       SelfIdentifier: IdentifierStr option
       Value: Expression option
       ValueType: TypeName option }
 
 type AMethod =
     { Method: Function<unit, TypeName>
-      MethodName: Name
+      MethodName: GenericName
       Modifiers: AbstractModf * MutatorModf }
 
 type AbstractPropAccessors =
@@ -65,7 +65,7 @@ type AbstractPropAccessors =
 
 type AProperty =
     { Accessors: AbstractPropAccessors
-      PropName: Name
+      PropName: SimpleName
       Purity: AbstractModf
       ValueType: TypeName }
 
@@ -85,7 +85,7 @@ type InstanceMember =
 type StaticMember =
     | Function of
         {| Function: InfFunction
-           FunctionName: Name |}
+           FunctionName: GenericName |}
     | Operator of Operator.Operator
 
 type Member =
@@ -93,7 +93,7 @@ type Member =
     | Static of StaticMember
 
 type MemberName =
-    | IdentifierName of Name
+    | IdentifierName of GenericName
     | OperatorName of Operator.OperatorStr
 
 [<RequireQualifiedAccess>]
@@ -134,8 +134,11 @@ module Member =
             emptyParams
 
     let instanceName =
-        let inline methodName def = Some ((^a) : (member MethodName : Name) (def))
-        let inline propName def = Some ((^a) : (member PropName : Name) (def))
+        let inline methodName def = Some ((^a) : (member MethodName : GenericName) (def))
+        let inline propName def =
+            ((^a) : (member PropName : SimpleName) (def))
+            |> Name.asGeneric
+            |> Some
         foldInstance
             methodName
             propName

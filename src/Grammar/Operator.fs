@@ -17,6 +17,7 @@ type Operator =
     { Body: Statement list
       Kind: OperatorKind
       Operands: InfParam list
+      ReturnType: TypeName option
       Symbol: OperatorStr }
 
 let operatorChars = [ '!'; '%'; '&'; '*'; '+'; '-'; '/'; '<'; '='; '<'; '?'; '|'; '~' ]
