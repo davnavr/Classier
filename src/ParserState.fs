@@ -43,11 +43,6 @@ module ParserState =
 
     let private errEmptyStack = sprintf "The %s stack was unexpectedly empty"
 
-    let private popStack stack action state =
-        match stack state with
-        | [] -> None
-        | items -> action items |> Some
-
     let newMembers state = { state with Members = MemberDef.emptyMemberSet :: state.Members }
     let popMembers state =
         match state.Members with
@@ -160,7 +155,6 @@ module ParserState =
                 | Some newState -> setUserState newState
                 | None -> fail msg
 
-        // TODO: Make the functions below regular functions in the ParserState module that do not return Parser<_,_>. Use tryUpdateState to call these new functions
         let tryPopMembers: Parser<_, ParserState> =
             tryUpdateState
                 popMembers
@@ -171,7 +165,7 @@ module ParserState =
                 popValidator
                 (errEmptyStack "validator")
 
-        let tryAddMember mdef = // TODO: preturn the mdef.
+        let tryAddMember mdef =
             getUserState
             >>= fun state ->
                 match List.tryHead state.Validators with

@@ -629,7 +629,7 @@ let private genericTypeName placeholder =
         >>% name
 
 let opName: Parser<_, ParserState> =
-    [ '!'; '%'; '&'; '*'; '+'; '-'; '/'; '<'; '='; '<'; '?'; '|'; '~' ]
+    Operator.operatorChars
     |> anyOf
     |> many1Chars
 
@@ -669,7 +669,7 @@ let ctorDef modfs =
             let placeholder =
                 cparams
                 |> MemberDef.placeholderCtor
-                |> Ctor
+                |> Constructor
             tryAddMember (Access.Public, placeholder) >>% cparams
     let ctorBody ctorBase =
         [
@@ -711,10 +711,9 @@ let ctorDef modfs =
               Body = body
               Parameters = cparams
               SelfIdentifier = selfid }
-            |> Ctor
+            |> Constructor
     .>> tryPopParams
     <?> "constructor definition"
-
 let functionDef modfs =
     let funcHeader =
         genericName
@@ -743,7 +742,6 @@ let functionDef modfs =
                   Parameters = fparams
                   ReturnType = retType }
                FunctionName = name |}
-// TODO: Create parser for operators.
 let methodDef modfs =
     let methodModf =
         validateModifiers
@@ -836,7 +834,8 @@ let methodDef modfs =
     .>> tryPopParams
     <?> "method definition"
     |> attempt
-
+let operatorDef modfs =
+    fail "bad"
 let propDef modfs =
     let propModf =
         validateModifiers
@@ -1114,7 +1113,7 @@ let classDef modfs =
                         BaseCall = SuperCall baseArgs
                         Body = body }
                 acc, ctor
-            tryAddMember (acc, Ctor placeholder)
+            tryAddMember (acc, Constructor placeholder)
             >>% actual
         |> opt
     let classBase =
@@ -1176,7 +1175,7 @@ let classDef modfs =
                  | Some (acc, ctor) ->
                     let ctorDef =
                         ctor
-                        |> Ctor
+                        |> Constructor
                         |> MemberDef.withAccess acc
                     SortedSet.add ctorDef members
                  | None -> members
@@ -1188,7 +1187,7 @@ let classDef modfs =
             Seq.forall
                 (fun (_, mdef)->
                     match mdef with
-                    | Ctor _ -> false
+                    | Constructor _ -> false
                     | _ -> true)
         match (ctorGen, cmembers, scall) with
         | (Some ctor, _, _) ->
