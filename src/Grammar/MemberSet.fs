@@ -8,20 +8,24 @@ module MemberSet =
         ImmutableSortedSet.Empty.WithComparer
             { new IComparer<_> with member _.Compare(m1, m2) = f m1 m2 }
 
-    let classSet =
+    let private memberSet param typeName memberName =
         emptySet
             (fun m1 m2 ->
                 match (m1, m2) with
                 | (Member i1, Member i2) ->
+                    let firstParams m =
+                        param m
+                        |> Option.map List.tryHead
+                        |> Option.flatten
                     let paramCompare =
                         compare
-                            (Member.instanceParams i1)
-                            (Member.instanceParams i2)
+                            (firstParams i1)
+                            (firstParams i2)
                     match paramCompare with
                     | 0 ->
                         compare
-                            (Member.instanceName i1)
-                            (Member.instanceName i2)
+                            (memberName i1)
+                            (memberName i2)
                     | _ -> paramCompare
                 | (Member mdef, Type tdef)
                 | (Type tdef, Member mdef) ->
@@ -29,10 +33,44 @@ module MemberSet =
                         match m1 with
                         | Member _ -> 1
                         | Type _ -> -1
-                    let nameCompare =
-                        mdef
-                        |> Member.instanceName
-                        |> compare (Some tdef.ClassName)
-                    nameCompare * factor
+                    match param mdef with
+                    | Some _ -> factor
+                    | None ->
+                        let nameCompare =
+                            mdef
+                            |> memberName
+                            |> compare (typeName tdef)
+                        factor * nameCompare
                 | (Type t1, Type t2) ->
-                    compare t1.ClassName t2.ClassName)
+                    compare (typeName t1) (typeName t2))
+
+    let classSet =
+        memberSet
+            Member.instanceParams
+            (fun cdef -> Some cdef.ClassName)
+            Member.instanceName
+
+    let interfaceSet =
+        memberSet
+            (function
+            | AMethod mdef -> Some mdef.Method.Parameters
+            | _ -> None)
+            (fun idef -> idef.InterfaceName)
+            (function
+            | AMethod mdef -> mdef.MethodName
+            | AProperty pdef -> pdef.PropName)
+
+    let moduleSet =
+        memberSet
+            (function
+            | Function fdef -> Some fdef.Function.Parameters
+            | Operator op -> Some [ op.Operands ])
+            (fun tdef ->
+                match tdef with
+                | Class cdef -> cdef.ClassName
+                | Interface idef -> idef.InterfaceName
+                | Module mdef -> mdef.ModuleName
+                |> IdentifierName)
+            (function
+            | Function fdef -> IdentifierName fdef.FunctionName
+            | Operator op -> OperatorName op.Symbol)

@@ -35,4 +35,5 @@ type Module<'Type> =
 type TypeDef =
     | Class of Class
     | Interface of Interface
-    | Module of Module<TypeDef>
+    | Module of Module
+and Module = Module<TypeDef>

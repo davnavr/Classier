@@ -94,7 +94,6 @@ type Member =
 
 type MemberName =
     | IdentifierName of Name
-    | NoName
     | OperatorName of Operator.OperatorStr
 
 [<RequireQualifiedAccess>]
@@ -105,8 +104,8 @@ module Member =
         |> Some
     let private emptyParams _ = None
 
-    let withAccess (acc: Access) (mdef: Member) = acc, mdef
-    let defaultAccess = withAccess Access.Public
+    let withAccess<'Member> (acc: Access) (mdef: 'Member) = acc, mdef
+    let defaultAccess<'Member> = withAccess<'Member> Access.Public
 
     let defaultCtor =
         { BaseCall = SuperCall List.empty
