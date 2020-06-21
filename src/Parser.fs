@@ -253,7 +253,7 @@ let implements =
     |> optList
     <?> "interface implementations"
 
-let paramIdentifier = identifierStr >>= tryPushParam ParamIdentifier
+let paramIdentifier = identifierStr >>= tryAddParam ParamIdentifier
 let param typeAnn =
     paramIdentifier
     .>>. typeAnn
@@ -633,7 +633,7 @@ let opName: Parser<_, ParserState> =
     |> anyOf
     |> many1Chars
 
-let selfIdStr = identifierStr >>= tryPushParam SelfIdentifier
+let selfIdStr = identifierStr >>= tryAddParam SelfIdentifier
 let selfId =
     selfIdStr
     .>> space
@@ -1128,7 +1128,7 @@ let classDef modfs =
             match selfid with
             | Some self -> preturn self
             | None ->
-                tryPushParam
+                tryAddParam
                     SelfIdentifier
                     defaultSelfId
     let def header label body =
@@ -1586,7 +1586,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         [
             accessModifier Access.Internal
             .>>. typeDef
-            >>= (replacePlaceholder >> updateUserState)
+            >>= (replaceMember >> updateUserState)
             |>> ignore
 
             entrypoint

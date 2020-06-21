@@ -12,25 +12,29 @@ type TypeOrMember<'Type, 'Member> =
     | Type of 'Type
     | Member of 'Member
 
+type MemberSet<'Member> = ImmutableSortedSet<Access * 'Member>
+
 type Class =
     { ClassName: GenericName
       Body: Statement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier list
-      Members: ImmutableSortedSet<TypeOrMember<Class, InstanceMember>>
+      Members: MemberSet<ClassMember>
       PrimaryCtor: (Access * Ctor) option
       SelfIdentifier: IdentifierStr
       SuperClass: FullIdentifier option }
+and ClassMember = TypeOrMember<Class, InstanceMember>
 
 type Interface =
     { InterfaceName: GenericName
-      Members: ImmutableSortedSet<TypeOrMember<Interface, AbstractMember>>
+      Members: MemberSet<InterfaceMember>
       SuperInterfaces: FullIdentifier list }
+and InterfaceMember = TypeOrMember<Interface, AbstractMember>
 
 type Module<'Type> =
     { Body: Statement list
       ModuleName: SimpleName
-      Members: ImmutableSortedSet<TypeOrMember<'Type, StaticMember>>}
+      Members: MemberSet<TypeOrMember<'Type, StaticMember>> }
 
 type TypeDef =
     | Class of Class

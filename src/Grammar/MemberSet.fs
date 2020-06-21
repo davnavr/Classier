@@ -3,12 +3,18 @@
 open System.Collections.Generic
 open System.Collections.Immutable
 
+type MemberSet =
+    | ClassSet of MemberSet<TypeOrMember<Class, InstanceMember>>
+    | InterfaceSet of MemberSet<TypeOrMember<Interface, AbstractMember>>
+    | ModuleSet of MemberSet<TypeOrMember<TypeDef, StaticMember>>
+    | TypeSet of MemberSet<TypeDef>
+
 module MemberSet =
     let private emptySet f =
         ImmutableSortedSet.Empty.WithComparer
-            { new IComparer<_> with member _.Compare(m1, m2) = f m1 m2 }
+            { new IComparer<_> with member _.Compare((_, m1), (_, m2)) = f m1 m2 }
 
-    let private memberSet param typeName memberName =
+    let private memberSet setType param typeName memberName =
         emptySet
             (fun m1 m2 ->
                 match (m1, m2) with
@@ -43,15 +49,18 @@ module MemberSet =
                         factor * nameCompare
                 | (Type t1, Type t2) ->
                     compare (typeName t1) (typeName t2))
+        |> setType
 
     let classSet =
         memberSet
+            ClassSet
             Member.instanceParams
             (fun cdef -> Some cdef.ClassName)
             Member.instanceName
 
     let interfaceSet =
         memberSet
+            InterfaceSet
             (function
             | AMethod mdef -> Some mdef.Method.Parameters
             | _ -> None)
@@ -62,6 +71,7 @@ module MemberSet =
 
     let moduleSet =
         memberSet
+            ModuleSet
             (function
             | Function fdef -> Some fdef.Function.Parameters
             | Operator op -> Some [ op.Operands ])

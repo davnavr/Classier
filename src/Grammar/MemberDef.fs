@@ -1,7 +1,15 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
 type MemberDef =
-    | Member of Member
-    | Type of TypeDef
+    | ClassMember of ClassMember
+    | InterfaceMember of InstanceMember
+    | ModuleMember of TypeOrMember<TypeDef, StaticMember>
+    | GlobalType of TypeDef
 
-//module MemberDef =
+module MemberDef =
+    let fold classm intfm modlm typem mdef =
+        match mdef with
+        | ClassMember cmem -> classm cmem
+        | InterfaceMember imem -> intfm imem
+        | ModuleMember mmem -> modlm mmem
+        | GlobalType tdef -> typem tdef
