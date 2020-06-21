@@ -617,6 +617,10 @@ let genericName =
         genericIdentifier
     .>> space
     |>> fun (pos, id) -> { Identifier = id; Position = pos }
+let simpleName: Parser<SimpleName, _> =
+    position
+    .>>. identifierStr
+    |>> fun (pos, name) -> Name.simple pos name
 let private genericTypeName placeholder =
     genericName
     >>= fun name ->
@@ -657,15 +661,16 @@ let functionBody =
         ]
         "function body"
 
-let ctorDef modfs =
+let ctorDef cdef modfs =
     let ctorHeader =
         paramTuple typeAnnOpt
         .>> space
         <?> "constructor parameters"
         >>= fun cparams ->
-            let placeholder =
-                { Member.defaultCtor with Parameters = cparams }
-            tryAddMember (Access.Public, placeholder) >>% cparams
+            { Member.defaultCtor with Parameters = cparams }
+            |> cdef
+            |> tryAddPlaceholder
+            >>% cparams
     let ctorBody ctorBase =
         [
             lambdaOperator
@@ -706,23 +711,22 @@ let ctorDef modfs =
               Body = body
               Parameters = cparams
               SelfIdentifier = selfid }
-            |> Constructor
     .>> (tryUpdateState popParams)
     <?> "constructor definition"
-let functionDef modfs =
+let functionDef fdef modfs =
     let funcHeader =
         genericName
         .>>. paramTupleList typeAnnOpt
         .>> space
         >>= fun (name, fparams) ->
-            let placeholder =
-                {| Function =
-                    { Body = List.empty
-                      Parameters = fparams
-                      ReturnType = None }
-                   FunctionName = name |}
-                |> Function
-            tryAddMember (Access.Public, placeholder) >>% (name, fparams)
+            { Function =
+                { Body = List.empty
+                  Parameters = fparams
+                  ReturnType = None }
+              FunctionName = name }
+            |> fdef
+            |> tryAddPlaceholder
+            >>% (name, fparams)
     noModifiers modfs
     .>> updateUserState newParams
     >>. tuple3
@@ -731,12 +735,11 @@ let functionDef modfs =
         functionBody
     .>> (tryUpdateState popParams)
     |>> fun ((name, fparams), retType, body) ->
-        Function
-            {| Function =
-                { Body = body
-                  Parameters = fparams
-                  ReturnType = retType }
-               FunctionName = name |}
+        { Function =
+            { Body = body
+              Parameters = fparams
+              ReturnType = retType }
+          FunctionName = name }
 let methodDef modfs =
     let methodModf =
         validateModifiers
@@ -784,50 +787,61 @@ let methodDef modfs =
                 genericName
                 (paramTupleList typeAnnExp .>> space)
                 (typeAnnExp <?> "method return type")
-            >>= fun (name, mparams, retType) ->
-                let memdef =
-                    { Method =
-                         { Body = ()
-                           Parameters = mparams
-                           ReturnType = retType }
-                         : Function<unit, TypeName>
-                      MethodName = name
-                      Purity = mmodf.Purity }
-                    |> AMethod
-                tryAddMember (Access.Public, memdef)
-                >>. space
-                >>. semicolon
-                >>% memdef
+            .>> space
+            .>> semicolon
+            |>> fun (name, mparams, retType) ->
+                { Method =
+                     { Body = ()
+                       Parameters = mparams
+                       ReturnType = retType }
+                     : Function<unit, TypeName>
+                  MethodName = name
+                  Purity = mmodf.Purity }
+                |> AMethod
+                |> Abstract
+                |> Member
         else
-            tuple3
+            tuple4
                 selfId
                 genericName
-                (paramTupleList typeAnnOpt)
-            >>= fun (selfId, name, mparams) ->
-                let placeholder =
-                    MemberDef.placeholderMethod
-                        name
-                        (selfId)
-                        mparams
-                tryAddMember (Access.Public, placeholder)
-                >>. typeAnnOpt
-                .>> space
-                .>>. functionBody
-                |>> fun (retType, body) ->
-                    {| Method =
-                         { Body = body
-                           Parameters = mparams
-                           ReturnType = retType }
-                       MethodName = name
-                       Modifiers = mmodf
-                       SelfIdentifier = selfId |}
-                    |> Method
+                (paramTupleList typeAnnOpt .>> space)
+                typeAnnOpt
+            .>> space
+            >>= fun (selfId, name, mparams, retType) ->
+                let mthd = Method >> Concrete >> Member
+                let def =
+                    { Method =
+                        { Body = List.empty
+                          Parameters = mparams
+                          ReturnType = retType }
+                      MethodName = name
+                      Modifiers = mmodf
+                      SelfIdentifier = selfId }
+                tryAddPlaceholder (mthd def |> ClassMember)
+                >>. functionBody
+                |>> fun body ->
+                    { def with
+                        Method =
+                          { def.Method with
+                              Body = body } }
+                    |> mthd
     .>> (tryUpdateState popParams)
     <?> "method definition"
     |> attempt
 let operatorDef modfs =
     fail "bad"
-let propDef modfs =
+let propDef aprop a2 cprop c2 modfs = // TODO: Simplify the parameters.
+    let abstractEmpty name =
+        { Accessors = AbstractGet
+          PropName = name
+          Purity = IsMutator
+          ValueType = TypeName.Unknown }
+    let concreteEmpty name =
+        { Accessors = AutoGet
+          PropName = name
+          SelfIdentifier = None
+          Value = None
+          ValueType = None }
     let propModf =
         validateModifiers
             modfs
@@ -836,18 +850,12 @@ let propDef modfs =
                 | "abstract" -> Result.Ok true
                 | _ -> Result.Error None)
             false
-    let propName =
-        genericName
+    let propName empty def =
+        simpleName
         >>= fun name ->
-            let placeholder =
-                { Accessors = AutoGet
-                  PropName = name
-                  SelfIdentifier = None
-                  Value = None
-                  ValueType = None }
-                |> Property
-            (Access.Public, placeholder)
-            |> tryAddMember
+            empty name
+            |> def
+            |> tryAddPlaceholder
             >>% name
     propModf
     >>= fun isAbstract ->
@@ -866,16 +874,17 @@ let propDef modfs =
                     ]
                 |> block
             tuple3
-                propName
+                (propName abstractEmpty aprop)
                 (typeAnnExp .>> space)
                 body
             |>> fun (name, vtype, accessors) ->
                 { Accessors = accessors
                   PropName = name
-                  Purity = IsPure // TODO: Add modifier for property
+                  Purity = IsPure // TODO: Handle modifiers for properties.
                   ValueType = vtype }
-                |> AProperty
+                |> a2
         else
+            
             let propBody =
                 let setFull =
                     keyword "set"
@@ -934,7 +943,7 @@ let propDef modfs =
                 |> opt
             tuple5
                 selfId
-                propName
+                (propName concreteEmpty cprop)
                 (typeAnnOpt .>> space)
                 propBody
                 propValue
@@ -944,7 +953,7 @@ let propDef modfs =
                   SelfIdentifier = selfid
                   Value = pvalue
                   ValueType = vtype }
-                |> Property
+                |> c2
     <?> "property definition"
     |> attempt
 
@@ -994,7 +1003,7 @@ let memberSection empty validator members selector =
     .>> tryUpdateState popMembers
 
 let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
-let interfaceDef idef modfs: Parser<Interface, _> =
+let interfaceDef idef modfs =
     let interfaceName =
         genericTypeName
             (fun name ->
@@ -1032,10 +1041,15 @@ let interfaceDef idef modfs: Parser<Interface, _> =
           Members = members
           SuperInterfaces = ilist }
 do
+    let badMember _ = invalidOp "Non-abstract members are not allowed on interfaces"
     let members =
         [
             //methodDef
-            //propDef
+            propDef
+                (AProperty >> Member >> InterfaceMember)
+                (AProperty >> Member)
+                badMember
+                badMember
         ]
         |> Seq.map
             (fun def ->

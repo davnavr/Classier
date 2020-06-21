@@ -106,7 +106,6 @@ module ParserState =
                         strMem
                         |> sprintf "Unable to add member %s, the stack is empty"
                         |> Result.Error)
-
         let tryAddPlaceholder mdef = tryAddMember (Access.Public, mdef)
 
         let tryAddParam idtype (param: IdentifierStr) =

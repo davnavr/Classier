@@ -65,6 +65,10 @@ type AProperty =
       Purity: MutatorModf
       ValueType: TypeName }
 
+type StaticFunction =
+    { Function: InfFunction
+      FunctionName: GenericName }
+
 type AbstractMember =
     | AMethod of AMethod
     | AProperty of AProperty
@@ -79,9 +83,7 @@ type InstanceMember =
     | Concrete of ConcreteMember
 
 type StaticMember =
-    | Function of
-        {| Function: InfFunction
-           FunctionName: GenericName |}
+    | Function of StaticFunction
     | Operator of Operator.Operator
 
 type Member =
