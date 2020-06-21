@@ -2,10 +2,6 @@
 
 open Classier.NET.Compiler.Identifier
 
-type AbstractModf =
-    | Abstract
-    | Concrete
-
 type MutatorModf =
     | IsMutator
     | IsPure
@@ -57,16 +53,16 @@ type Property =
 type AMethod =
     { Method: Function<unit, TypeName>
       MethodName: GenericName
-      Modifiers: AbstractModf * MutatorModf }
+      Purity: MutatorModf }
 
 type AbstractPropAccessors =
     | AbstractGet
-    | AbstractSet
+    | AbstractGetSet
 
 type AProperty =
     { Accessors: AbstractPropAccessors
       PropName: SimpleName
-      Purity: AbstractModf
+      Purity: MutatorModf
       ValueType: TypeName }
 
 type AbstractMember =

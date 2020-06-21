@@ -620,12 +620,9 @@ let genericName =
 let private genericTypeName placeholder =
     genericName
     >>= fun name ->
-        let def = 
-            name
-            |> placeholder
-            |> Type
-        (Access.Public, def)
-        |> tryAddMember
+        name
+        |> placeholder
+        |> tryAddPlaceholder
         >>% name
 
 let opName: Parser<_, ParserState> =
@@ -667,9 +664,7 @@ let ctorDef modfs =
         <?> "constructor parameters"
         >>= fun cparams ->
             let placeholder =
-                cparams
-                |> MemberDef.placeholderCtor
-                |> Constructor
+                { Member.defaultCtor with Parameters = cparams }
             tryAddMember (Access.Public, placeholder) >>% cparams
     let ctorBody ctorBase =
         [
@@ -691,7 +686,7 @@ let ctorDef modfs =
     >>. updateUserState newParams
     >>. ctorHeader
     .>>. selfIdAs
-    .>>. trySelfId
+    .>>. (tryMapState getSelfId)
     >>= fun ((cparams, selfid), currentSelf) ->
         [
             keyword "super" >>% SuperCall
@@ -712,7 +707,7 @@ let ctorDef modfs =
               Parameters = cparams
               SelfIdentifier = selfid }
             |> Constructor
-    .>> tryPopParams
+    .>> (tryUpdateState popParams)
     <?> "constructor definition"
 let functionDef modfs =
     let funcHeader =
@@ -734,7 +729,7 @@ let functionDef modfs =
         funcHeader
         (typeAnnOpt .>> space)
         functionBody
-    .>> tryPopParams
+    .>> (tryUpdateState popParams)
     |>> fun ((name, fparams), retType, body) ->
         Function
             {| Function =
@@ -755,7 +750,7 @@ let methodDef modfs =
                     | MethodImpl.Virtual ->
                         badModfier "An 'abstract' method implies that it can be overriden, making the 'virtual' modifier redundant"
                     | _ -> Result.Ok (prev, true)
-                | "mutator" -> Result.Ok ({ prev with IsMutator = true }, isAbstract)
+                | "mutator" -> Result.Ok ({ prev with Purity = IsMutator }, isAbstract)
                 | "override" ->
                     match prev.ImplKind with
                     | MethodImpl.Virtual ->
@@ -791,18 +786,14 @@ let methodDef modfs =
                 (typeAnnExp <?> "method return type")
             >>= fun (name, mparams, retType) ->
                 let memdef =
-                    {| IsMutator = mmodf.IsMutator
-                       IsOverride =
-                         match mmodf.ImplKind with
-                         | MethodImpl.Override -> true
-                         | _ -> false
-                       Method =
-                          { Body = ()
-                            Parameters = mparams
-                            ReturnType = retType }
-                          : Function<unit, TypeName>
-                       MethodName = name |}
-                    |> AbMethod
+                    { Method =
+                         { Body = ()
+                           Parameters = mparams
+                           ReturnType = retType }
+                         : Function<unit, TypeName>
+                      MethodName = name
+                      Purity = mmodf.Purity }
+                    |> AMethod
                 tryAddMember (Access.Public, memdef)
                 >>. space
                 >>. semicolon
@@ -831,7 +822,7 @@ let methodDef modfs =
                        Modifiers = mmodf
                        SelfIdentifier = selfId |}
                     |> Method
-    .>> tryPopParams
+    .>> (tryUpdateState popParams)
     <?> "method definition"
     |> attempt
 let operatorDef modfs =
@@ -849,11 +840,11 @@ let propDef modfs =
         genericName
         >>= fun name ->
             let placeholder =
-                {| Accessors = AutoGet
-                   PropName = name
-                   SelfIdentifier = None
-                   Value = None
-                   ValueType = None |}
+                { Accessors = AutoGet
+                  PropName = name
+                  SelfIdentifier = None
+                  Value = None
+                  ValueType = None }
                 |> Property
             (Access.Public, placeholder)
             |> tryAddMember
@@ -869,20 +860,21 @@ let propDef modfs =
                     [
                         keyword "set"
                         >>. semicolon
-                        >>% true
+                        >>% AbstractGetSet
 
-                        preturn false
+                        preturn AbstractGet
                     ]
                 |> block
             tuple3
                 propName
                 (typeAnnExp .>> space)
                 body
-            |>> fun (name, vtype, hasSet) ->
-                {| HasSet = hasSet
-                   PropName = name
-                   ValueType = vtype |}
-                |> AbProperty
+            |>> fun (name, vtype, accessors) ->
+                { Accessors = accessors
+                  PropName = name
+                  Purity = IsPure // TODO: Add modifier for property
+                  ValueType = vtype }
+                |> AProperty
         else
             let propBody =
                 let setFull =
@@ -894,7 +886,7 @@ let propDef modfs =
                     >>. param typeAnnOpt
                     .>> space
                     .>> rparen
-                    .>> tryPopParams
+                    .>> (tryUpdateState popParams)
                     .>> space
                     .>>. functionBody
                     |> opt
@@ -947,11 +939,11 @@ let propDef modfs =
                 propBody
                 propValue
             |>> fun (selfid, name, vtype, accessors, pvalue) ->
-                {| Accessors = accessors
-                   PropName = name
-                   SelfIdentifier = selfid
-                   Value = pvalue
-                   ValueType = vtype |}
+                { Accessors = accessors
+                  PropName = name
+                  SelfIdentifier = selfid
+                  Value = pvalue
+                  ValueType = vtype }
                 |> Property
     <?> "property definition"
     |> attempt
@@ -989,26 +981,61 @@ let memberBlock (members: seq<_>) types =
         ]
     |>> List.choose id
     .>>. (getUserState |>> getMembers)
+let memberSection empty validator members selector =
+    pushMembers
+        empty
+        (fun set mdef ->
+            validator set mdef
+            |> Option.bind (Option.map Result.Ok)
+            |> Option.defaultValue (Result.Error "Invalid member or set type"))
+    |> updateUserState
+    >>. members
+    >>. tryMembers selector
+    .>> tryUpdateState popMembers
 
 let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
-let interfaceDef modfs =
+let interfaceDef idef modfs: Parser<Interface, _> =
+    let interfaceName =
+        genericTypeName
+            (fun name ->
+                { InterfaceName = name
+                  Members = MemberSet.interfaceSet
+                  SuperInterfaces = List.empty }
+                |> idef)
+    let interfaceSet f set =
+        match set with
+        | InterfaceSet iset -> f iset |> Some
+        | _ -> None
+    let interfaceBody =
+        memberSection
+            (InterfaceSet MemberSet.interfaceSet)
+            (fun (acc, mdef) ->
+                (fun set ->
+                    match mdef with
+                    | InterfaceMember imem ->
+                        set
+                        |> SortedSet.tryAdd (acc, imem)
+                        |> Option.map InterfaceSet
+                    | _ -> None)
+                |> interfaceSet)
+            interfaceMembers
+            (interfaceSet id)
     keyword "interface"
     >>. noModifiers modfs
     >>. tuple3
-        (genericTypeName TypeDef.placeholderInterface)
+        interfaceName
         (implements .>> space)
-        interfaceMembers
+        interfaceBody
     <?> "interface definition"
     |>> fun (name, ilist, members) ->
-        Interface
-            {| InterfaceName = name
-               Members = members
-               SuperInterfaces = ilist |}
+        { InterfaceName = name
+          Members = members
+          SuperInterfaces = ilist }
 do
     let members =
         [
-            methodDef
-            propDef
+            //methodDef
+            //propDef
         ]
         |> Seq.map
             (fun def ->
@@ -1020,19 +1047,15 @@ do
         accessModifier Access.Internal
         >>. memberDef
             members
-            [
-                interfaceDef
-            ]
+            [ interfaceDef (Type >> InterfaceMember) ]
         |> attempt
         .>> space
         |> many
-        >>. (getUserState |>> getMembers)
-        |> memberSection
         |> block
         <?> "interface body"
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
-let classDef modfs =
+let classDef modfs: Parser<TypeDef, _> =
     let dataMembers =
         keyword "data"
         >>. position
@@ -1041,24 +1064,24 @@ let classDef modfs =
                 let selfid = "this__"
                 seq {
                     Method
-                        {| Method =
-                            { Body = List.empty // TODO: Create a body here.
-                              Parameters =
-                                [
-                                    [
-                                        "obj"
-                                        |> IdentifierStr 
-                                        |> Some
-                                        |> Param<_>.Create None
-                                    ]
-                                ]
-                              ReturnType =
-                                PrimitiveType.Boolean
-                                |> TypeName.Primitive
-                                |> Some }
-                           MethodName = "equals" |> IdentifierStr |> Name.OfStr pos
-                           Modifiers = MethodModifiers.Default
-                           SelfIdentifier = IdentifierStr selfid |> Some |}
+                        { Method =
+                           { Body = List.empty // TODO: Create a body here.
+                             Parameters =
+                               [
+                                   [
+                                       "obj"
+                                       |> IdentifierStr 
+                                       |> Some
+                                       |> Param<_>.Create None
+                                   ]
+                               ]
+                             ReturnType =
+                               PrimitiveType.Boolean
+                               |> TypeName.Primitive
+                               |> Some }
+                          MethodName = "equals" |> IdentifierStr |> Name.ofStr pos
+                          Modifiers = MethodModifiers.Default
+                          SelfIdentifier = IdentifierStr selfid |> Some }
 
                     yield!
                         values
@@ -1067,18 +1090,18 @@ let classDef modfs =
                                 match param.Name with
                                 | None -> None
                                 | Some pname ->
-                                    {| Accessors =
-                                         pname
-                                         |> Identifier.ofStr
-                                         |> IdentifierRef
-                                         |> Return
-                                         |> Expression.withPos pos
-                                         |> List.singleton
-                                         |> Get
-                                       PropName = Name.OfStr pos pname
-                                       SelfIdentifier = None
-                                       Value = None
-                                       ValueType = param.Type |}
+                                    { Accessors =
+                                        pname
+                                        |> Identifier.ofStr
+                                        |> IdentifierRef
+                                        |> Return
+                                        |> Expression.withPos pos
+                                        |> List.singleton
+                                        |> Get
+                                      PropName = Name.simple pos pname
+                                      SelfIdentifier = None
+                                      Value = None
+                                      ValueType = param.Type }
                                     |> Property
                                     |> Some)
                         |> Seq.choose id
@@ -1106,7 +1129,7 @@ let classDef modfs =
         .>> space
         <?> "primary constructor"
         >>= fun (acc, ctorParams) ->
-            let placeholder = MemberDef.placeholderCtor ctorParams
+            let placeholder = { Member.defaultCtor with Parameters = ctorParams }
             let actual body baseArgs = // TODO: Don't forget to replace it in the member set when the actual primary ctor is retrieved.
                 let ctor =
                     { placeholder with
@@ -1140,7 +1163,7 @@ let classDef modfs =
                 (implements .>> space)
                 classSelf
                 body
-            .>> tryPopParams
+            .>> (tryUpdateState popParams)
             |> memberSection
         tuple4
             header
@@ -1150,7 +1173,7 @@ let classDef modfs =
         <?> label
     [
         [
-            semicolon >>% (List.empty, MemberDef.emptyMemberSet)
+            semicolon >>% (List.empty, MemberSet.classSet)
             classBody
         ]
         |> choice
@@ -1176,7 +1199,7 @@ let classDef modfs =
                     let ctorDef =
                         ctor
                         |> Constructor
-                        |> MemberDef.withAccess acc
+                        |> Member.withAccess acc
                     SortedSet.add ctorDef members
                  | None -> members
                PrimaryCtor = pctor
@@ -1241,7 +1264,7 @@ do
         <?> "class body"
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
-let moduleDef modfs =
+let moduleDef modfs: Parser<TypeDef, _> =
     keyword "module"
     >>. noModifiers modfs
     >>. tuple2
@@ -1249,10 +1272,10 @@ let moduleDef modfs =
         moduleBody
     <?> "module definition"
     |>> fun (name, (body, members)) ->
-        Module
-            {| Body = body
-               ModuleName = name
-               Members = members |}
+        { Body = body
+          ModuleName = name
+          Members = members }
+        |> Module
 do
     moduleBodyRef :=
         memberBlock
@@ -1413,7 +1436,7 @@ do
                 .>> space
                 .>>. lambdaBlock
                 |> attempt
-                .>> tryPopParams
+                .>> (tryUpdateState popParams)
                 <?> "anonymous function"
                 |>> fun (parameters, body) ->
                     { Body = body
@@ -1464,11 +1487,11 @@ do
                 .>>. getUserState
                 |>> fun (id, state) ->
                     match getSelfId state with
-                    | Some self ->
+                    | Result.Ok self ->
                         match id.Generics with
                         | [] when id.Name = self -> SelfRef
                         | _ -> IdentifierRef id
-                    | None ->
+                    | Result.Error _ ->
                         IdentifierRef id
 
                 numLit |>> NumLit
@@ -1569,7 +1592,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 updateUserState newParams
                 >>. paramTuple typeAnnExp
                 .>> space
-                .>> tryPopParams
+                .>> (tryUpdateState popParams)
             tuple3
                 mainDef
                 mainParams
@@ -1595,27 +1618,15 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         .>> space
         |> many
 
-    (newMembers >> pushValidator typeValidator >> newParams)
-    |> updateUserState
-    >>. space
+    space
     >>. tuple4
         (namespaceDecl .>> space)
         (useStatements .>> definitions .>> eof)
         position
         getUserState
-    .>> tryPopMembers
-    .>> tryPopValidators
-    .>> tryPopParams
     |>> fun (ns, uses, pos, state) ->
         { EntryPoint = state.EntryPoint
           Namespace = ns
           Usings = uses
           Source = pos.StreamName
-          Types =
-            state
-            |> ParserState.getMembers
-            |> Seq.choose
-                (fun (acc, mdef) ->
-                    match mdef with
-                    | Type tdef -> Some (acc, tdef)
-                    | _ -> None)}
+          Types = invalidOp "How do we get members?"}

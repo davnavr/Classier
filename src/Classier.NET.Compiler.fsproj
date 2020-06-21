@@ -24,7 +24,6 @@
     <Compile Include="Grammar\Member.fs" />
     <Compile Include="Grammar\Types.fs" />
     <Compile Include="Grammar\MemberSet.fs" />
-    <Compile Include="Grammar\TypeDef.fs" />
     <Compile Include="Grammar\MemberDef.fs" />
     <Compile Include="Grammar\Misc.fs" />
     <Compile Include="Namespace.fs" />

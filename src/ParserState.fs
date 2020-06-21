@@ -3,7 +3,6 @@
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.GlobalsTable
-open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Identifier
 open FParsec
 
@@ -32,7 +31,7 @@ module ParserState =
                 let other = obj :?> ParamIdentifier
                 compare this.Identifier other.Identifier
 
-    type Validator = MemberSet -> Access * MemberDef -> Result<MemberSet, string>
+    type Validator =  Access * MemberDef -> MemberSet -> Result<MemberSet, string>
 
     type ParserState =
         { EntryPoint: EntryPoint option
@@ -84,12 +83,14 @@ module ParserState =
 
     [<AutoOpen>]
     module StateManagement =
-        let tryUpdateState action =
+        let tryBindParser f =
             getUserState
             >>= fun state ->
-                match action state with
-                | Result.Ok newState -> setUserState newState
+                match f state with
+                | Result.Ok result -> result
                 | Result.Error msg -> fail msg
+        let tryMapState map = tryBindParser (map >> Result.map preturn)
+        let tryUpdateState action = tryBindParser (action >> Result.map setUserState)
 
         let tryAddMember mdef =
             tryUpdateState
@@ -97,14 +98,16 @@ module ParserState =
                     let strMem = string mdef
                     match List.tryHead state.Members with
                     | Some (members, validate) ->
-                        mdef
-                        |> validate members
+                        members
+                        |> validate mdef
                         |> Result.map
                             (fun added -> { state with Members = (added, validate) :: state.Members.Tail })
                     | None ->
                         strMem
                         |> sprintf "Unable to add member %s, the stack is empty"
                         |> Result.Error)
+
+        let tryAddPlaceholder mdef = tryAddMember (Access.Public, mdef)
 
         let tryAddParam idtype (param: IdentifierStr) =
             tryUpdateState
@@ -124,3 +127,14 @@ module ParserState =
                         |> sprintf "Unable to add parameter %s since the stack was empty"
                         |> Result.Error)
             >>% param
+
+        let tryMembers (selector: MemberSet -> _ option) =
+            tryMapState
+                (fun state ->
+                    state.Members
+                    |> List.tryHead
+                    |> Option.map (fun (set, _) ->
+                        match selector set with
+                        | Some result -> Result.Ok result
+                        | None -> Result.Error "The member set was of the incorrect type")
+                    |> Option.defaultValue (Result.Error "Unable to retrieve members because the member stack is empty"))

@@ -2,7 +2,7 @@
 
 type MemberDef =
     | ClassMember of ClassMember
-    | InterfaceMember of InstanceMember
+    | InterfaceMember of InterfaceMember
     | ModuleMember of TypeOrMember<TypeDef, StaticMember>
     | GlobalType of TypeDef
 

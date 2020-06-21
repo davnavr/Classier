@@ -1,6 +1,5 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
-open Classier.NET.Compiler
 open Classier.NET.Compiler.Identifier
 
 type private Position = FParsec.Position

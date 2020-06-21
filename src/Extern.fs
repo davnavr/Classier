@@ -5,6 +5,8 @@ open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
 
+// TODO: How to differentiate between external members and types that are public or protected?
+
 type EMethod<'Modifier> =
     { MethodName: Identifier
       Modifiers: 'Modifier

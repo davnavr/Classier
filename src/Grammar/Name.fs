@@ -13,6 +13,12 @@ type SimpleName = Name<IdentifierStr>
 type GenericName = Name<Identifier>
 
 module Name =
-    let asGeneric name =
-        { Identifier = Identifier.ofStr name.Identifier
-          Position = name.Position }
+    let simple pos (str: IdentifierStr) =
+        { Identifier = str
+          Position = pos }
+
+    let ofStr pos str =
+        { Identifier = Identifier.ofStr str
+          Position = pos }
+
+    let asGeneric name = ofStr name.Position name.Identifier
