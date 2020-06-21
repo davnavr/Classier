@@ -35,40 +35,48 @@ type MethodModifiers =
         { ImplKind = MethodImpl.Default
           Purity = IsMutator }
 
+type Method =
+    { Method: InfFunction
+      MethodName: Name
+      Modifiers: MethodModifiers
+      SelfIdentifier: IdentifierStr option }
+
 type PropAccessors =
     | AutoGet
     | AutoGetSet
     | Get of Statement list
     | GetSet of Statement list * InfParam * Statement list
 
+type Property =
+    { Accessors: PropAccessors
+      PropName: Name
+      SelfIdentifier: IdentifierStr option
+      Value: Expression option
+      ValueType: TypeName option }
+
+type AMethod =
+    { Method: Function<unit, TypeName>
+      MethodName: Name
+      Modifiers: AbstractModf * MutatorModf }
+
 type AbstractPropAccessors =
     | AbstractGet
     | AbstractSet
 
+type AProperty =
+    { Accessors: AbstractPropAccessors
+      PropName: Name
+      Purity: AbstractModf
+      ValueType: TypeName }
+
 type AbstractMember =
-    | AMethod of
-        {| Method: Function<unit, TypeName>
-           MethodName: Name
-           Modifiers: AbstractModf * MutatorModf |}
-    | AProperty of
-        {| Accessors: AbstractPropAccessors
-           PropName: Name
-           Purity: AbstractModf
-           ValueType: TypeName |}
+    | AMethod of AMethod
+    | AProperty of AProperty
 
 type ConcreteMember =
     | Constructor of Ctor
-    | Method of
-        {| Method: InfFunction
-           MethodName: Name
-           Modifiers: MethodModifiers
-           SelfIdentifier: IdentifierStr option |}
-    | Property of
-        {| Accessors: PropAccessors
-           PropName: Name
-           SelfIdentifier: IdentifierStr option
-           Value: Expression option
-           ValueType: TypeName option |}
+    | Method of Method
+    | Property of Property
 
 type InstanceMember =
     | Abstract of AbstractMember
@@ -84,72 +92,75 @@ type Member =
     | Instance of InstanceMember
     | Static of StaticMember
 
+type MemberName =
+    | IdentifierName of Name
+    | NoName
+    | OperatorName of Operator.OperatorStr
+
+[<RequireQualifiedAccess>]
 module Member =
-    let withAccess (acc: Access) (mdef: ConcreteMember) = acc, mdef
+    let inline private methodParams map def =
+        ((^a) : (member Method : Function<_, _>) (def)).Parameters
+        |> List.map (List.map map)
+        |> Some
+    let private emptyParams _ = None
+
+    let withAccess (acc: Access) (mdef: Member) = acc, mdef
     let defaultAccess = withAccess Access.Public
 
-    let name mdef =
-        match mdef with
-        | Constructor _ -> None
-        | Function fdef -> Some fdef.FunctionName
-        | Method mdef -> Some mdef.MethodName
-        | Property pdef -> Some pdef.PropName
-
-    let identifier mdef =
-        Option.map
-            (fun def -> def.Identifier)
-            (name mdef)
-
-    /// Gets the parameters of the method, function, or constructor.
-    let paramSets mdef =
-        match mdef with
-        | Constructor ctor -> [ ctor.Parameters ]
-        | Function fdef -> fdef.Function.Parameters
-        | Method mdef -> mdef.Method.Parameters
-        | _ -> List.empty
-    /// Gets the first parameter set of the method or function, or the parameters of the constructor.
-    let firstParams mdef =
-        mdef
-        |> paramSets
-        |> List.tryHead
-        |> Option.defaultValue List.empty
-
-    let compare m1 m2 = // TODO: Use Member instead of ConcreteMember and add checks for abstract methods.
-        let paramCompare =
-            List.compareWith
-                (fun p1 p2 ->
-                    match (p1.Type, p2.Type) with
-                    | (None, _)
-                    | (_, None) -> 0
-                    | (Some t1, Some t2) -> compare t1 t2)
-                (firstParams m1)
-                (firstParams m2)
-        match paramCompare with
-        | 0 ->
-            match (m1, m2) with
-            | (Function _, Method _) -> -1
-            | (Method _, Function _) -> 1
-            | (_, _) ->
-                compare
-                    (identifier m1)
-                    (identifier m2)
-        | _ -> paramCompare
-
-    // TODO: Remove as many placeholder functions as possible.
-    let placeholderCtor cparams =
+    let defaultCtor =
         { BaseCall = SuperCall List.empty
           Body = List.empty
-          Parameters = cparams
+          Parameters = List.empty
           SelfIdentifier = None }
-    
-    let emptyCtor = placeholderCtor List.empty
-    
-    let internal placeholderMethod name selfid mparams =
-        Method
-            {| Method =
-                { Body = List.empty
-                  Parameters = mparams
-                  ReturnType = None }
-               MethodName = name
-               Modifiers = MethodModifiers.Default
-               SelfIdentifier = selfid |}
+
+    let foldInstance amthd aprop ctor mthd prop mdef =
+        match mdef with
+        | Abstract adef ->
+            match adef with
+            | AMethod mdef -> amthd mdef
+            | AProperty pdef -> aprop pdef
+        | Concrete cdef ->
+            match cdef with
+            | Constructor c -> ctor c
+            | Method mdef -> mthd mdef
+            | Property pdef -> prop pdef
+
+    let instanceParams =
+        foldInstance
+            (methodParams Param.asInferred)
+            emptyParams
+            (fun ctor -> Some [ ctor.Parameters ])
+            (methodParams id)
+            emptyParams
+
+    let instanceName =
+        let inline methodName def = Some ((^a) : (member MethodName : Name) (def))
+        let inline propName def = Some ((^a) : (member PropName : Name) (def))
+        foldInstance
+            methodName
+            propName
+            (fun _ -> None)
+            methodName
+            propName
+
+    //let compare m1 m2 =
+    //    let paramCompare =
+    //        List.compareWith
+    //            (fun p1 p2 ->
+    //                match (p1.Type, p2.Type) with
+    //                | (None, _)
+    //                | (_, None) -> 0
+    //                | (Some t1, Some t2) -> compare t1 t2)
+    //            (firstParams m1)
+    //            (firstParams m2)
+    //    match paramCompare with
+    //    | 0 ->
+    //        match (m1, m2) with
+    //        | (Function _, Method _) -> -1
+    //        | (Method _, Function _) -> 1
+    //        | (_, _) ->
+    //            compare
+    //                (identifier m1)
+    //                (identifier m2)
+    //    | _ -> paramCompare

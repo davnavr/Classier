@@ -12,21 +12,19 @@ type TypeOrMember<'Type, 'Member> =
     | Type of 'Type
     | Member of 'Member
 
-type TypeOrMemberSet<'Type> = ImmutableSortedSet<TypeOrMember<'Type, InstanceMember>>
-
 type Class =
     { ClassName: Name
       Body: Statement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier list
-      Members: TypeOrMemberSet<Class>
+      Members: ImmutableSortedSet<TypeOrMember<Class, InstanceMember>>
       PrimaryCtor: (Access * Ctor) option
       SelfIdentifier: IdentifierStr
       SuperClass: FullIdentifier option }
 
 type Interface =
     { InterfaceName: Name
-      Members: TypeOrMemberSet<Interface>
+      Members: ImmutableSortedSet<TypeOrMember<Interface, AbstractMember>>
       SuperInterfaces: FullIdentifier list }
 
 type Module<'Type> =

@@ -26,3 +26,7 @@ module Param =
     let create ptype name =
         { Name = name
           Type = ptype }
+
+    let asInferred param =
+        { Name = param.Name
+          Type = Some param.Type }
