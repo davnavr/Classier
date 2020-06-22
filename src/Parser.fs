@@ -880,7 +880,7 @@ let memberDef members types =
                 members
         [
             keyword "def"
-            >>. choice memberDefs
+            >>. choice memberDefs // TODO: Are the placeholder members ever replaced here?
             <?> "member"
 
             types
@@ -1719,12 +1719,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                       |> Some }
                 |> setUserState
         [
-            accessModifier Access.Internal
-            .>>. typeDef
-            >>= (replaceMember >> updateUserState)
-            |>> ignore
-
-            entrypoint
+            accessModifier Access.Internal .>>. typeDef |>> Some
+            entrypoint >>% None
         ]
         |> choice
         .>> space

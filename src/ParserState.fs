@@ -46,8 +46,29 @@ module ParserState =
         match state.Members with
         | [] -> Result.Error "Unable to pop the member stack since it is already empty"
         | _ -> Result.Ok { state with Members = state.Members.Tail }
-    let replaceMember mdef state =
-        invalidOp "no impl to replace placeholder"
+    let replaceMember (acc, mdef) tset setsel state =
+        let err =
+            mdef.ToString()
+            |> sprintf "Unable to replace member %s, %s"
+            >> Result.Error
+        state.Members
+        |> List.tryHead
+        |> Option.map
+            (fun (mset, _) ->
+                match setsel mset with
+                | Some validSet ->
+                    let def = (acc, mdef)
+                    match validSet with
+                    | SortedSet.Contains def ->
+                        let members =
+                            validSet
+                            |> SortedSet.remove def
+                            |> SortedSet.add def
+                            |> tset
+                        Result.Ok { state with Members = members :: state.Members.Tail }
+                    | _ -> err "the member was not in the member set"
+                | None -> err "The member set was invalid")
+        |> Option.defaultValue (err "the member stack is empty")
 
     let defaultState: ParserState =
         { EntryPoint = None
