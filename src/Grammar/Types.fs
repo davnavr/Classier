@@ -42,6 +42,13 @@ type TypeDef =
     | Module of Module
 and Module = Module<TypeDef>
 
+module TypeDef =
+    let name tdef =
+        match tdef with
+        | Class cdef -> cdef.ClassName
+        | Interface idef -> idef.InterfaceName
+        | Module mdef -> Name.asGeneric mdef.ModuleName
+
 type EntryPoint =
     { Body: Statement list
       Origin: Position

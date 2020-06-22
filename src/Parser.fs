@@ -650,7 +650,6 @@ let selfIdAs =
     <?> "self identifier"
     |> opt
 
-
 let functionBody =
     choiceL
         [
@@ -963,46 +962,34 @@ let memberBlock (members: seq<_>) types =
             |>> (fun _ -> None)
         ]
     |>> List.choose id
-    .>>. (getUserState |>> getMembers)
-let memberSection empty validator selector members =
-    pushMembers
-        empty
-        (fun set mdef ->
-            validator set mdef
-            |> Option.bind (Option.map Result.Ok)
-            |> Option.defaultValue (Result.Error "Invalid member or set type"))
-    |> updateUserState
-    >>. members
-    >>. tryMembers selector
-    .>> tryUpdateState popMembers
-let memberSection2 empty setf setsel memsel mname members =
+let memberSection empty setf setsel memsel mname members =
     pushMembers
         (setf empty)
-        (fun (acc, mdef) set ->
+        (fun (acc, def) set ->
             match setsel set with
             | Some actualSet ->
-                match memsel mdef with
-                | Some actualMember ->
+                match memsel def with
+                | Some mdef ->
+                    let amember = acc, mdef
                     match actualSet with
-                    | SortedSet.Contains actualMember ->
-                        actualMember
-                        |> mname
-                        |> sprintf "A member with the %s already exists"
+                    | SortedSet.Contains amember ->
+                        mname mdef
+                        |> sprintf "A member with the signature '%s' already exists"
                         |> Result.Error
                     | _ ->
                         actualSet
-                        |> SortedSet.add actualMember
+                        |> SortedSet.add amember
                         |> setf
                         |> Result.Ok
                 | None ->
-                    mdef
+                    def
                     |> string
                     |> sprintf "The member %A cannot be added to the set since it is an invalid member type"
                     |> Result.Error
             | None -> Result.Error "Invalid member set type")
     |> updateUserState
     >>. members
-    >>. tryMembers (fun _ -> invalidOp "badder") //selector
+    .>>. tryMembers setsel
     .>> tryUpdateState popMembers
 
 let private interfaceBody, private interfaceBodyRef = createParserForwardedToRef<_, _>()
@@ -1022,16 +1009,12 @@ let interfaceDef iface idef modfs =
         (implements .>> space)
         interfaceBody
     <?> "interface definition"
-    |>> fun (name, ilist, members) ->
+    |>> fun (name, ilist, (_, members)) ->
         { InterfaceName = name
           Members = members
           SuperInterfaces = ilist }
         |> iface
 do
-    let iset f set =
-        match set with
-        | InterfaceSet iset -> f iset |> Some
-        | _ -> None
     let members =
         [
             propDef
@@ -1055,18 +1038,26 @@ do
         .>> space
         |> many
         |> block
-        |> memberSection // TODO: iset is used alot. Add another parameter to memberSection?
-            (InterfaceSet MemberSet.interfaceSet)
-            (fun (acc, mdef) ->
-                (fun set ->
-                    match mdef with
-                    | InterfaceMember imem ->
-                        set
-                        |> SortedSet.tryAdd (acc, imem)
-                        |> Option.map InterfaceSet
-                    | _ -> None)
-                |> iset)
-            (iset id)
+        |> memberSection
+            MemberSet.interfaceSet
+            InterfaceSet
+            (function
+            | InterfaceSet set -> Some set
+            | _ -> None)
+            (function
+            | InterfaceMember mdef -> Some mdef
+            | _ -> None)
+            (function
+            | Member mdef ->
+                match mdef with
+                | AMethod mthd ->
+                    mthd.Method.Parameters
+                    |> Seq.map Param.toExpStr
+                    |> String.concat " "
+                    |> sprintf "%s%s" (string mthd.MethodName)
+                | AProperty pdef ->
+                    Name.asGeneric pdef.PropName |> string
+            | Type idef -> string idef.InterfaceName)
         <?> "interface body"
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
@@ -1087,7 +1078,7 @@ let classDef cdef modfs: Parser<Class, _> =
                                        "obj"
                                        |> IdentifierStr 
                                        |> Some
-                                       |> Param<_>.Create None
+                                       |> Param.create None
                                    ]
                                ]
                              ReturnType =
@@ -1348,6 +1339,27 @@ do
             ]
             types
         |> memberSection
+            MemberSet.moduleSet
+            ModuleSet
+            (function
+            | ModuleSet set -> Some set
+            | _ -> None)
+            (function
+            | ModuleMember mdef -> Some mdef
+            | _ -> None)
+            (function
+            | Member mdef ->
+                match mdef with
+                | Function fdef ->
+                    fdef.Function.Parameters
+                    |> Seq.map Param.toInfStr
+                    |> String.concat " "
+                    |> sprintf "%s%s" (string fdef.FunctionName)
+                | Operator odef ->
+                    odef.Operands
+                    |> Param.toInfStr
+                    |> sprintf "(%s)%s" (string odef.Symbol)
+            | Type tdef -> TypeDef.name tdef |> string)
         <?> "module body"
 
 do
