@@ -76,7 +76,7 @@ let main args =
                                 "member count"
                                 (fun cu _ ->
                                     cu.Types
-                                    |> Seq.map (snd >> TypeDef.getMembers >> SortedSet.length)
+                                    |> Seq.map (snd >> TypeDef.getMembers >> Seq.length)
                                     |> List.ofSeq
                                     |> Assert.equal
                                         "member counts"
@@ -88,7 +88,6 @@ let main args =
                                     [
                                         Assert.empty state.Members
                                         Assert.empty state.Params
-                                        Assert.empty state.Validators
                                     ]
                                     |> Assert.list)
                         ]

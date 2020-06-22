@@ -1668,11 +1668,11 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
             modifiers
             >>= (fun modfs ->
                 [
-                    classDef
-                    interfaceDef
-                    moduleDef
+                    classDef Class
+                    interfaceDef Interface
+                    moduleDef Module
                 ]
-                |> Seq.map (fun def -> def modfs)
+                |> Seq.map (fun def -> def GlobalType modfs)
                 |> choice)
             |>> Type
         let entrypoint =

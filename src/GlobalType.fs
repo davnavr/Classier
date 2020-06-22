@@ -20,6 +20,10 @@ let getName gtype =
             match tdef with
             | Class cdef -> cdef.ClassName
             | Interface idef -> idef.InterfaceName
-            | Module mdef -> mdef.ModuleName
+            | Module mdef -> Name.asGeneric mdef.ModuleName
         typeName.Identifier
-    | ExternType etype -> etype.TypeName
+    | ExternType etype ->
+        match etype with
+        | EClass cdef -> cdef.ClassName
+        | EInterface idef -> idef.InterfaceName
+        | EModule mdef -> mdef.ModuleName

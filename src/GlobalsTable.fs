@@ -19,9 +19,9 @@ module GlobalsTable =
                 match (one, two) with
                 | (DefinedType dtype, ExternType etype)
                 | (ExternType etype, DefinedType dtype) ->
-                    match (dtype, etype.Kind) with
-                    | (Module _, ExternTypeKind.Module) -> 0
-                    | (_, ExternTypeKind.Module)
+                    match (dtype, etype) with
+                    | (Module _, EModule _) -> 0
+                    | (_, EModule _)
                     | (Module _, _) ->
                         match one with
                         | ExternType _ -> 1
