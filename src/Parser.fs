@@ -4,6 +4,7 @@ open System
 open System.Collections.Immutable
 open FParsec
 open Classier.NET.Compiler.Generic
+open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.ParserState
@@ -1318,7 +1319,7 @@ let moduleDef modl mdef modfs =
     keyword "module"
     >>. noModifiers modfs
     >>. tuple2
-        moduleName
+        (moduleName .>> space)
         moduleBody
     <?> "module definition"
     |>> fun (name, (body, members)) ->
@@ -1683,7 +1684,6 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                 ]
                 |> Seq.map (fun def -> def GlobalType modfs)
                 |> choice)
-            |>> Type
         let entrypoint =
             let mainDef =
                 position
@@ -1719,12 +1719,25 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                       |> Some }
                 |> setUserState
         [
-            accessModifier Access.Internal .>>. typeDef |>> Some
-            entrypoint >>% None
+            accessModifier Access.Internal
+            >>. typeDef
+            .>>. getUserState
+            >>= fun (tdef, state) ->
+                let err =
+                    TypeDef.name tdef
+                    |> string
+                    |> sprintf "A type with the name %s already exists"
+                { Namespace = state.Namespace
+                  Type = DefinedType tdef }
+                |> GlobalsTable.addType
+                |> tryUpdateSymbols err
+
+            entrypoint |>> ignore
         ]
         |> choice
         .>> space
         |> many
+        |>> ignore
         |> memberSection
             MemberSet.typeSet
             TypeSet

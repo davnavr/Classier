@@ -158,3 +158,11 @@ module ParserState =
                         | Some result -> Result.Ok result
                         | None -> Result.Error "The member set was of the incorrect type")
                     |> Option.defaultValue (Result.Error "Unable to retrieve members because the member stack is empty"))
+
+        let tryUpdateSymbols msg f =
+            tryUpdateState
+                (fun state ->
+                    match f state.Symbols with
+                    | Some newSymbols ->
+                        Result.Ok { state with Symbols = newSymbols }
+                    | None -> Result.Error msg )
