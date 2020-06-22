@@ -891,7 +891,7 @@ let memberDef members types =
             |> choice
         ]
         |> choice
-let memberBlock (members: seq<_>) types =
+let memberBlock (members: seq<_>) types setf setsel =
     blockChoice
         [
             statement
@@ -900,7 +900,10 @@ let memberBlock (members: seq<_>) types =
 
             accessModifier Access.Private
             .>>. memberDef members types
-            |>> (fun _ -> None)
+            >>= fun mdef ->
+                replaceMember mdef setf setsel
+                |> tryUpdateState
+            >>% None
         ]
     |>> List.choose id
 let memberSection empty setf setsel memsel mname members =
@@ -1004,6 +1007,10 @@ do
         <?> "interface body"
 
 let private classBody, private classBodyRef = createParserForwardedToRef<Statement list, _>()
+let private classSel set =
+    match set with
+    | ClassSet set -> Some set
+    | _ -> None
 let classDef clss cdef modfs =
     let dataMembers =
         keyword "data"
@@ -1128,9 +1135,7 @@ let classDef clss cdef modfs =
             |> memberSection
                 MemberSet.classSet
                 ClassSet
-                (function
-                | ClassSet set -> Some set
-                | _ -> None)
+                classSel
                 (function
                 | ClassMember mdef -> Some mdef
                 | _ -> None)
@@ -1302,6 +1307,8 @@ do
         memberBlock
             members
             [ classDef Type ClassMember ]
+            ClassSet
+            classSel
         <?> "class body"
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
@@ -1328,6 +1335,10 @@ let moduleDef modl mdef modfs =
           Members = members }
         |> modl
 do
+    let moduleSel set =
+        match set with
+        | ModuleSet set -> Some set
+        | _ -> None
     let opName: Parser<_, ParserState> =
         Operator.operatorChars
         |> anyOf
@@ -1379,12 +1390,12 @@ do
                 operatorDef
             ]
             types
+            ModuleSet
+            moduleSel
         |> memberSection
             MemberSet.moduleSet
             ModuleSet
-            (function
-            | ModuleSet set -> Some set
-            | _ -> None)
+            moduleSel
             (function
             | ModuleMember mdef -> Some mdef
             | _ -> None)
@@ -1643,6 +1654,10 @@ do
     expressionRef.TermParser <- simpleExpression
 
 let compilationUnit: Parser<CompilationUnit, ParserState> =
+    let typeSel set =
+        match set with
+        | TypeSet set -> Some set
+        | _ -> None
     let namespaceDecl =
         skipString "namespace"
         >>. space1
@@ -1719,10 +1734,16 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                       |> Some }
                 |> setUserState
         [
-            accessModifier Access.Internal
-            >>. typeDef
-            .>>. getUserState
-            >>= fun (tdef, state) ->
+            tuple3
+                (accessModifier Access.Internal)
+                typeDef
+                getUserState
+            >>= fun (acc, tdef, state) ->
+                let replaceType =
+                    replaceMember
+                        (acc, tdef)
+                        TypeSet
+                        typeSel
                 let err =
                     TypeDef.name tdef
                     |> string
@@ -1731,6 +1752,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
                   Type = DefinedType tdef }
                 |> GlobalsTable.addType
                 |> tryUpdateSymbols err
+                >>. tryUpdateState replaceType
 
             entrypoint |>> ignore
         ]
@@ -1741,9 +1763,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> memberSection
             MemberSet.typeSet
             TypeSet
-            (function
-            | TypeSet set -> Some set
-            | _ -> None)
+            typeSel
             (function
             | GlobalType tdef -> Some tdef
             | _ -> None)
@@ -1756,6 +1776,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         position
         getUserState
     |>> fun (ns, uses, (_, types), pos, state) ->
+        let a = types |> Seq.map (snd >> TypeDef.getMembers) // NOTE: Found reason why member count tests are failing, typeDef placeholders are never replaced, meaning that they never have members!
         { EntryPoint = state.EntryPoint
           Namespace = ns
           Usings = uses

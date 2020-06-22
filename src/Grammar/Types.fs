@@ -8,6 +8,12 @@ type ClassInheritance =
     | CanInherit
     | Sealed
 
+    override this.ToString() =
+        match this with
+        | MustInherit -> "abstract "
+        | CanInherit -> "inheritable "
+        | _ -> ""
+
 type TypeOrMember<'Type, 'Member> =
     | Type of 'Type
     | Member of 'Member
@@ -23,6 +29,12 @@ type Class =
       PrimaryCtor: (Access * Ctor) option
       SelfIdentifier: IdentifierStr
       SuperClass: FullIdentifier option }
+
+    override this.ToString() =
+        sprintf
+            "%sclass %s"
+            (string this.Inheritance)
+            (string this.ClassName)
 and ClassMember = TypeOrMember<Class, InstanceMember>
 
 type Interface =

@@ -54,7 +54,7 @@ module ParserState =
         state.Members
         |> List.tryHead
         |> Option.map
-            (fun (mset, _) ->
+            (fun (mset, v) ->
                 match setsel mset with
                 | Some validSet ->
                     let def = (acc, mdef)
@@ -65,7 +65,7 @@ module ParserState =
                             |> SortedSet.remove def
                             |> SortedSet.add def
                             |> tset
-                        Result.Ok { state with Members = members :: state.Members.Tail }
+                        Result.Ok { state with Members = (members, v) :: state.Members.Tail }
                     | _ -> err "the member was not in the member set"
                 | None -> err "The member set was invalid")
         |> Option.defaultValue (err "the member stack is empty")

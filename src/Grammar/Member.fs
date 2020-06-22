@@ -16,6 +16,9 @@ type Ctor =
       Parameters: InfParam list
       SelfIdentifier: IdentifierStr option }
 
+    override this.ToString() =
+        sprintf "new %s" (Param.toInfStr this.Parameters)
+
 [<RequireQualifiedAccess>]
 type MethodImpl =
     | Default
