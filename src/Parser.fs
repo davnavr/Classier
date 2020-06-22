@@ -1729,16 +1729,26 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> choice
         .>> space
         |> many
-    
+        |> memberSection
+            MemberSet.typeSet
+            TypeSet
+            (function
+            | TypeSet set -> Some set
+            | _ -> None)
+            (function
+            | GlobalType tdef -> Some tdef
+            | _ -> None)
+            (TypeDef.name >> string)
     space
-    >>. tuple4
+    >>. tuple5
         (namespaceDecl .>> space)
-        (useStatements .>> definitions .>> eof)
+        (useStatements .>> space)
+        (definitions .>> eof)
         position
         getUserState
-    |>> fun (ns, uses, pos, state) ->
+    |>> fun (ns, uses, (_, types), pos, state) ->
         { EntryPoint = state.EntryPoint
           Namespace = ns
           Usings = uses
           Source = pos.StreamName
-          Types = invalidOp "How do we get members?"}
+          Types = types }

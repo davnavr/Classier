@@ -14,7 +14,7 @@ module MemberSet =
         ImmutableSortedSet.Empty.WithComparer
             { new IComparer<Access * _> with member _.Compare((_, m1), (_, m2)) = f m1 m2 }
 
-    let private memberSet param typeName memberName =
+    let private memberSet param typeName memberName typeCompare =
         emptySet
             (fun m1 m2 ->
                 match (m1, m2) with
@@ -47,14 +47,14 @@ module MemberSet =
                             |> memberName
                             |> compare (typeName tdef)
                         factor * nameCompare
-                | (Type t1, Type t2) ->
-                    compare (typeName t1) (typeName t2))
+                | (Type t1, Type t2) -> typeCompare t1 t2)
 
     let classSet =
         memberSet
             Member.instanceParams
             (fun cdef -> Some cdef.ClassName)
             Member.instanceName
+            (fun c1 c2 -> compare c1.ClassName c2.ClassName)
 
     let interfaceSet =
         memberSet
@@ -65,6 +65,7 @@ module MemberSet =
             (function
             | AMethod mdef -> mdef.MethodName
             | AProperty pdef -> Name.asGeneric pdef.PropName)
+            (fun i1 i2 -> compare i1.InterfaceName i2.InterfaceName)
 
     let moduleSet =
         memberSet
@@ -80,3 +81,6 @@ module MemberSet =
             (function
             | Function fdef -> IdentifierName fdef.FunctionName
             | Operator op -> OperatorName op.Symbol)
+            TypeDef.compare
+
+    let typeSet = emptySet TypeDef.compare
