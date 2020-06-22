@@ -52,8 +52,7 @@ type Property =
 
 type AMethod =
     { Method: Function<unit, TypeName>
-      MethodName: GenericName
-      Purity: MutatorModf }
+      MethodName: GenericName }
 
 type AbstractPropAccessors =
     | AbstractGet
@@ -143,24 +142,3 @@ module Member =
             (fun _ -> None)
             methodName
             propName
-
-    //let compare m1 m2 =
-    //    let paramCompare =
-    //        List.compareWith
-    //            (fun p1 p2 ->
-    //                match (p1.Type, p2.Type) with
-    //                | (None, _)
-    //                | (_, None) -> 0
-    //                | (Some t1, Some t2) -> compare t1 t2)
-    //            (firstParams m1)
-    //            (firstParams m2)
-    //    match paramCompare with
-    //    | 0 ->
-    //        match (m1, m2) with
-    //        | (Function _, Method _) -> -1
-    //        | (Method _, Function _) -> 1
-    //        | (_, _) ->
-    //            compare
-    //                (identifier m1)
-    //                (identifier m2)
-    //    | _ -> paramCompare

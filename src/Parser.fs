@@ -650,6 +650,7 @@ let selfIdAs =
     <?> "self identifier"
     |> opt
 
+
 let functionBody =
     choiceL
         [
@@ -713,33 +714,6 @@ let ctorDef cdef modfs =
               SelfIdentifier = selfid }
     .>> (tryUpdateState popParams)
     <?> "constructor definition"
-let functionDef fdef modfs =
-    let funcHeader =
-        genericName
-        .>>. paramTupleList typeAnnOpt
-        .>> space
-        >>= fun (name, fparams) ->
-            { Function =
-                { Body = List.empty
-                  Parameters = fparams
-                  ReturnType = None }
-              FunctionName = name }
-            |> fdef
-            |> tryAddPlaceholder
-            >>% (name, fparams)
-    noModifiers modfs
-    .>> updateUserState newParams
-    >>. tuple3
-        funcHeader
-        (typeAnnOpt .>> space)
-        functionBody
-    .>> (tryUpdateState popParams)
-    |>> fun ((name, fparams), retType, body) ->
-        { Function =
-            { Body = body
-              Parameters = fparams
-              ReturnType = retType }
-          FunctionName = name }
 let methodDef modfs =
     let methodModf =
         validateModifiers
@@ -795,8 +769,7 @@ let methodDef modfs =
                        Parameters = mparams
                        ReturnType = retType }
                      : Function<unit, TypeName>
-                  MethodName = name
-                  Purity = mmodf.Purity }
+                  MethodName = name }
                 |> AMethod
                 |> Abstract
                 |> Member
@@ -828,20 +801,8 @@ let methodDef modfs =
     .>> (tryUpdateState popParams)
     <?> "method definition"
     |> attempt
-let operatorDef modfs =
-    fail "bad"
-let propDef aprop a2 cprop c2 modfs = // TODO: Simplify the parameters.
-    let abstractEmpty name =
-        { Accessors = AbstractGet
-          PropName = name
-          Purity = IsMutator
-          ValueType = TypeName.Unknown }
-    let concreteEmpty name =
-        { Accessors = AutoGet
-          PropName = name
-          SelfIdentifier = None
-          Value = None
-          ValueType = None }
+
+let propDef aprop cprop pdef modfs =
     let propModf =
         validateModifiers
             modfs
@@ -850,41 +811,16 @@ let propDef aprop a2 cprop c2 modfs = // TODO: Simplify the parameters.
                 | "abstract" -> Result.Ok true
                 | _ -> Result.Error None)
             false
-    let propName empty def =
+    let propName def =
         simpleName
         >>= fun name ->
-            empty name
-            |> def
+            def name
             |> tryAddPlaceholder
             >>% name
     propModf
     >>= fun isAbstract ->
-        if isAbstract then
-            let body =
-                keyword "get"
-                >>. semicolon
-                >>. space
-                >>. choice
-                    [
-                        keyword "set"
-                        >>. semicolon
-                        >>% AbstractGetSet
-
-                        preturn AbstractGet
-                    ]
-                |> block
-            tuple3
-                (propName abstractEmpty aprop)
-                (typeAnnExp .>> space)
-                body
-            |>> fun (name, vtype, accessors) ->
-                { Accessors = accessors
-                  PropName = name
-                  Purity = IsPure // TODO: Handle modifiers for properties.
-                  ValueType = vtype }
-                |> a2
-        else
-            
+        match cprop with
+        | Some cprop when (not isAbstract) ->
             let propBody =
                 let setFull =
                     keyword "set"
@@ -943,7 +879,15 @@ let propDef aprop a2 cprop c2 modfs = // TODO: Simplify the parameters.
                 |> opt
             tuple5
                 selfId
-                (propName concreteEmpty cprop)
+                (propName
+                    (fun name ->
+                        { Accessors = AutoGet
+                          PropName = name
+                          SelfIdentifier = None
+                          Value = None
+                          ValueType = None }
+                        |> cprop
+                        |> pdef))
                 (typeAnnOpt .>> space)
                 propBody
                 propValue
@@ -953,7 +897,38 @@ let propDef aprop a2 cprop c2 modfs = // TODO: Simplify the parameters.
                   SelfIdentifier = selfid
                   Value = pvalue
                   ValueType = vtype }
-                |> c2
+                |> cprop
+        | _ ->
+            let body =
+                keyword "get"
+                >>. semicolon
+                >>. space
+                >>. choice
+                    [
+                        keyword "set"
+                        >>. semicolon
+                        >>% AbstractGetSet
+
+                        preturn AbstractGet
+                    ]
+                |> block
+            tuple3
+                (propName
+                    (fun name ->
+                        { Accessors = AbstractGet
+                          PropName = name
+                          Purity = IsMutator
+                          ValueType = TypeName.Unknown }
+                        |> aprop
+                        |> pdef))
+                (typeAnnExp .>> space)
+                body
+            |>> fun (name, vtype, accessors) ->
+                { Accessors = accessors
+                  PropName = name
+                  Purity = IsPure // TODO: Handle modifiers for properties.
+                  ValueType = vtype }
+                |> aprop
     <?> "property definition"
     |> attempt
 
@@ -972,7 +947,6 @@ let memberDef members types =
             types
             |> Seq.map (fun def ->
                 def modfs
-                |>> Type
                 .>> space)
             |> choice
         ]
@@ -990,7 +964,7 @@ let memberBlock (members: seq<_>) types =
         ]
     |>> List.choose id
     .>>. (getUserState |>> getMembers)
-let memberSection empty validator members selector =
+let memberSection empty validator selector members =
     pushMembers
         empty
         (fun set mdef ->
@@ -1001,34 +975,46 @@ let memberSection empty validator members selector =
     >>. members
     >>. tryMembers selector
     .>> tryUpdateState popMembers
+let memberSection2 empty setf setsel memsel mname members =
+    pushMembers
+        (setf empty)
+        (fun (acc, mdef) set ->
+            match setsel set with
+            | Some actualSet ->
+                match memsel mdef with
+                | Some actualMember ->
+                    match actualSet with
+                    | SortedSet.Contains actualMember ->
+                        actualMember
+                        |> mname
+                        |> sprintf "A member with the %s already exists"
+                        |> Result.Error
+                    | _ ->
+                        actualSet
+                        |> SortedSet.add actualMember
+                        |> setf
+                        |> Result.Ok
+                | None ->
+                    mdef
+                    |> string
+                    |> sprintf "The member %A cannot be added to the set since it is an invalid member type"
+                    |> Result.Error
+            | None -> Result.Error "Invalid member set type")
+    |> updateUserState
+    >>. members
+    >>. tryMembers (fun _ -> invalidOp "badder") //selector
+    .>> tryUpdateState popMembers
 
-let private interfaceMembers, private interfaceMembersRef = createParserForwardedToRef<_, _>()
-let interfaceDef idef modfs =
+let private interfaceBody, private interfaceBodyRef = createParserForwardedToRef<_, _>()
+let interfaceDef iface idef modfs =
     let interfaceName =
         genericTypeName
             (fun name ->
                 { InterfaceName = name
                   Members = MemberSet.interfaceSet
                   SuperInterfaces = List.empty }
+                |> iface
                 |> idef)
-    let interfaceSet f set =
-        match set with
-        | InterfaceSet iset -> f iset |> Some
-        | _ -> None
-    let interfaceBody =
-        memberSection
-            (InterfaceSet MemberSet.interfaceSet)
-            (fun (acc, mdef) ->
-                (fun set ->
-                    match mdef with
-                    | InterfaceMember imem ->
-                        set
-                        |> SortedSet.tryAdd (acc, imem)
-                        |> Option.map InterfaceSet
-                    | _ -> None)
-                |> interfaceSet)
-            interfaceMembers
-            (interfaceSet id)
     keyword "interface"
     >>. noModifiers modfs
     >>. tuple3
@@ -1040,16 +1026,19 @@ let interfaceDef idef modfs =
         { InterfaceName = name
           Members = members
           SuperInterfaces = ilist }
+        |> iface
 do
-    let badMember _ = invalidOp "Non-abstract members are not allowed on interfaces"
+    let iset f set =
+        match set with
+        | InterfaceSet iset -> f iset |> Some
+        | _ -> None
     let members =
         [
-            //methodDef
             propDef
-                (AProperty >> Member >> InterfaceMember)
                 (AProperty >> Member)
-                badMember
-                badMember
+                None
+                InterfaceMember
+            //methodDef
         ]
         |> Seq.map
             (fun def ->
@@ -1057,19 +1046,31 @@ do
                     "abstract"
                     |> rest.Add
                     |> def)
-    interfaceMembersRef :=
+    interfaceBodyRef :=
         accessModifier Access.Internal
         >>. memberDef
             members
-            [ interfaceDef (Type >> InterfaceMember) ]
+            [ interfaceDef Type InterfaceMember ]
         |> attempt
         .>> space
         |> many
         |> block
+        |> memberSection // TODO: iset is used alot. Add another parameter to memberSection?
+            (InterfaceSet MemberSet.interfaceSet)
+            (fun (acc, mdef) ->
+                (fun set ->
+                    match mdef with
+                    | InterfaceMember imem ->
+                        set
+                        |> SortedSet.tryAdd (acc, imem)
+                        |> Option.map InterfaceSet
+                    | _ -> None)
+                |> iset)
+            (iset id)
         <?> "interface body"
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
-let classDef modfs: Parser<TypeDef, _> =
+let classDef cdef modfs: Parser<Class, _> =
     let dataMembers =
         keyword "data"
         >>. position
@@ -1203,23 +1204,22 @@ let classDef modfs: Parser<TypeDef, _> =
     |> choice
     |>> fun (rmembers, cmodf, name, (ctorGen, (sclass, scall), ilist, selfid, (body, cmembers))) ->
         let def (members) pctor =
-            {| ClassName = name
-               Body = body
-               Inheritance = cmodf
-               Interfaces = ilist
-               Members =
-                 match pctor with
-                 | Some (acc, ctor) ->
-                    let ctorDef =
-                        ctor
-                        |> Constructor
-                        |> Member.withAccess acc
-                    SortedSet.add ctorDef members
-                 | None -> members
-               PrimaryCtor = pctor
-               SelfIdentifier = selfid
-               SuperClass = sclass |}
-            |> Class
+            { ClassName = name
+              Body = body
+              Inheritance = cmodf
+              Interfaces = ilist
+              Members =
+                match pctor with
+                | Some (acc, ctor) ->
+                   let ctorDef =
+                       ctor
+                       |> Constructor
+                       |> Member.withAccess acc
+                   SortedSet.add ctorDef members
+                | None -> members
+              PrimaryCtor = pctor
+              SelfIdentifier = selfid
+              SuperClass = sclass }
         let noCtor =
             Seq.forall
                 (fun (_, mdef)->
@@ -1262,47 +1262,93 @@ let classDef modfs: Parser<TypeDef, _> =
             |> def cmembers
         | (None, _, _) ->
             def cmembers None
-
 do
+    let members =
+        [
+            propDef
+                (AProperty >> Abstract >> Member)
+                (Property >> Concrete >> Member |> Some)
+        ]
+        |> Seq.map (fun def -> def ClassMember)
     classBodyRef :=
         memberBlock
-            [
-                ctorDef
-                methodDef
-                propDef
-            ]
-            [
-                classDef
-                interfaceDef
-            ]
+            members
+            [ classDef Type ClassMember ]
         <?> "class body"
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
-let moduleDef modfs: Parser<TypeDef, _> =
+let moduleDef modl mdef modfs =
+    let moduleName =
+        simpleName
+        >>= fun name ->
+            { Body = List.empty
+              ModuleName = name
+              Members = MemberSet.moduleSet }
+            |> modl
+            |> mdef
+            |> tryAddPlaceholder
+            >>% name
     keyword "module"
     >>. noModifiers modfs
     >>. tuple2
-        (genericTypeName TypeDef.placeholderModule)
+        moduleName
         moduleBody
     <?> "module definition"
     |>> fun (name, (body, members)) ->
         { Body = body
           ModuleName = name
           Members = members }
-        |> Module
+        |> modl
 do
+    let functionDef modfs =
+        let funcHeader =
+            genericName
+            .>>. paramTupleList typeAnnOpt
+            .>> space
+            >>= fun (name, fparams) ->
+                { Function =
+                    { Body = List.empty
+                      Parameters = fparams
+                      ReturnType = None }
+                  FunctionName = name }
+                |> Function
+                |> Member
+                |> ModuleMember
+                |> tryAddPlaceholder
+                >>% (name, fparams)
+        noModifiers modfs
+        .>> updateUserState newParams
+        >>. tuple3
+            funcHeader
+            (typeAnnOpt .>> space)
+            functionBody
+        .>> (tryUpdateState popParams)
+        |>> fun ((name, fparams), retType, body) ->
+            { Function =
+                { Body = body
+                  Parameters = fparams
+                  ReturnType = retType }
+              FunctionName = name }
+            |> Function
+            |> Member
+    let operatorDef modfs =
+        fail "bad"
+    let types =
+        [
+            //classDef (Class >> Type) >> Type
+            interfaceDef (Interface >> Type)
+            moduleDef (Module >> Type)
+        ]
+        |> Seq.map (fun def -> def ModuleMember)
     moduleBodyRef :=
         memberBlock
             [
                 functionDef
+                operatorDef
             ]
-            [
-                classDef
-                interfaceDef
-                moduleDef
-            ]
+            types
         |> memberSection
-        <?> "module block"
+        <?> "module body"
 
 do
     let toOp op = op :> Operator<_,_,_>
