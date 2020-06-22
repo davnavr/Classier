@@ -26,7 +26,7 @@ type Pattern<'Expr> =
 [<RequireQualifiedAccess>]
 type Local<'Expr> =
     | Let of Pattern<'Expr> * 'Expr
-    | Var of Pattern<'Expr> * 'Expr option
+    | Var of Pattern<'Expr> * 'Expr option // TODO: Require 'var' to also have an expression, just like how let mutable works in F#.
 
 type MatchCase<'Expr, 'Stat> =
     { Body: 'Stat list

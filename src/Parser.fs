@@ -629,11 +629,6 @@ let private genericTypeName placeholder =
         |> tryAddPlaceholder
         >>% name
 
-let opName: Parser<_, ParserState> =
-    Operator.operatorChars
-    |> anyOf
-    |> many1Chars
-
 let selfIdStr = identifierStr >>= tryAddParam SelfIdentifier
 let selfId =
     selfIdStr
@@ -661,59 +656,7 @@ let functionBody =
         ]
         "function body"
 
-let ctorDef cdef modfs =
-    let ctorHeader =
-        paramTuple typeAnnOpt
-        .>> space
-        <?> "constructor parameters"
-        >>= fun cparams ->
-            { Member.defaultCtor with Parameters = cparams }
-            |> cdef
-            |> tryAddPlaceholder
-            >>% cparams
-    let ctorBody ctorBase =
-        [
-            lambdaOperator
-            |> attempt
-            >>. space
-            >>. ctorBase
-            |>> fun bcall -> bcall, List.empty
-
-            ctorBase <|>% SuperCall List.empty
-            .>>. many (attempt statement .>> space)
-            |> block
-        ]
-        |> choice
-    keyword "new"
-    |> attempt
-    >>. noModifiers
-        modfs
-    >>. updateUserState newParams
-    >>. ctorHeader
-    .>>. selfIdAs
-    .>>. (tryMapState getSelfId)
-    >>= fun ((cparams, selfid), currentSelf) ->
-        [
-            keyword "super" >>% SuperCall
-
-            currentSelf
-            |> string
-            |> keyword
-            >>% SelfCall
-        ]
-        |> choice
-        .>>. tupleExpr
-        |>> (fun (baseCall, baseArgs) -> baseCall baseArgs)
-        <?> "base call"
-        |> ctorBody
-        |>> fun (baseCall, body) ->
-            { BaseCall = baseCall
-              Body = body
-              Parameters = cparams
-              SelfIdentifier = selfid }
-    .>> (tryUpdateState popParams)
-    <?> "constructor definition"
-let methodDef modfs =
+let methodDef amthd cmthd mdef modfs =
     let methodModf =
         validateModifiers
             modfs
@@ -755,7 +698,32 @@ let methodDef modfs =
     methodModf
     .>> updateUserState newParams
     >>= fun (mmodf, isAbstract) ->
-        if isAbstract then
+        match cmthd with
+        | Some cmthd when (not isAbstract) ->
+            tuple4
+                selfId
+                genericName
+                (paramTupleList typeAnnOpt .>> space)
+                typeAnnOpt
+            .>> space
+            >>= fun (selfId, name, mparams, retType) ->
+                let def =
+                    { Method =
+                        { Body = List.empty
+                          Parameters = mparams
+                          ReturnType = retType }
+                      MethodName = name
+                      Modifiers = mmodf
+                      SelfIdentifier = selfId }
+                tryAddPlaceholder (cmthd def |> mdef)
+                >>. functionBody
+                |>> fun body ->
+                    { def with
+                        Method =
+                          { def.Method with
+                              Body = body } }
+                    |> cmthd
+        | _ ->
             tuple3
                 genericName
                 (paramTupleList typeAnnExp .>> space)
@@ -769,38 +737,10 @@ let methodDef modfs =
                        ReturnType = retType }
                      : Function<unit, TypeName>
                   MethodName = name }
-                |> AMethod
-                |> Abstract
-                |> Member
-        else
-            tuple4
-                selfId
-                genericName
-                (paramTupleList typeAnnOpt .>> space)
-                typeAnnOpt
-            .>> space
-            >>= fun (selfId, name, mparams, retType) ->
-                let mthd = Method >> Concrete >> Member
-                let def =
-                    { Method =
-                        { Body = List.empty
-                          Parameters = mparams
-                          ReturnType = retType }
-                      MethodName = name
-                      Modifiers = mmodf
-                      SelfIdentifier = selfId }
-                tryAddPlaceholder (mthd def |> ClassMember)
-                >>. functionBody
-                |>> fun body ->
-                    { def with
-                        Method =
-                          { def.Method with
-                              Body = body } }
-                    |> mthd
+                |> amthd
     .>> (tryUpdateState popParams)
     <?> "method definition"
     |> attempt
-
 let propDef aprop cprop pdef modfs =
     let propModf =
         validateModifiers
@@ -1017,18 +957,20 @@ let interfaceDef iface idef modfs =
 do
     let members =
         [
+            methodDef
+                (AMethod >> Member)
+                None
+
             propDef
                 (AProperty >> Member)
                 None
-                InterfaceMember
-            //methodDef
         ]
         |> Seq.map
             (fun def ->
                 fun (rest: ImmutableList<_>) ->
                     "abstract"
                     |> rest.Add
-                    |> def)
+                    |> def InterfaceMember)
     interfaceBodyRef :=
         accessModifier Access.Internal
         >>. memberDef
@@ -1285,13 +1227,76 @@ let classDef clss cdef modfs =
         | (None, _, _) ->
             create cmembers None
 do
+    let ctorDef modfs =
+        let cdef = Constructor >> Concrete >> Member
+        let ctorHeader =
+            paramTuple typeAnnOpt
+            .>> space
+            <?> "constructor parameters"
+            >>= fun cparams ->
+                { Member.defaultCtor with Parameters = cparams }
+                |> cdef
+                |> ClassMember
+                |> tryAddPlaceholder
+                >>% cparams
+        let ctorBody ctorBase =
+            [
+                lambdaOperator
+                |> attempt
+                >>. space
+                >>. ctorBase
+                |>> fun bcall -> bcall, List.empty
+    
+                ctorBase <|>% SuperCall List.empty
+                .>>. many (attempt statement .>> space)
+                |> block
+            ]
+            |> choice
+        keyword "new"
+        |> attempt
+        >>. noModifiers
+            modfs
+        >>. updateUserState newParams
+        >>. ctorHeader
+        .>>. selfIdAs
+        .>>. (tryMapState getSelfId)
+        >>= fun ((cparams, selfid), currentSelf) ->
+            [
+                keyword "super" >>% SuperCall
+    
+                currentSelf
+                |> string
+                |> keyword
+                >>% SelfCall
+            ]
+            |> choice
+            .>>. tupleExpr
+            |>> (fun (baseCall, baseArgs) -> baseCall baseArgs)
+            <?> "base call"
+            |> ctorBody
+            |>> fun (baseCall, body) ->
+                { BaseCall = baseCall
+                  Body = body
+                  Parameters = cparams
+                  SelfIdentifier = selfid }
+                |> cdef
+        .>> (tryUpdateState popParams)
+        <?> "constructor definition"
     let members =
         [
+            ctorDef
+
+            methodDef
+                (AMethod >> Abstract >> Member)
+                (Method >> Concrete >> Member |> Some)
+                ClassMember
+
             propDef
                 (AProperty >> Abstract >> Member)
                 (Property >> Concrete >> Member |> Some)
+                ClassMember
         ]
-        |> Seq.map (fun def -> def ClassMember)
+        |> Seq.map (fun def -> def)
     classBodyRef :=
         memberBlock
             members
@@ -1322,6 +1327,10 @@ let moduleDef modl mdef modfs =
           Members = members }
         |> modl
 do
+    let opName: Parser<_, ParserState> =
+        Operator.operatorChars
+        |> anyOf
+        |> many1Chars
     let functionDef modfs =
         let funcHeader =
             genericName
@@ -1720,7 +1729,7 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         |> choice
         .>> space
         |> many
-
+    
     space
     >>. tuple4
         (namespaceDecl .>> space)
