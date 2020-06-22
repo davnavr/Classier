@@ -142,3 +142,6 @@ module Member =
             (fun _ -> None)
             methodName
             propName
+
+    let instanceSig mdef =
+        invalidOp "bad"

@@ -1060,8 +1060,8 @@ do
             | Type idef -> string idef.InterfaceName)
         <?> "interface body"
 
-let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
-let classDef cdef modfs: Parser<Class, _> =
+let private classBody, private classBodyRef = createParserForwardedToRef<Statement list, _>()
+let classDef clss cdef modfs =
     let dataMembers =
         keyword "data"
         >>. position
@@ -1112,7 +1112,7 @@ let classDef cdef modfs: Parser<Class, _> =
                                     |> Some)
                         |> Seq.choose id
                 }
-                |> Seq.map (fun mdef -> Access.Public, mdef)
+                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> Member)
         |> opt
     let classModf =
         validateModifiers
@@ -1126,6 +1126,19 @@ let classDef cdef modfs: Parser<Class, _> =
                 | (_, "abstract") -> Result.Ok MustInherit
                 | _ -> Result.Error None)
             Sealed
+    let className =
+        genericTypeName
+            (fun name ->
+                { ClassName = name
+                  Body = List.empty
+                  Inheritance = ClassInheritance.Sealed
+                  Interfaces = List.empty
+                  Members = MemberSet.classSet
+                  PrimaryCtor = None
+                  SelfIdentifier = Identifier.defaultSelfId
+                  SuperClass = None }
+                |> clss
+                |> cdef)
     let classCtor =
         accessModifier Access.Private
         .>> space
@@ -1142,7 +1155,7 @@ let classDef cdef modfs: Parser<Class, _> =
                         BaseCall = SuperCall baseArgs
                         Body = body }
                 acc, ctor
-            tryAddMember (acc, Constructor placeholder)
+            tryAddMember (acc, placeholder |> Constructor |> Concrete |> Member |> ClassMember)
             >>% actual
         |> opt
     let classBase =
@@ -1169,17 +1182,28 @@ let classDef cdef modfs: Parser<Class, _> =
                 (implements .>> space)
                 classSelf
                 body
-            .>> (tryUpdateState popParams)
             |> memberSection
+                MemberSet.classSet
+                ClassSet
+                (function
+                | ClassSet set -> Some set
+                | _ -> None)
+                (function
+                | ClassMember mdef -> Some mdef
+                | _ -> None)
+                (function
+                | Member mdef -> Member.instanceSig mdef
+                | Type cdef -> string cdef.ClassName)
+            .>> (tryUpdateState popParams)
         tuple4
             header
             classModf
-            (genericTypeName TypeDef.placeholderClass)
+            className
             actualBody
         <?> label
     [
         [
-            semicolon >>% (List.empty, MemberSet.classSet)
+            //semicolon >>% List.empty // TODO: Don't forget to push an empty member stack here!
             classBody
         ]
         |> choice
@@ -1193,8 +1217,8 @@ let classDef cdef modfs: Parser<Class, _> =
             classBody
     ]
     |> choice
-    |>> fun (rmembers, cmodf, name, (ctorGen, (sclass, scall), ilist, selfid, (body, cmembers))) ->
-        let def (members) pctor =
+    |>> fun (rmembers, cmodf, name, ((ctorGen, (sclass, scall), ilist, selfid, body), cmembers)) ->
+        let create members pctor =
             { ClassName = name
               Body = body
               Inheritance = cmodf
@@ -1204,18 +1228,25 @@ let classDef cdef modfs: Parser<Class, _> =
                 | Some (acc, ctor) ->
                    let ctorDef =
                        ctor
-                       |> Constructor
+                       |> (Constructor >> Concrete >> Member)
                        |> Member.withAccess acc
                    SortedSet.add ctorDef members
                 | None -> members
               PrimaryCtor = pctor
               SelfIdentifier = selfid
               SuperClass = sclass }
+            |> clss
         let noCtor =
             Seq.forall
                 (fun (_, mdef)->
                     match mdef with
-                    | Constructor _ -> false
+                    | Member mdef ->
+                        match mdef with
+                        | Concrete cdef ->
+                            match cdef with
+                            | Constructor _ -> false
+                            | _ -> true
+                        | _ -> true
                     | _ -> true)
         match (ctorGen, cmembers, scall) with
         | (Some ctor, _, _) ->
@@ -1230,29 +1261,29 @@ let classDef cdef modfs: Parser<Class, _> =
                    |> recordMems
                    |> cmembers.Union
                 | None -> cmembers
-            def
+            create
                 members
                 (Some primaryCtor)
         | (None, _, Some args) ->
-            { MemberDef.emptyCtor with
+            { Member.defaultCtor with
                 BaseCall = SuperCall args
                 Body = body }
-            |> MemberDef.defaultAccess
+            |> Member.defaultAccess
             |> Some
-            |> def cmembers
+            |> create cmembers
         | (None, _, _) when (noCtor cmembers) ->
-            { MemberDef.emptyCtor with
+            { Member.defaultCtor with
                 BaseCall =
                     match scall with
                     | Some args -> args
                     | None -> List.empty
                     |> SuperCall
                 Body = body }
-            |> MemberDef.defaultAccess
+            |> Member.defaultAccess
             |> Some
-            |> def cmembers
+            |> create cmembers
         | (None, _, _) ->
-            def cmembers None
+            create cmembers None
 do
     let members =
         [
