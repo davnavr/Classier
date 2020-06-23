@@ -1,5 +1,6 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
+open System.Collections.Immutable
 open Classier.NET.Compiler.Identifier
 
 type ClassInheritance =
@@ -17,15 +18,13 @@ type TypeOrMember<'Type, 'Member> =
     | Type of 'Type
     | Member of 'Member
 
-type MemberList<'Member> = (Access * 'Member) list
-
 type Class =
     { ClassName: GenericName
       Body: Statement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier list
-      Members: MemberList<ClassMember>
-      PrimaryCtor: (Access * Ctor) option
+      Members: ImmutableList<Access * ClassMember>
+      PrimaryCtor: Access * InfParam list * Expression list
       SelfIdentifier: IdentifierStr option
       SuperClass: FullIdentifier option }
 
@@ -38,14 +37,14 @@ and ClassMember = TypeOrMember<Class, InstanceMember>
 
 type Interface =
     { InterfaceName: GenericName
-      Members: MemberList<InterfaceMember>
+      Members: (Access * InterfaceMember) list
       SuperInterfaces: FullIdentifier list }
 and InterfaceMember = TypeOrMember<Interface, AbstractMember>
 
 type Module<'Type> =
     { Body: Statement list
       ModuleName: SimpleName
-      Members: MemberList<TypeOrMember<'Type, StaticMember>> }
+      Members: ImmutableList<Access * TypeOrMember<'Type, StaticMember>> }
 
 type TypeDef =
     | Class of Class

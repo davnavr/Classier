@@ -236,11 +236,8 @@ let identifierFull =
     |>> FullIdentifier
     <?> "fully qualified name"
 
-let extends =
-    keyword "extends"
-    >>. identifierFull
-    |> opt
-let implements =
+let extends = keyword "extends" >>. identifierFull
+let implementsOpt =
     keyword "implements"
     >>. sepBy1
         identifierFull
@@ -582,8 +579,8 @@ let genericParams =
         .>>. identifierStr
         |> attempt
         .>> space
-        .>>. extends
-        .>>. implements
+        .>>. opt extends
+        .>>. implementsOpt
         <?> "generic parameter"
         |>> fun (((variance, name), super), iimpl) ->
             { Name = name
@@ -715,7 +712,7 @@ let methodDef amthd cmthd modfs =
                   MethodName = name }
                 |> amthd
     <?> "method definition"
-    |> attempt // TODO: Can the attempt be moved elsewhere? Check for both methodDef and propDef
+    |> attempt // TODO: Can the attempt be moved elsewhere? Check both methodDef and propDef
 let propDef aprop cprop modfs =
     validateModifiers
         modfs
@@ -851,9 +848,12 @@ let memberBlock (members: seq<_>) types =
             .>>. memberDef members types
             |>> Choice2Of2
         ]
-    |>> fun a ->
-        invalidOp "partition the list!" |> ignore
-        List.empty, List.empty
+    |>> List.fold
+            (fun (body: ImmutableList<_>, members: ImmutableList<_>) item ->
+                match item with
+                | Choice1Of2 st -> body.Add st, members
+                | Choice2Of2 mdef -> body, members.Add mdef)
+            (ImmutableList.Empty, ImmutableList.Empty)
 
 let private interfaceBody, private interfaceBodyRef = createParserForwardedToRef<_, _>()
 let interfaceDef idef modfs =
@@ -861,7 +861,7 @@ let interfaceDef idef modfs =
     >>. noModifiers modfs
     >>. tuple3
         genericName
-        (implements .>> space)
+        (implementsOpt .>> space)
         interfaceBody
     <?> "interface definition"
     |>> fun (name, ilist, members) ->
@@ -897,7 +897,7 @@ do
         |> block
         <?> "interface body"
 
-let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
+let private classBody, private classBodyRef = createParserForwardedToRef<_ * ImmutableList<_ * ClassMember>, _>()
 let classDef cdef modfs =
     let dataMembers =
         keyword "data"
@@ -968,30 +968,33 @@ let classDef cdef modfs =
         .>> space
         |> opt
         |>> Option.defaultValue Access.Public
-        .>>. paramTuple typeAnnOpt
+        .>>. (paramTuple typeAnnOpt |> optList)
         .>> space
         <?> "primary constructor"
-        |> opt
     let classBase =
         extends
-        |> attempt
         .>> space
-        .>>. opt tupleExpr
+        .>>. optList tupleExpr
         .>> space
+        |> opt
+        |>> fun cbase ->
+            match cbase with
+            | Some (basec, baseargs) -> Some basec, baseargs
+            | None -> None, List.empty
     let def header label body =
         tuple8
             header
             classModf
             genericName
-            selfIdAs
             classCtor
+            selfIdAs
             classBase
-            (implements .>> space)
+            (implementsOpt .>> space)
             body
         <?> label
     [
         [
-            semicolon >>% (List.empty, List.empty)
+            semicolon >>% (ImmutableList.Empty, ImmutableList.Empty)
             classBody
         ]
         |> choice
@@ -1005,33 +1008,38 @@ let classDef cdef modfs =
             classBody
     ]
     |> choice
-    |>> fun (rmembers, cmodf, name, selfid, ctorGen, (sclass, scall), ilist, (b)) ->
-        let create members pctor =
-            { ClassName = name
-              Body = invalidOp "noBody?"
-              Inheritance = cmodf
-              Interfaces = ilist
-              Members =
-                match pctor with
-                | Some ctor -> ctor :: members
-                | None -> members
-              PrimaryCtor = invalidOp "primary ctor?"
-              SelfIdentifier = selfid
-              SuperClass = sclass }
-            |> cdef
-        invalidOp "bad"
+    |>> fun (rmembers, cmodf, name, (ctoracc, ctorparams), selfid, (basec, baseargs), ilist, (body, cmembers)) ->
+        { ClassName = name
+          Body = List.ofSeq body
+          Inheritance = cmodf
+          Interfaces = ilist
+          Members =
+            match rmembers with
+            | Some toadd -> cmembers.InsertRange(0, toadd ctorparams)
+            | None -> cmembers
+          PrimaryCtor = (ctoracc, ctorparams, baseargs)
+          SelfIdentifier = selfid
+          SuperClass = basec }
+        |> cdef
 do
     let ctorDef modfs =
+        let ctorCall =
+            lambdaOperator
+            .>> space
+            >>. expression
+            .>> space
+            .>> semicolon
+            <?> "primary call"
         keyword "new"
         |> attempt
         >>. noModifiers modfs
         >>. tuple3
             (paramTuple typeAnnOpt .>> space)
             selfIdAs
-            functionBody
+            ctorCall
         <?> "constructor definition"
-        |>> fun (cparams, selfid, body) ->
-            { Body = body
+        |>> fun (cparams, selfid, call) ->
+            { Call = call
               Parameters = cparams
               SelfIdentifier = selfid }
             |> Constructor
@@ -1053,7 +1061,7 @@ do
             [ classDef Type ]
         <?> "class body"
 
-let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
+let private moduleBody, private moduleBodyRef = createParserForwardedToRef<ImmutableList<_> * ImmutableList<_>, _>()
 let moduleDef mdef modfs =
     keyword "module"
     >>. noModifiers modfs
@@ -1062,7 +1070,7 @@ let moduleDef mdef modfs =
         moduleBody
     <?> "module definition"
     |>> fun (name, (body, members)) ->
-        { Body = body
+        { Body = List.ofSeq body
           ModuleName = name
           Members = members }
         |> mdef
@@ -1364,7 +1372,7 @@ let compilationUnit: Parser<CompilationUnit, EntryPoint option> =
             getUserState
             >>= function
                 | Some existing ->
-                    string existing
+                    string existing.Origin
                     |> sprintf "An entry point already exists at %s"
                     |> fail
                 | None ->

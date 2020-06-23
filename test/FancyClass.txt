@@ -5,7 +5,7 @@ This is a very long text
 
 use System;
 
-public class FancyClass() implements IDisposable as this {
+public class FancyClass() as this implements IDisposable {
     
     let myField = this.toString();
 

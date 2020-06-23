@@ -1,7 +1,0 @@
-
-public class HelloWorld private (myArg: int) {
-    def new(myArg: int) {
-        super();
-        System.Console.WriteLine("Hello to the world!");
-    }
-}

@@ -5,4 +5,4 @@ type CompilationUnit =
       Namespace: FullIdentifier option
       Usings: FullIdentifier list
       Source: string
-      Types: MemberList<TypeDef> }
+      Types: (Access * TypeDef) list }

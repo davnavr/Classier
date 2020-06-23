@@ -1,8 +1,0 @@
-
-/**
- * Is this comment ugly?
- */
-public class Conflict {
-    public def self.sayGoodbye (self: String) {
-    }
-}

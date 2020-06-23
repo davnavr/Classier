@@ -1,5 +1,0 @@
-
-public module DuplicateParamNames {
-  public def funny (p1: IAbstractSyntaxFactoryFactory, p1) {
-  }
-}

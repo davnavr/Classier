@@ -53,7 +53,6 @@ type TypeName<'Generic> =
     | Identifier of FullIdentifier<'Generic>
     | Primitive of PrimitiveType
     | Tuple of TypeName<'Generic> list
-    | Unknown
 
     override this.ToString() =
         match this with
@@ -61,4 +60,3 @@ type TypeName<'Generic> =
         | Identifier names -> String.Join('.', names)
         | Primitive p -> p.ToString()
         | Tuple types -> sprintf "(%s)" (String.Join(", ", types))
-        | Unknown -> "?"

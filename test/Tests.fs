@@ -14,7 +14,7 @@ let parseSource source =
 
     runParserOnStream
         Parser.compilationUnit
-        ParserState.defaultState
+        None
         source
         file
         System.Text.Encoding.UTF8
@@ -24,16 +24,16 @@ let main args =
     [
         [
             [
-                "FancyClass", "", [ "System" ], [ "FancyClass", 4 ]
+                "FancyClass", "", [ "System" ], [ "FancyClass", 3 ]
                 "HelloWorld", "", [ "System.Console" ], List.empty
-                "MethodOverloading", "", List.empty, [ "OverloadingExample", 6 ]
-                "MultipleClasses", "test", List.empty, [ "Class1", 3; "Class2", 3; "Class3", 2; "Class4", 2; "Class5", 1; "Class6", 1; "Interface1", 1 ]
-                "MyAbstractClass", "this.is.my.space", [ "java.lang"; "java.util" ], [ "MyAbstractClass", 4 ]
-                "MyException1", "", List.empty, [ "MyException1", 3 ]
-                "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>", 3 ]
+                "MethodOverloading", "", List.empty, [ "OverloadingExample", 5 ]
+                "MultipleClasses", "test", List.empty, [ "Class1", 2; "Class2", 2; "Interface1", 1; "Class3", 1; "Class4", 1; "Class5", 1; "Class6", 0 ]
+                "MyAbstractClass", "this.is.my.space", [ "java.lang"; "java.util" ], [ "MyAbstractClass", 3 ]
+                "MyException1", "", List.empty, [ "MyException1", 2 ]
+                "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>", 2 ]
                 "MyModule", "blah.blah.blah", [ "system.reflection.Assembly" ], [ "Math", 5 ]
-                "NoAccessModifiers", "My.Awesome.Project", List.empty, [ "MyModule", 2; "MyModule", 1; "MyInterface", 1 ]
-                "PropertyTest", "", List.empty, [ "IPropertyTest", 1; "PropertyTest", 5  ]
+                "NoAccessModifiers", "My.Awesome.Project", List.empty, [ "MyModule", 1; "MyModule", 1; "MyInterface", 1 ]
+                "PropertyTest", "", List.empty, [ "PropertyTest", 4 ; "IPropertyTest", 1; ]
             ]
             |> Seq.map
                 (fun (sourceName, ns, usings, defs) ->
@@ -56,23 +56,6 @@ let main args =
                                     |> Assert.equal "usings" usings)
 
                             TestCase.psuccess
-                                "types in symbol table"
-                                (fun _ state ->
-                                    let expectedNs =
-                                        state.Symbols
-                                        |> GlobalsTable.getNamespaces
-                                        |> Seq.find (fun tablens -> string tablens = ns)
-                                    let expectedTypes = Seq.map fst defs
-                                    state.Symbols
-                                    |> GlobalsTable.getTypes expectedNs
-                                    |> Seq.map
-                                        (fun gtype ->
-                                            gtype.Type
-                                            |> GlobalType.getName
-                                            |> string)
-                                    |> Assert.isSuperSet expectedTypes)
-
-                            TestCase.psuccess
                                 "member count"
                                 (fun cu _ ->
                                     cu.Types
@@ -81,47 +64,24 @@ let main args =
                                     |> Assert.equal
                                         "member counts"
                                         (List.map snd defs))
-
-                            TestCase.psuccess
-                                "empty stacks"
-                                (fun _ state ->
-                                    [
-                                        Assert.empty state.Members
-                                        Assert.empty state.Params
-                                    ]
-                                    |> Assert.list)
                         ]
                     |> testList sourceName)
             |> testList "success tests"
-
-            parseSource "HelloWorld"
-            |> TestCase.psuccess
-                "valid entry point"
-                (fun cu _ -> cu.EntryPoint.IsSome |> Assert.isTrue "The entry point is missing")
-
+            
             [
-                "BadOverloadCtor", "already", 3L, 5L
-                "BadOverloadInferredParamType", "exists", 8L, 5L
-                "BadOverloadReturnType", "already exists", 6L, 5L
-                "DuplicateEntryPoint", "existing entry point", 9L, 5L
-                "DuplicateParamNames", "'p1' already", 3L, 3L
-                "ParamConflictsWithSelfId", "'self' already exists", 6L, 5L
+                parseSource "HelloWorld"
+                |> TestCase.psuccess
+                    "valid entry point"
+                    (fun cu _ -> cu.EntryPoint.IsSome |> Assert.isTrue "The entry point is missing")
+
+                parseSource "DuplicateEntryPoint"
+                |> TestCase.pfailure
+                    "existing entry point"
+                    (fun msg _ ->
+                        Assert.hasSubstring
+                            "entry point already exists at (\"DuplicateEntryPoint\", Ln: 4, Col: 1)"
+                            msg)
             ]
-            |> Seq.collect
-                (fun (source, err, lineNum, colNum) ->
-                    parseSource source
-                    |> TestCase.ofResult
-                        [
-                            TestCase.pfailure
-                                source
-                                (fun msg pErr ->
-                                    [
-                                        Assert.hasSubstring err msg
-                                        Assert.equal "line number" lineNum pErr.Position.Line
-                                        Assert.equal "column number" colNum pErr.Position.Column
-                                    ]
-                                    |> Assert.list)
-                        ])
             |> testList "failure tests"
         ]
         |> testList "parser tests"

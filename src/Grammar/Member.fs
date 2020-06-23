@@ -7,7 +7,7 @@ type MutatorModf =
     | IsPure
 
 type Ctor =
-    { Body: Statement list
+    { Call: Expression
       Parameters: InfParam list
       SelfIdentifier: IdentifierStr option }
 
@@ -103,7 +103,7 @@ module Member =
     let defaultAccess<'Member> = withAccess<'Member> Access.Public
 
     let defaultCtor =
-        { Body = List.empty
+        { Call = NullLit
           Parameters = List.empty
           SelfIdentifier = None }
 

@@ -18,7 +18,6 @@ type Expression =
     | Nested of Expression
     | NullLit
     | NumLit of NumericLit
-    | SelfRef
     | StrLit of string
     | ThrowExpr of Expression
     | TryExpr of Try<Expression>

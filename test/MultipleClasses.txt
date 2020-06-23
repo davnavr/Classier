@@ -4,12 +4,7 @@ namespace test;
 public class Class1(arg1) {
   printfn(arg1.toString());
 
-  def new(arg1, arg2) {
-    this(arg1);
-
-    // Any statement can be in here
-    System.out.println("here");
-  }
+  def new(arg1, arg2) => this(arg1);
 
   match (arg1) {
     1 => 3;
@@ -56,7 +51,7 @@ public class Class4(arg4) extends Class2(arg4 + 5) implements Interface1 {
   public override sealed def myVirtMethod() => 2;
 }
 
-public class Class5 extends Class3 as self {
+public class Class5 as self extends Class3 {
   public def new (thing1) => self();
 }
 
