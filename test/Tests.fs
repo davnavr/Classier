@@ -14,7 +14,7 @@ let parseSource source =
 
     runParserOnStream
         Parser.compilationUnit
-        None
+        Parser.defaultState
         source
         file
         System.Text.Encoding.UTF8

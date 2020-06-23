@@ -3,14 +3,6 @@
 open System.Collections.Immutable
 open Classier.NET.Compiler.Identifier
 
-[<StructuralEquality>]
-[<StructuralComparison>]
-type Access =
-    | Public
-    | Internal
-    | Protected
-    | Private
-
 type ClassInheritance =
     | MustInherit
     | CanInherit

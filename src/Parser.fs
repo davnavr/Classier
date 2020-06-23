@@ -9,7 +9,17 @@ open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
-// TODO: Create a parser state that contains both entrypoint and whether or not the expression needs a semicolon.
+type StatementEnd =
+    | RequireEnd
+    | OptionalEnd
+
+type State =
+    { EntryPoint: EntryPoint option
+      StatementEnd: StatementEnd }
+
+let defaultState =
+    { EntryPoint = None
+      StatementEnd = RequireEnd }
 
 let private position: Parser<_, _> = fun stream -> Reply(stream.Position)
 
@@ -337,7 +347,6 @@ do
             | Some _ -> FuncType {| ParamType = paramsType; ReturnType = retType.Value |}
             | None -> paramsType
 
-
 let private pattern =
     [
         identifierStr
@@ -436,7 +445,13 @@ do
                         >>% Return
                         <?> "implicit return"
 
-                        semicolon
+                        getUserState
+                        >>= (fun state ->
+                            match state.StatementEnd with
+                            | RequireEnd -> semicolon
+                            | OptionalEnd ->
+                                optional semicolon
+                                >>. setUserState { state with StatementEnd = RequireEnd })
                         >>% IgnoredExpr
                         <?> "ignored expression"
                     ]
@@ -1039,6 +1054,10 @@ do
                 moduleDef (Module >> Type)
             ]
 
+let private optionalEnd =
+    updateUserState
+        (fun state -> { state with StatementEnd = OptionalEnd })
+
 let private ifExpr, private ifExprRef = createParserForwardedToRef<_, _>()
 do
     ifExprRef :=
@@ -1068,6 +1087,7 @@ do
 
                 preturn []
             ]
+        .>> optionalEnd
         <?> "if expression"
         |>> fun ((condition, body), rest) ->
             { Condition = condition
@@ -1122,6 +1142,7 @@ let private tryExpr =
         (attempt statementBlock <?> "try block")
         catchBlock
         finallyBlock
+    .>> optionalEnd
     <?> "try expression"
     >>= fun (tryBlock, catchBlock, finallyBlock) ->
         if List.isEmpty catchBlock && List.isEmpty finallyBlock then
@@ -1301,6 +1322,7 @@ do
                 |> attempt
                 .>> space
                 .>>. matchCases
+                .>> optionalEnd
                 <?> "match expression"
                 |>> fun (against, cases) ->
                     { Against = against
@@ -1381,7 +1403,7 @@ do
 
     expressionRef.TermParser <- simpleExpression
 
-let compilationUnit: Parser<CompilationUnit, EntryPoint option> =
+let compilationUnit: Parser<CompilationUnit, State> =
     let namespaceDecl =
         skipString "namespace"
         >>. space1
@@ -1415,7 +1437,8 @@ let compilationUnit: Parser<CompilationUnit, EntryPoint option> =
                 |> choice
         let entrypoint =
             getUserState
-            >>= function
+            >>= fun state ->
+                match state.EntryPoint with
                 | Some existing ->
                     string existing.Origin
                     |> sprintf "An entry point already exists at %s"
@@ -1428,11 +1451,12 @@ let compilationUnit: Parser<CompilationUnit, EntryPoint option> =
                     .>> space
                     .>>. functionBody
                     >>= fun ((pos, eparams), body) ->
-                        { Body = body
-                          Origin = pos
-                          Parameters = eparams }
-                        |> Some
-                        |> setUserState
+                        let entrypoint =
+                            { Body = body
+                              Origin = pos
+                              Parameters = eparams }
+                            |> Some
+                        setUserState { state with EntryPoint = entrypoint }
         [
             Access.Internal
             |> accessModifier
@@ -1452,8 +1476,8 @@ let compilationUnit: Parser<CompilationUnit, EntryPoint option> =
         (definitions .>> eof)
         position
         getUserState
-    |>> fun (ns, uses, types, pos, entryPoint) ->
-        { EntryPoint = entryPoint
+    |>> fun (ns, uses, types, pos, state) ->
+        { EntryPoint = state.EntryPoint
           Namespace = ns
           Usings = uses
           Source = pos.StreamName

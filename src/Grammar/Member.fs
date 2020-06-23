@@ -2,6 +2,14 @@
 
 open Classier.NET.Compiler.Identifier
 
+[<StructuralEquality>]
+[<StructuralComparison>]
+type Access =
+    | Public
+    | Internal
+    | Protected
+    | Private
+
 type MutatorModf =
     | IsMutator
     | IsPure
