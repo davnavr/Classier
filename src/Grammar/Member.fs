@@ -38,8 +38,8 @@ type Method =
 type PropAccessors =
     | AutoGet
     | AutoGetSet
-    | Get of Statement list
-    | GetSet of Statement list * InfParam * Statement list
+    | Get of PStatement list
+    | GetSet of PStatement list * InfParam * PStatement list
 
 type Property =
     { Accessors: PropAccessors
@@ -49,7 +49,7 @@ type Property =
       ValueType: TypeName option }
 
 type AMethod =
-    { Method: Function<unit, TypeName>
+    { Method: Signature<unit, TypeName>
       MethodName: GenericName }
 
 type AbstractPropAccessors =
@@ -94,7 +94,7 @@ type MemberName =
 [<RequireQualifiedAccess>]
 module Member =
     let inline private methodParams map def =
-        ((^a) : (member Method : Function<_, _>) (def)).Parameters
+        ((^a) : (member Method : Signature<_, _>) (def)).Parameters
         |> List.map (List.map map)
         |> Some
     let private emptyParams _ = None

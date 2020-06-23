@@ -1,7 +1,30 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
+type If<'Expr> =
+    { Condition: 'Expr
+      Choice1: PStatement<'Expr> list
+      Choice2: PStatement<'Expr> list }
+
+type MatchCase<'Expr> =
+    { Body: PStatement<'Expr> list
+      Patterns: Pattern<'Expr> list }
+
+type Match<'Expr> =
+    { Against: 'Expr
+      Cases: MatchCase<'Expr> list }
+
+type Try<'Expr> =
+    { TryBody: PStatement<'Expr> list
+      Handlers: MatchCase<'Expr> list
+      Finally: PStatement<'Expr> list }
+
+type Signature<'Body, 'Type> =
+    { Body: 'Body
+      Parameters: Param<'Type> list list
+      ReturnType: 'Type }
+
 type Expression =
-    | AnonFunc of Function<Expression, PStatement<Expression> list, TypeName option>
+    | AnonFunc of Signature<PStatement<Expression> list, TypeName option>
     | BoolLit of bool
     | CtorCall of
         {| Arguments: Expression list
@@ -19,7 +42,7 @@ type Expression =
     | NullLit
     | NumLit of NumericLit
     | StrLit of string
-    | ThrowExpr of Expression
+    | ThrowExpr of Expression option
     | TryExpr of Try<Expression>
     | TupleLit of Expression list
     | UnitLit
@@ -27,16 +50,15 @@ type Expression =
         {| Target: Expression
            Value: Expression |}
 
-type Statement = PStatement<Expression>
+type PStatement = PStatement<Expression>
 type If = If<Expression>
 type Pattern = Pattern<Expression>
 type Local = Local<Expression>
 type MatchCase = MatchCase<Expression>
 type Match = Match<Expression>
 type Try = Try<Expression>
-type Function<'Body, 'Type> = Function<Expression, 'Body, 'Type>
 /// A function whose return type can be inferred.
-type InfFunction = Function<Statement list, TypeName option>
+type InfFunction = Signature<PStatement list, TypeName option>
 
 module Expression =
     let withPos pos expr = pos, expr

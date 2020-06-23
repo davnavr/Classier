@@ -17,7 +17,7 @@
     <Compile Include="Grammar\Name.fs" />
     <Compile Include="Grammar\Numeric.fs" />
     <Compile Include="Grammar\Param.fs" />
-    <Compile Include="Grammar\Grammar.fs" />
+    <Compile Include="Grammar\Statement.fs" />
     <Compile Include="Grammar\Expression.fs" />
     <Compile Include="Grammar\Operator.fs" />
     <Compile Include="Grammar\Member.fs" />

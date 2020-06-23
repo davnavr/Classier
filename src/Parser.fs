@@ -9,6 +9,8 @@ open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
+// TODO: Create a parser state that contains both entrypoint and whether or not the expression needs a semicolon.
+
 let private position: Parser<_, _> = fun stream -> Reply(stream.Position)
 
 let private optList p = opt p |>> Option.defaultValue []
@@ -210,7 +212,7 @@ let blockChoice p =
     |> many
     |> block
 
-let statement, private statementRef = createParserForwardedToRef<Statement,_>()
+let statement, private statementRef = createParserForwardedToRef<PStatement,_>()
 let statementBlock = blockChoice [ statement ]
 
 let genericArgs =
@@ -301,137 +303,6 @@ let tupleExpr =
     <?> "tuple"
 let parenExpr = tupleExpr |>> TupleLit
 
-let pattern =
-    [
-        identifierStr
-        .>> space
-        .>>. typeAnnOpt
-        |>> VarPattern
-        <?> "variable pattern"
-
-        typeAnnOpt
-        |> paramTuple
-        |>> TuplePattern
-        <?> "tuple deconstruction"
-    ]
-    |> choice
-let matchCases =
-    let matchPattern =
-        [
-            pattern
-
-            expression
-            |>> Constant
-            <?> "constant pattern"
-
-            skipChar '_'
-            >>. space
-            |> attempt
-            >>% Default
-            <?> "default pattern"
-        ]
-        |> choice
-    sepBy1 matchPattern (separator comma |> attempt)
-    .>> space
-    .>>. lambdaBlock
-    .>> space
-    .>> semicolon
-    |>> (fun (patterns, body) -> { Body = body; Patterns = patterns })
-    .>> space
-    |> many1
-    |> block
-    <?> "cases"
-let matchStatement =
-    skipString "match"
-    >>. space
-    >>. parenExpr
-    .>> space
-    .>>. matchCases
-    |>> fun (against, cases) ->
-        { Against = against
-          Cases = cases }
-
-let tryBlock =
-    skipString "try"
-    >>. space
-    >>. statementBlock
-    |> attempt
-    <?> "try block"
-    .>>. (space
-        >>. skipString "catch"
-        >>. space
-        |> attempt
-        >>. matchCases
-        <?> "catch block"
-        |> optList)
-    .>>.
-        (space
-        >>. skipString "finally"
-        >>. space
-        |> attempt
-        >>. statementBlock
-        <?> "finally block"
-        |> optList)
-    >>= fun ((tryBlock, catchBlock), finallyBlock) ->
-        if List.isEmpty catchBlock && List.isEmpty finallyBlock then
-            fail "Expected at least one catch or finally block."
-        else
-            preturn
-                { TryBody = tryBlock
-                  Handlers = catchBlock
-                  Finally = finallyBlock }
-
-let throwStatement =
-    skipString "throw"
-    >>. choice
-        [
-            space1
-            |> attempt
-            >>. expression
-            |>> Some
-
-            space
-            >>. semicolon
-            >>% None
-        ]
-    |> attempt
-    <?> "throw statement"
-
-let ifStatement, private ifStatementRef = createParserForwardedToRef<If,_>()
-do
-    ifStatementRef :=
-        skipString "if"
-        >>. space1
-        >>. parenExpr
-        .>> space
-        .>>. statementBlock
-        |> attempt
-        .>>. choice
-            [
-                space
-                >>. skipString "else"
-                |> attempt
-                >>. choice
-                    [
-                        space1
-                        >>. position
-                        .>>. ifStatement
-                        |> attempt
-                        |>> fun (pos, e) -> [ pos, IfStatement e ]
-
-                        space
-                        >>. statementBlock
-                        |> attempt;
-                    ]
-                <?> "else or else-if"
-
-                preturn []
-            ]
-        |>> fun ((condition, body), rest) ->
-            { Condition = condition
-              Choice1 = body
-              Choice2 = rest }
-
 do
     let simpleType =
         choiceL
@@ -465,6 +336,22 @@ do
             match retType with
             | Some _ -> FuncType {| ParamType = paramsType; ReturnType = retType.Value |}
             | None -> paramsType
+
+
+let private pattern =
+    [
+        identifierStr
+        .>> space
+        .>>. typeAnnOpt
+        |>> VarPattern
+        <?> "variable pattern"
+
+        typeAnnOpt
+        |> paramTuple
+        |>> TuplePattern
+        <?> "tuple deconstruction"
+    ]
+    |> choice
 
 do
     statementRef :=
@@ -540,11 +427,6 @@ do
                 <?> "return statement"
                 .>> space
                 .>> semicolon
-
-                throwStatement |>> Throw
-                ifStatement |>> IfStatement <?> "if statement"
-                matchStatement |>> MatchStatement <?> "match statement"
-                tryBlock |>> TryStatement <?> "try statement"
             
                 expression
                 .>> space
@@ -710,7 +592,7 @@ let methodDef amthd cmthd modfs =
                      { Body = ()
                        Parameters = mparams
                        ReturnType = retType }
-                     : Function<unit, TypeName>
+                     : Signature<unit, TypeName>
                   MethodName = name }
                 |> amthd
     <?> "method definition"
@@ -1157,6 +1039,100 @@ do
                 moduleDef (Module >> Type)
             ]
 
+let private ifExpr, private ifExprRef = createParserForwardedToRef<_, _>()
+do
+    ifExprRef :=
+        keyword "if"
+        >>. parenExpr
+        .>> space
+        .>>. statementBlock
+        |> attempt
+        .>>. choice
+            [
+                space
+                >>. skipString "else"
+                |> attempt
+                >>. choice
+                    [
+                        space1
+                        >>. position
+                        .>>. ifExpr
+                        |> attempt
+                        |>> fun (pos, e) -> [ pos, Return e ]
+
+                        space
+                        >>. statementBlock
+                        |> attempt;
+                    ]
+                <?> "else or else-if"
+
+                preturn []
+            ]
+        <?> "if expression"
+        |>> fun ((condition, body), rest) ->
+            { Condition = condition
+              Choice1 = body
+              Choice2 = rest }
+            |> IfExpr
+
+let private matchCases =
+    let matchPattern =
+        [
+            pattern
+
+            expression
+            |>> Constant
+            <?> "constant pattern"
+
+            skipChar '_'
+            >>. space
+            |> attempt
+            >>% Default
+            <?> "default pattern"
+        ]
+        |> choice
+    sepBy1 matchPattern (separator comma |> attempt)
+    .>> space
+    .>>. lambdaBlock
+    .>> space
+    .>> semicolon
+    |>> (fun (patterns, body) -> { Body = body; Patterns = patterns })
+    .>> space
+    |> many1
+    |> block
+    <?> "cases"
+
+let private tryExpr =
+    let catchBlock =
+        space
+        >>. keyword "catch"
+        |> attempt
+        >>. matchCases
+        <?> "catch block"
+        |> optList
+    let finallyBlock =
+        space
+        >>. keyword "finally"
+        |> attempt
+        >>. statementBlock
+        <?> "finally block"
+        |> optList
+    keyword "try"
+    >>. tuple3
+        (attempt statementBlock <?> "try block")
+        catchBlock
+        finallyBlock
+    <?> "try expression"
+    >>= fun (tryBlock, catchBlock, finallyBlock) ->
+        if List.isEmpty catchBlock && List.isEmpty finallyBlock then
+            fail "Expected at least one catch or finally block"
+        else
+            { TryBody = tryBlock
+              Handlers = catchBlock
+              Finally = finallyBlock }
+            |> TryExpr
+            |> preturn
+
 do
     let toOp op = op :> Operator<_,_,_>
     let prefixOp op prec =
@@ -1317,16 +1293,37 @@ do
                     | [ nested ] -> nested
                     | _ -> TupleLit ex)
 
-                ifStatement |>> IfExpr <?> "if expression"
-                matchStatement |>> MatchExpr <?> "match expression"
-                tryBlock |>> TryExpr <?> "try expression"
+                ifExpr
+
+                keyword "match"
+                >>. space
+                >>. parenExpr
+                |> attempt
+                .>> space
+                .>>. matchCases
+                <?> "match expression"
+                |>> fun (against, cases) ->
+                    { Against = against
+                      Cases = cases }
+                    |> MatchExpr
+
+                tryExpr
+
                 skipString "null" >>% NullLit <?> "null literal"
 
-                throwStatement
-                >>= fun ex ->
-                    match ex with
-                    | None -> fail "Throw statements used as expressions must provide an exception to throw"
-                    | Some _ -> ex.Value |> ThrowExpr |> preturn
+                skipString "throw"
+                >>. choice
+                    [
+                        space1
+                        |> attempt
+                        >>. expression
+                        |>> Some
+
+                        preturn None // NOTE: Require semicolon?
+                    ]
+                |> attempt
+                <?> "throw expression"
+                |>> ThrowExpr
 
                 skipString "new"
                 >>. space

@@ -3,6 +3,14 @@
 open System.Collections.Immutable
 open Classier.NET.Compiler.Identifier
 
+[<StructuralEquality>]
+[<StructuralComparison>]
+type Access =
+    | Public
+    | Internal
+    | Protected
+    | Private
+
 type ClassInheritance =
     | MustInherit
     | CanInherit
@@ -20,7 +28,7 @@ type TypeOrMember<'Type, 'Member> =
 
 type Class =
     { ClassName: GenericName
-      Body: Statement list
+      Body: PStatement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier list
       Members: ImmutableList<Access * ClassMember>
@@ -52,6 +60,6 @@ type TypeDef =
 and Module = Module<TypeDef>
 
 type EntryPoint =
-    { Body: Statement list
-      Origin: Position
+    { Body: PStatement list
+      Origin: FParsec.Position
       Parameters: ExpParam list }

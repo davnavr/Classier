@@ -14,7 +14,7 @@ type OperatorStr =
         str
 
 type Operator =
-    { Body: Statement list
+    { Body: PStatement list
       Kind: OperatorKind
       Operands: InfParam list
       ReturnType: TypeName option
