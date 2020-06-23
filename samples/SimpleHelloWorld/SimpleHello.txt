@@ -1,0 +1,6 @@
+
+use System.Console;
+
+main (args: Array<String>) {
+  System.Console.WriteLine("Hello world!");
+}

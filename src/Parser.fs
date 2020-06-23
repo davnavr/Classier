@@ -1485,7 +1485,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
           Source = pos.StreamName
           Types = types }
 
-let parseFiles paths enc =
+let parseFiles enc paths =
     let parseFile state path =
         runParserOnFile
             compilationUnit

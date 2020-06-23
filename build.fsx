@@ -22,20 +22,22 @@ let handleError (result: ProcessResult) =
     | 0 -> ()
     | code -> failwithf "Process returned with an exit code of %i\n" code
 
-let runProj proj =
+let runProj proj args =
     let projFile =
         proj
         |> Path.getFullName
         |> FileInfo.ofPath
-    let action =
-        if projFile.Exists then
-            sprintf "--project %s --no-restore --configuration Release"
-            >> DotNetCli.exec id "run"
-            >> handleError
-        else
-            failwithf "Unable to run the project file %s as it does not exist\n"
-
-    action projFile.FullName
+    if projFile.Exists then
+        sprintf
+            "--project %s --no-restore --configuration Release -- %s"
+            projFile.FullName
+            (String.concat " " args)
+        |> DotNetCli.exec id "run"
+        |> handleError
+    else
+        failwithf
+            "Unable to run the project file %s as it does not exist\n"
+            projFile.FullName
 
 Target.create "Clean" (fun _ ->
     slnFile
@@ -43,26 +45,31 @@ Target.create "Clean" (fun _ ->
     |> handleError
 )
 
-Target.create "Build" (fun _ ->
+Target.create "Build Bootstrap" (fun _ ->
     DotNetCli.build id slnFile
 )
 
-Target.create "Lint" (fun _ ->
+Target.create "Lint Bootstrap" (fun _ ->
     slnFile
     |> sprintf "lint %s"
     |> DotNetCli.exec id "fsharplint"
     |> handleError
 )
 
-Target.create "Test" (fun _ ->
-    runProj "./test/Classier.NET.Compiler.Tests.fsproj"
+Target.create "Test Bootstrap" (fun _ ->
+    runProj "./test/Classier.NET.Compiler.Tests.fsproj" List.empty
+)
+
+Target.create "Build Samples" (fun _ ->
+    runProj "./src/Classier.NET.Compiler.fsproj" [ "\"./samples/SimpleHelloWorld/SimpleHello.txt\""; "--output"; "./samples/SimpleHelloWorld/Hello.output.cs" ]
+    DotNetCli.build id "./samples/SimpleHelloWorld/SimpleHelloWorld.csproj"
 )
 
 Target.create "Publish" (fun _ ->
     Trace.trace "Publishing..."
 )
 
-"Clean" ==> "Build" ==> "Test" ==> "Publish"
-"Build" ==> "Lint" ==> "Publish"
+"Clean" ==> "Build Bootstrap" ==> "Test Bootstrap" ==> "Build Samples" ==> "Publish"
+"Build Bootstrap" ==> "Lint Bootstrap" ==> "Publish"
 
 Target.runOrDefault "Publish"

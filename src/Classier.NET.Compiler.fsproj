@@ -33,6 +33,7 @@
     <Compile Include="LocalsTable.fs" />
     <Compile Include="Analyzer.fs" />
     <Compile Include="CompilerError.fs" />
+    <Compile Include="Output.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

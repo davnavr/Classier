@@ -8,3 +8,6 @@ obj/
 # FAKE
 .fake/
 /build.fsx.lock
+
+# Compiler output
+*.output.cs
