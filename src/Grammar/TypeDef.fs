@@ -25,7 +25,7 @@ let getMembers tdef =
     let map mtype members =
         Seq.map (snd >> mtype) members
     match tdef with
-    | Class cdef -> // NOTE: cdef.Members was empty for some reason!
+    | Class cdef ->
         map ClassMember cdef.Members
     | Interface idef ->
         map InterfaceMember idef.Members

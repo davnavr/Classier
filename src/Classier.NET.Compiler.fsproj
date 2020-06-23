@@ -10,7 +10,6 @@
   <!-- Source files -->
   <ItemGroup>
     <Compile Include="SortedSet.fs" />
-    <Compile Include="CompilerError.fs" />
     <Compile Include="Identifier.fs" />
     <Compile Include="TypeSystem.fs" />
     <Compile Include="Generic.fs" />
@@ -25,15 +24,14 @@
     <Compile Include="Grammar\Types.fs" />
     <Compile Include="Grammar\MemberDef.fs" />
     <Compile Include="Grammar\TypeDef.fs" />
-    <Compile Include="Grammar\MemberSet.fs" />
     <Compile Include="Grammar\Misc.fs" />
     <Compile Include="Namespace.fs" />
     <Compile Include="Extern.fs" />
     <Compile Include="GlobalType.fs" />
     <Compile Include="GlobalsTable.fs" />
-    <Compile Include="ParserState.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="LocalsTable.fs" />
+    <Compile Include="CompilerError.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

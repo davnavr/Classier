@@ -7,20 +7,11 @@ open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Identifier
-open Classier.NET.Compiler.ParserState
 open Classier.NET.Compiler.TypeSystem
 
-let private position: Parser<_, ParserState> = fun stream -> Reply(stream.Position)
+let private position: Parser<_, _> = fun stream -> Reply(stream.Position)
 
 let private optList p = opt p |>> Option.defaultValue []
-
-let debugIt p =
-    tuple3
-        p
-        getUserState
-        position
-    >>= fun (result, state, pos) ->
-        preturn result
 
 let private tuple6 p1 p2 p3 p4 p5 p6 =
     tuple5 p1 p2 p3 p4 p5 .>>. p6
@@ -28,6 +19,9 @@ let private tuple6 p1 p2 p3 p4 p5 p6 =
 let private tuple7 p1 p2 p3 p4 p5 p6 p7 =
     tuple6 p1 p2 p3 p4 p5 p6 .>>. p7
     |>> (fun ((a, b, c, d, e, f), g) -> a, b, c, d, e, f, g)
+let private tuple8 p1 p2 p3 p4 p5 p6 p7 p8 =
+    tuple7 p1 p2 p3 p4 p5 p6 p7 .>>. p8
+    |>> (fun ((a, b, c, d, e, f, g), h) -> a, b, c, d, e, f, g, h)
 
 let colon = skipChar ':'
 let comma = skipChar ','
@@ -109,7 +103,7 @@ let accessModifier lowestAccess =
             preturn Access.Public
         ]
 
-let typeName, private typeNameRef = createParserForwardedToRef<TypeName,_>()
+let typeName, private typeNameRef = createParserForwardedToRef<TypeName, _>()
 let typeNameOpt =
     choice
         [
@@ -198,7 +192,7 @@ let private noModifiers modfs =
         modfs
         (fun _ _ -> Result.Error None)
         ()
-let private badModfier str = str |> Some |> Result.Error
+let private badModfier str = Some str  |> Result.Error // TODO: Fix the name. Or maybe this function isn't necessary at all?
 
 let block p =
     lcurlybracket
@@ -254,9 +248,8 @@ let implements =
     |> optList
     <?> "interface implementations"
 
-let paramIdentifier = identifierStr >>= tryAddParam ParamIdentifier
 let param typeAnn =
-    paramIdentifier
+    identifierStr
     .>>. typeAnn
     <?> "parameter"
     |>> fun (name, ptype) ->
@@ -622,17 +615,9 @@ let simpleName: Parser<SimpleName, _> =
     position
     .>>. identifierStr
     |>> fun (pos, name) -> Name.simple pos name
-let private genericTypeName placeholder =
-    genericName
-    >>= fun name ->
-        name
-        |> placeholder
-        |> tryAddPlaceholder
-        >>% name
 
-let selfIdStr = identifierStr >>= tryAddParam SelfIdentifier
 let selfId =
-    selfIdStr
+    identifierStr
     .>> space
     .>> period
     .>> space
@@ -641,7 +626,8 @@ let selfId =
     |> opt
 let selfIdAs =
     keyword "as"
-    >>. selfIdStr
+    |> attempt
+    >>. identifierStr
     .>> space
     <?> "self identifier"
     |> opt
@@ -657,73 +643,62 @@ let functionBody =
         ]
         "function body"
 
-let methodDef amthd cmthd mdef modfs =
-    let methodModf =
-        validateModifiers
-            modfs
-            (fun (prev, isAbstract) modf ->
-                match modf with
-                | "abstract" ->
-                    match prev.ImplKind with
-                    | MethodImpl.SealedOverride ->
-                        badModfier "A 'sealed' method cannot also be 'abstract'"
-                    | MethodImpl.Virtual ->
-                        badModfier "An 'abstract' method implies that it can be overriden, making the 'virtual' modifier redundant"
-                    | _ -> Result.Ok (prev, true)
-                | "mutator" -> Result.Ok ({ prev with Purity = IsMutator }, isAbstract)
-                | "override" ->
-                    match prev.ImplKind with
-                    | MethodImpl.Virtual ->
-                        badModfier "A 'virtual' method makes the 'override' modifier redundant, since it already can be overriden"
-                    | _ ->
-                        Result.Ok ({ prev with ImplKind = MethodImpl.Override }, false)
-                | "sealed" ->
-                    match prev.ImplKind with
-                    | MethodImpl.Default ->
-                        badModfier "The 'sealed' modifier is redundant, since methods cannot be overriden by default"
-                    | MethodImpl.Virtual ->
-                        badModfier "The method cannot be 'sealed' since it is already 'virtual'"
-                    | _ when isAbstract -> badModfier "An abstract method cannot also be 'sealed'"
-                    | _ ->
-                        Result.Ok ({ prev with ImplKind = MethodImpl.SealedOverride}, false)
-                | "virtual" ->
-                    match prev.ImplKind with
-                    | MethodImpl.Override ->
-                        badModfier "An overriden method cannot be 'virtual'"
-                    | MethodImpl.SealedOverride ->
-                        badModfier "A sealed method cannot be 'virtual', since it cannot be overriden"
-                    | _ when isAbstract -> badModfier "An abstract method already implies that the method is 'virtual'"
-                    | _ -> Result.Ok ({ prev with ImplKind = MethodImpl.Virtual }, false)
-                | _ -> Result.Error None)
-            (MethodModifiers.Default, false)
-    methodModf
-    .>> updateUserState newParams
+let methodDef amthd cmthd modfs =
+    validateModifiers
+        modfs
+        (fun (prev, isAbstract) modf ->
+            match modf with
+            | "abstract" ->
+                match prev.ImplKind with
+                | MethodImpl.SealedOverride ->
+                    badModfier "A 'sealed' method cannot also be 'abstract'"
+                | MethodImpl.Virtual ->
+                    badModfier "An 'abstract' method implies that it can be overriden, making the 'virtual' modifier redundant"
+                | _ -> Result.Ok (prev, true)
+            | "mutator" -> Result.Ok ({ prev with Purity = IsMutator }, isAbstract)
+            | "override" ->
+                match prev.ImplKind with
+                | MethodImpl.Virtual ->
+                    badModfier "A 'virtual' method makes the 'override' modifier redundant, since it already can be overriden"
+                | _ ->
+                    Result.Ok ({ prev with ImplKind = MethodImpl.Override }, false)
+            | "sealed" ->
+                match prev.ImplKind with
+                | MethodImpl.Default ->
+                    badModfier "The 'sealed' modifier is redundant, since methods cannot be overriden by default"
+                | MethodImpl.Virtual ->
+                    badModfier "The method cannot be 'sealed' since it is already 'virtual'"
+                | _ when isAbstract -> badModfier "An abstract method cannot also be 'sealed'"
+                | _ ->
+                    Result.Ok ({ prev with ImplKind = MethodImpl.SealedOverride}, false)
+            | "virtual" ->
+                match prev.ImplKind with
+                | MethodImpl.Override ->
+                    badModfier "An overriden method cannot be 'virtual'"
+                | MethodImpl.SealedOverride ->
+                    badModfier "A sealed method cannot be 'virtual', since it cannot be overriden"
+                | _ when isAbstract -> badModfier "An abstract method already implies that the method is 'virtual'"
+                | _ -> Result.Ok ({ prev with ImplKind = MethodImpl.Virtual }, false)
+            | _ -> Result.Error None)
+        (MethodModifiers.Default, false)
     >>= fun (mmodf, isAbstract) ->
         match cmthd with
         | Some cmthd when (not isAbstract) ->
-            tuple4
+            tuple5
                 selfId
                 genericName
                 (paramTupleList typeAnnOpt .>> space)
-                typeAnnOpt
-            .>> space
-            >>= fun (selfId, name, mparams, retType) ->
-                let def =
-                    { Method =
-                        { Body = List.empty
-                          Parameters = mparams
-                          ReturnType = retType }
-                      MethodName = name
-                      Modifiers = mmodf
-                      SelfIdentifier = selfId }
-                tryAddPlaceholder (cmthd def |> mdef)
-                >>. functionBody
-                |>> fun body ->
-                    { def with
-                        Method =
-                          { def.Method with
-                              Body = body } }
-                    |> cmthd
+                (typeAnnOpt .>> space)
+                functionBody
+            |>> fun (selfId, name, mparams, retType, body) ->
+                { Method =
+                    { Body = body
+                      Parameters = mparams
+                      ReturnType = retType }
+                  MethodName = name
+                  Modifiers = mmodf
+                  SelfIdentifier = selfId }
+                |> cmthd
         | _ ->
             tuple3
                 genericName
@@ -739,25 +714,16 @@ let methodDef amthd cmthd mdef modfs =
                      : Function<unit, TypeName>
                   MethodName = name }
                 |> amthd
-    .>> (tryUpdateState popParams)
     <?> "method definition"
-    |> attempt
-let propDef aprop cprop pdef modfs =
-    let propModf =
-        validateModifiers
-            modfs
-            (fun _ modf ->
-                match modf with
-                | "abstract" -> Result.Ok true
-                | _ -> Result.Error None)
-            false
-    let propName def =
-        simpleName
-        >>= fun name ->
-            def name
-            |> tryAddPlaceholder
-            >>% name
-    propModf
+    |> attempt // TODO: Can the attempt be moved elsewhere? Check for both methodDef and propDef
+let propDef aprop cprop modfs =
+    validateModifiers
+        modfs
+        (fun _ modf ->
+            match modf with
+            | "abstract" -> Result.Ok true
+            | _ -> Result.Error None)
+        false
     >>= fun isAbstract ->
         match cprop with
         | Some cprop when (not isAbstract) ->
@@ -765,13 +731,11 @@ let propDef aprop cprop pdef modfs =
                 let setFull =
                     keyword "set"
                     |> attempt
-                    >>. updateUserState newParams
                     >>. lparen
                     >>. space
                     >>. param typeAnnOpt
                     .>> space
                     .>> rparen
-                    .>> (tryUpdateState popParams)
                     .>> space
                     .>>. functionBody
                     |> opt
@@ -819,15 +783,7 @@ let propDef aprop cprop pdef modfs =
                 |> opt
             tuple5
                 selfId
-                (propName
-                    (fun name ->
-                        { Accessors = AutoGet
-                          PropName = name
-                          SelfIdentifier = None
-                          Value = None
-                          ValueType = None }
-                        |> cprop
-                        |> pdef))
+                simpleName
                 (typeAnnOpt .>> space)
                 propBody
                 propValue
@@ -839,7 +795,7 @@ let propDef aprop cprop pdef modfs =
                   ValueType = vtype }
                 |> cprop
         | _ ->
-            let body =
+            let propBody =
                 keyword "get"
                 >>. semicolon
                 >>. space
@@ -853,16 +809,9 @@ let propDef aprop cprop pdef modfs =
                     ]
                 |> block
             tuple3
-                (propName
-                    (fun name ->
-                        { Accessors = AbstractGet
-                          PropName = name
-                          Purity = IsMutator
-                          ValueType = TypeName.Unknown }
-                        |> aprop
-                        |> pdef))
+                simpleName
                 (typeAnnExp .>> space)
-                body
+                propBody
             |>> fun (name, vtype, accessors) ->
                 { Accessors = accessors
                   PropName = name
@@ -891,73 +840,35 @@ let memberDef members types =
             |> choice
         ]
         |> choice
-let memberBlock (members: seq<_>) types setf setsel =
+let memberBlock (members: seq<_>) types =
     blockChoice
         [
             statement
             |> attempt
-            |>> Some
+            |>> Choice1Of2
 
             accessModifier Access.Private
             .>>. memberDef members types
-            >>= fun mdef ->
-                replaceMember mdef setf setsel
-                |> tryUpdateState
-            >>% None
+            |>> Choice2Of2
         ]
-    |>> List.choose id
-let memberSection empty setf setsel memsel mname members =
-    pushMembers
-        (setf empty)
-        (fun (acc, def) set ->
-            match setsel set with
-            | Some actualSet ->
-                match memsel def with
-                | Some mdef ->
-                    let amember = acc, mdef
-                    match actualSet with
-                    | SortedSet.Contains amember ->
-                        mname mdef
-                        |> sprintf "A member with the signature '%s' already exists"
-                        |> Result.Error
-                    | _ ->
-                        actualSet
-                        |> SortedSet.add amember
-                        |> setf
-                        |> Result.Ok
-                | None ->
-                    def
-                    |> string
-                    |> sprintf "The member %A cannot be added to the set since it is an invalid member type"
-                    |> Result.Error
-            | None -> Result.Error "Invalid member set type")
-    |> updateUserState
-    >>. members
-    .>>. tryMembers setsel
-    .>> tryUpdateState popMembers
+    |>> fun a ->
+        invalidOp "partition the list!" |> ignore
+        List.empty, List.empty
 
 let private interfaceBody, private interfaceBodyRef = createParserForwardedToRef<_, _>()
-let interfaceDef iface idef modfs =
-    let interfaceName =
-        genericTypeName
-            (fun name ->
-                { InterfaceName = name
-                  Members = MemberSet.interfaceSet
-                  SuperInterfaces = List.empty }
-                |> iface
-                |> idef)
+let interfaceDef idef modfs =
     keyword "interface"
     >>. noModifiers modfs
     >>. tuple3
-        interfaceName
+        genericName
         (implements .>> space)
         interfaceBody
     <?> "interface definition"
-    |>> fun (name, ilist, (_, members)) ->
+    |>> fun (name, ilist, members) ->
         { InterfaceName = name
           Members = members
           SuperInterfaces = ilist }
-        |> iface
+        |> idef
 do
     let members =
         [
@@ -974,44 +885,20 @@ do
                 fun (rest: ImmutableList<_>) ->
                     "abstract"
                     |> rest.Add
-                    |> def InterfaceMember)
+                    |> def)
     interfaceBodyRef :=
         accessModifier Access.Internal
-        >>. memberDef
+        .>>. memberDef
             members
-            [ interfaceDef Type InterfaceMember ]
+            [ interfaceDef Type ]
         |> attempt
         .>> space
         |> many
         |> block
-        |> memberSection
-            MemberSet.interfaceSet
-            InterfaceSet
-            (function
-            | InterfaceSet set -> Some set
-            | _ -> None)
-            (function
-            | InterfaceMember mdef -> Some mdef
-            | _ -> None)
-            (function
-            | Member mdef ->
-                match mdef with
-                | AMethod mthd ->
-                    mthd.Method.Parameters
-                    |> Seq.map Param.toExpStr
-                    |> String.concat " "
-                    |> sprintf "%s%s" (string mthd.MethodName)
-                | AProperty pdef ->
-                    Name.asGeneric pdef.PropName |> string
-            | Type idef -> string idef.InterfaceName)
         <?> "interface body"
 
-let private classBody, private classBodyRef = createParserForwardedToRef<Statement list, _>()
-let private classSel set =
-    match set with
-    | ClassSet set -> Some set
-    | _ -> None
-let classDef clss cdef modfs =
+let private classBody, private classBodyRef = createParserForwardedToRef<_, _>()
+let classDef cdef modfs =
     let dataMembers =
         keyword "data"
         >>. position
@@ -1062,7 +949,7 @@ let classDef clss cdef modfs =
                                     |> Some)
                         |> Seq.choose id
                 }
-                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> Member)
+                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> ClassMember.Member)
         |> opt
     let classModf =
         validateModifiers
@@ -1076,19 +963,6 @@ let classDef clss cdef modfs =
                 | (_, "abstract") -> Result.Ok MustInherit
                 | _ -> Result.Error None)
             Sealed
-    let className =
-        genericTypeName
-            (fun name ->
-                { ClassName = name
-                  Body = List.empty
-                  Inheritance = ClassInheritance.Sealed
-                  Interfaces = List.empty
-                  Members = MemberSet.classSet
-                  PrimaryCtor = None
-                  SelfIdentifier = Identifier.defaultSelfId
-                  SuperClass = None }
-                |> clss
-                |> cdef)
     let classCtor =
         accessModifier Access.Private
         .>> space
@@ -1097,16 +971,6 @@ let classDef clss cdef modfs =
         .>>. paramTuple typeAnnOpt
         .>> space
         <?> "primary constructor"
-        >>= fun (acc, ctorParams) ->
-            let placeholder = { Member.defaultCtor with Parameters = ctorParams }
-            let actual body baseArgs = // TODO: Don't forget to replace it in the member set when the actual primary ctor is retrieved.
-                let ctor =
-                    { placeholder with
-                        BaseCall = SuperCall baseArgs
-                        Body = body }
-                acc, ctor
-            tryAddMember (acc, placeholder |> Constructor |> Concrete |> Member |> ClassMember)
-            >>% actual
         |> opt
     let classBase =
         extends
@@ -1114,44 +978,20 @@ let classDef clss cdef modfs =
         .>> space
         .>>. opt tupleExpr
         .>> space
-    let classSelf =
-        selfIdAs
-        >>= fun selfid ->
-            match selfid with
-            | Some self -> preturn self
-            | None ->
-                tryAddParam
-                    SelfIdentifier
-                    defaultSelfId
     let def header label body =
-        let actualBody =
-            updateUserState newParams
-            >>. tuple5
-                classCtor
-                classBase
-                (implements .>> space)
-                classSelf
-                body
-            |> memberSection
-                MemberSet.classSet
-                ClassSet
-                classSel
-                (function
-                | ClassMember mdef -> Some mdef
-                | _ -> None)
-                (function
-                | Member mdef -> Member.instanceSig mdef
-                | Type cdef -> string cdef.ClassName)
-            .>> (tryUpdateState popParams)
-        tuple4
+        tuple8
             header
             classModf
-            className
-            actualBody
+            genericName
+            selfIdAs
+            classCtor
+            classBase
+            (implements .>> space)
+            body
         <?> label
     [
         [
-            //semicolon >>% List.empty // TODO: Don't forget to push an empty member stack here!
+            semicolon >>% (List.empty, List.empty)
             classBody
         ]
         |> choice
@@ -1165,208 +1005,76 @@ let classDef clss cdef modfs =
             classBody
     ]
     |> choice
-    |>> fun (rmembers, cmodf, name, ((ctorGen, (sclass, scall), ilist, selfid, body), cmembers)) ->
+    |>> fun (rmembers, cmodf, name, selfid, ctorGen, (sclass, scall), ilist, (b)) ->
         let create members pctor =
             { ClassName = name
-              Body = body
+              Body = invalidOp "noBody?"
               Inheritance = cmodf
               Interfaces = ilist
               Members =
                 match pctor with
-                | Some (acc, ctor) ->
-                   let ctorDef =
-                       ctor
-                       |> (Constructor >> Concrete >> Member)
-                       |> Member.withAccess acc
-                   SortedSet.add ctorDef members
+                | Some ctor -> ctor :: members
                 | None -> members
-              PrimaryCtor = pctor
+              PrimaryCtor = invalidOp "primary ctor?"
               SelfIdentifier = selfid
               SuperClass = sclass }
-            |> clss
-        let noCtor =
-            Seq.forall
-                (fun (_, mdef)->
-                    match mdef with
-                    | Member mdef ->
-                        match mdef with
-                        | Concrete cdef ->
-                            match cdef with
-                            | Constructor _ -> false
-                            | _ -> true
-                        | _ -> true
-                    | _ -> true)
-        match (ctorGen, cmembers, scall) with
-        | (Some ctor, _, _) ->
-            let primaryCtor =
-                scall
-                |> Option.defaultValue List.empty
-                |> ctor body
-            let members =
-                match rmembers with
-                | Some recordMems ->
-                   (snd primaryCtor).Parameters
-                   |> recordMems
-                   |> cmembers.Union
-                | None -> cmembers
-            create
-                members
-                (Some primaryCtor)
-        | (None, _, Some args) ->
-            { Member.defaultCtor with
-                BaseCall = SuperCall args
-                Body = body }
-            |> Member.defaultAccess
-            |> Some
-            |> create cmembers
-        | (None, _, _) when (noCtor cmembers) ->
-            { Member.defaultCtor with
-                BaseCall =
-                    match scall with
-                    | Some args -> args
-                    | None -> List.empty
-                    |> SuperCall
-                Body = body }
-            |> Member.defaultAccess
-            |> Some
-            |> create cmembers
-        | (None, _, _) ->
-            create cmembers None
+            |> cdef
+        invalidOp "bad"
 do
     let ctorDef modfs =
-        let cdef = Constructor >> Concrete >> Member
-        let ctorHeader =
-            paramTuple typeAnnOpt
-            .>> space
-            <?> "constructor parameters"
-            >>= fun cparams ->
-                { Member.defaultCtor with Parameters = cparams }
-                |> cdef
-                |> ClassMember
-                |> tryAddPlaceholder
-                >>% cparams
-        let ctorBody ctorBase =
-            [
-                lambdaOperator
-                |> attempt
-                >>. space
-                >>. ctorBase
-                |>> fun bcall -> bcall, List.empty
-    
-                ctorBase <|>% SuperCall List.empty
-                .>>. many (attempt statement .>> space)
-                |> block
-            ]
-            |> choice
         keyword "new"
         |> attempt
-        >>. noModifiers
-            modfs
-        >>. updateUserState newParams
-        >>. ctorHeader
-        .>>. selfIdAs
-        .>>. (tryMapState getSelfId)
-        >>= fun ((cparams, selfid), currentSelf) ->
-            [
-                keyword "super" >>% SuperCall
-    
-                currentSelf
-                |> string
-                |> keyword
-                >>% SelfCall
-            ]
-            |> choice
-            .>>. tupleExpr
-            |>> (fun (baseCall, baseArgs) -> baseCall baseArgs)
-            <?> "base call"
-            |> ctorBody
-            |>> fun (baseCall, body) ->
-                { BaseCall = baseCall
-                  Body = body
-                  Parameters = cparams
-                  SelfIdentifier = selfid }
-                |> cdef
-        .>> (tryUpdateState popParams)
+        >>. noModifiers modfs
+        >>. tuple3
+            (paramTuple typeAnnOpt .>> space)
+            selfIdAs
+            functionBody
         <?> "constructor definition"
-    let members =
-        [
-            ctorDef
-
-            methodDef
-                (AMethod >> Abstract >> Member)
-                (Method >> Concrete >> Member |> Some)
-                ClassMember
-
-            propDef
-                (AProperty >> Abstract >> Member)
-                (Property >> Concrete >> Member |> Some)
-                ClassMember
-        ]
-        |> Seq.map (fun def -> def)
+        |>> fun (cparams, selfid, body) ->
+            { Body = body
+              Parameters = cparams
+              SelfIdentifier = selfid }
+            |> Constructor
+            |> Concrete
+            |> Member
     classBodyRef :=
         memberBlock
-            members
-            [ classDef Type ClassMember ]
-            ClassSet
-            classSel
+            [
+                ctorDef
+
+                methodDef
+                    (AMethod >> Abstract >> Member)
+                    (Method >> Concrete >> Member |> Some)
+
+                propDef
+                    (AProperty >> Abstract >> Member)
+                    (Property >> Concrete >> Member |> Some)
+            ]
+            [ classDef Type ]
         <?> "class body"
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
-let moduleDef modl mdef modfs =
-    let moduleName =
-        simpleName
-        >>= fun name ->
-            { Body = List.empty
-              ModuleName = name
-              Members = MemberSet.moduleSet }
-            |> modl
-            |> mdef
-            |> tryAddPlaceholder
-            >>% name
+let moduleDef mdef modfs =
     keyword "module"
     >>. noModifiers modfs
     >>. tuple2
-        (moduleName .>> space)
+        (simpleName .>> space)
         moduleBody
     <?> "module definition"
     |>> fun (name, (body, members)) ->
         { Body = body
           ModuleName = name
           Members = members }
-        |> modl
+        |> mdef
 do
-    let moduleSel set =
-        match set with
-        | ModuleSet set -> Some set
-        | _ -> None
-    let opName: Parser<_, ParserState> =
-        Operator.operatorChars
-        |> anyOf
-        |> many1Chars
     let functionDef modfs =
-        let funcHeader =
-            genericName
-            .>>. paramTupleList typeAnnOpt
-            .>> space
-            >>= fun (name, fparams) ->
-                { Function =
-                    { Body = List.empty
-                      Parameters = fparams
-                      ReturnType = None }
-                  FunctionName = name }
-                |> Function
-                |> Member
-                |> ModuleMember
-                |> tryAddPlaceholder
-                >>% (name, fparams)
         noModifiers modfs
-        .>> updateUserState newParams
-        >>. tuple3
-            funcHeader
+        >>. tuple4
+            genericName
+            (paramTupleList typeAnnOpt .>> space)
             (typeAnnOpt .>> space)
             functionBody
-        .>> (tryUpdateState popParams)
-        |>> fun ((name, fparams), retType, body) ->
+        |>> fun (name, fparams, retType, body) ->
             { Function =
                 { Body = body
                   Parameters = fparams
@@ -1374,44 +1082,23 @@ do
               FunctionName = name }
             |> Function
             |> Member
+    let opName =
+        Operator.operatorChars
+        |> anyOf
+        |> many1Chars
     let operatorDef modfs =
         fail "bad"
-    let types =
-        [
-            //classDef (Class >> Type) >> Type
-            interfaceDef (Interface >> Type)
-            moduleDef (Module >> Type)
-        ]
-        |> Seq.map (fun def -> def ModuleMember)
     moduleBodyRef :=
         memberBlock
             [
                 functionDef
                 operatorDef
             ]
-            types
-            ModuleSet
-            moduleSel
-        |> memberSection
-            MemberSet.moduleSet
-            ModuleSet
-            moduleSel
-            (function
-            | ModuleMember mdef -> Some mdef
-            | _ -> None)
-            (function
-            | Member mdef ->
-                match mdef with
-                | Function fdef ->
-                    fdef.Function.Parameters
-                    |> Seq.map Param.toInfStr
-                    |> String.concat " "
-                    |> sprintf "%s%s" (string fdef.FunctionName)
-                | Operator odef ->
-                    odef.Operands
-                    |> Param.toInfStr
-                    |> sprintf "(%s)%s" (string odef.Symbol)
-            | Type tdef -> TypeDef.name tdef |> string)
+            [
+                classDef (Class >> Type)
+                interfaceDef (Interface >> Type)
+                moduleDef (Module >> Type)
+            ]
         <?> "module body"
 
 do
@@ -1555,12 +1242,10 @@ do
             [
                 strLit
 
-                updateUserState newParams
-                >>. paramTuple typeAnnOpt
+                paramTuple typeAnnOpt
                 .>> space
                 .>>. lambdaBlock
                 |> attempt
-                .>> (tryUpdateState popParams)
                 <?> "anonymous function"
                 |>> fun (parameters, body) ->
                     { Body = body
@@ -1607,17 +1292,7 @@ do
                 |>> (bool.Parse >> BoolLit)
                 <?> "boolean literal"
 
-                identifier
-                .>>. getUserState
-                |>> fun (id, state) ->
-                    match getSelfId state with
-                    | Result.Ok self ->
-                        match id.Generics with
-                        | [] when id.Name = self -> SelfRef
-                        | _ -> IdentifierRef id
-                    | Result.Error _ ->
-                        IdentifierRef id
-
+                identifier |>> IdentifierRef
                 numLit |>> NumLit
             ]
         .>> space
@@ -1653,31 +1328,17 @@ do
 
     expressionRef.TermParser <- simpleExpression
 
-let compilationUnit: Parser<CompilationUnit, ParserState> =
-    let typeSel set =
-        match set with
-        | TypeSet set -> Some set
-        | _ -> None
+let compilationUnit: Parser<CompilationUnit, EntryPoint option> =
     let namespaceDecl =
         skipString "namespace"
         >>. space1
         |> attempt
-        >>. sepBy1 identifierStr (separator period)
+        >>. sepBy1 identifier (separator period)
+        |>> FullIdentifier
         .>> space
         .>> semicolon
         |> opt
         <?> "namespace declaration"
-        >>= fun names ->
-            let nsName =
-                Option.bind
-                    Identifier.ofStrSeq
-                    names
-            GlobalsTable.addNamespace
-                (Namespace.fullId nsName)
-            |> updateSymbols
-            >> setNamespace nsName
-            |> updateUserState
-            >>% nsName
     let useStatements =
         skipString "use"
         >>. space1
@@ -1691,83 +1352,46 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
     let definitions =
         let typeDef =
             modifiers
-            >>= (fun modfs ->
+            >>= fun modfs ->
                 [
                     classDef Class
                     interfaceDef Interface
                     moduleDef Module
                 ]
-                |> Seq.map (fun def -> def GlobalType modfs)
-                |> choice)
+                |> Seq.map (fun def -> def modfs)
+                |> choice
         let entrypoint =
-            let mainDef =
-                position
-                .>>. getUserState
-                .>> skipString "main"
-                |> attempt
-                >>= fun (pos, state) ->
-                    match state.EntryPoint with
-                    | Some existing ->
-                        existing.Origin
-                        |> string
-                        |> sprintf "An existing entry point was found at %s"
-                        |> fail
-                    | None ->
-                        preturn (pos, state)
-                .>> space
-            let mainParams =
-                updateUserState newParams
-                >>. paramTuple typeAnnExp
-                .>> space
-                .>> (tryUpdateState popParams)
-            tuple3
-                mainDef
-                mainParams
-                functionBody
-            <?> "entry point"
-            >>= fun ((pos, state), eparams, body) ->
-                { state with
-                    EntryPoint =
-                      { Body = body
-                        Origin = pos
-                        Parameters = eparams }
-                      |> Some }
-                |> setUserState
+            getUserState
+            >>= function
+                | Some existing ->
+                    string existing
+                    |> sprintf "An entry point already exists at %s"
+                    |> fail
+                | None ->
+                    position
+                    .>> keyword "main"
+                    |> attempt
+                    .>>. paramTuple typeAnnExp
+                    .>> space
+                    .>>. functionBody
+                    >>= fun ((pos, eparams), body) ->
+                        { Body = body
+                          Origin = pos
+                          Parameters = eparams }
+                        |> Some
+                        |> setUserState
         [
-            tuple3
-                (accessModifier Access.Internal)
-                typeDef
-                getUserState
-            >>= fun (acc, tdef, state) ->
-                let replaceType =
-                    replaceMember
-                        (acc, tdef)
-                        TypeSet
-                        typeSel
-                let err =
-                    TypeDef.name tdef
-                    |> string
-                    |> sprintf "A type with the name %s already exists"
-                { Namespace = state.Namespace
-                  Type = DefinedType tdef }
-                |> GlobalsTable.addType
-                |> tryUpdateSymbols err
-                >>. tryUpdateState replaceType
+            Access.Internal
+            |> accessModifier
+            .>>. typeDef
+            |>> Some
 
-            entrypoint |>> ignore
+            entrypoint >>% None
         ]
         |> choice
         .>> space
         |> many
-        |>> ignore
-        |> memberSection
-            MemberSet.typeSet
-            TypeSet
-            typeSel
-            (function
-            | GlobalType tdef -> Some tdef
-            | _ -> None)
-            (TypeDef.name >> string)
+        |>> List.choose id
     space
     >>. tuple5
         (namespaceDecl .>> space)
@@ -1775,9 +1399,8 @@ let compilationUnit: Parser<CompilationUnit, ParserState> =
         (definitions .>> eof)
         position
         getUserState
-    |>> fun (ns, uses, (_, types), pos, state) ->
-        let a = types |> Seq.map (snd >> TypeDef.getMembers) // NOTE: Found reason why member count tests are failing, typeDef placeholders are never replaced, meaning that they never have members!
-        { EntryPoint = state.EntryPoint
+    |>> fun (ns, uses, types, pos, entryPoint) ->
+        { EntryPoint = entryPoint
           Namespace = ns
           Usings = uses
           Source = pos.StreamName

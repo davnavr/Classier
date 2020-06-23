@@ -6,13 +6,8 @@ type MutatorModf =
     | IsMutator
     | IsPure
 
-type CtorBase =
-    | SelfCall of Expression list
-    | SuperCall of Expression list
-
 type Ctor =
-    { BaseCall: CtorBase
-      Body: Statement list
+    { Body: Statement list
       Parameters: InfParam list
       SelfIdentifier: IdentifierStr option }
 
@@ -108,8 +103,7 @@ module Member =
     let defaultAccess<'Member> = withAccess<'Member> Access.Public
 
     let defaultCtor =
-        { BaseCall = SuperCall List.empty
-          Body = List.empty
+        { Body = List.empty
           Parameters = List.empty
           SelfIdentifier = None }
 
