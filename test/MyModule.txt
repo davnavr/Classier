@@ -4,10 +4,6 @@ namespace blah.blah.blah;
 use system.reflection.Assembly;
 
 public module Math {
-    let myGlobal: long = 42L;
-
-    let three: uint = 03;
-
     protected def badFormatting ()
                                                 ()
 
@@ -29,6 +25,8 @@ public module Math {
     public def functionTest (f: int => int) {
         f(555)
     }
+
+    public infix def (+) (a, b) => a.add(b);
 
     // Overloading!
     public def functionTest (f: int => int, p: int) {

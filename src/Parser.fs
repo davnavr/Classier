@@ -4,8 +4,8 @@ open System
 open System.Collections.Immutable
 open FParsec
 open Classier.NET.Compiler.Generic
-open Classier.NET.Compiler.GlobalType
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
@@ -131,9 +131,11 @@ let modifiers =
             "abstract"
             "extern"
             "inheritable"
+            "infix"
             "inline"
             "mutator"
             "override"
+            "prefix"
             "sealed"
             "virtual"
         ]
@@ -192,7 +194,7 @@ let private noModifiers modfs =
         modfs
         (fun _ _ -> Result.Error None)
         ()
-let private badModfier str = Some str  |> Result.Error // TODO: Fix the name. Or maybe this function isn't necessary at all?
+let private badModfier str = Some str |> Result.Error
 
 let block p =
     lcurlybracket
@@ -712,7 +714,7 @@ let methodDef amthd cmthd modfs =
                   MethodName = name }
                 |> amthd
     <?> "method definition"
-    |> attempt // TODO: Can the attempt be moved elsewhere? Check both methodDef and propDef
+    |> attempt
 let propDef aprop cprop modfs =
     validateModifiers
         modfs
@@ -827,7 +829,8 @@ let memberDef members types =
                 members
         [
             keyword "def"
-            >>. choice memberDefs // TODO: Are the placeholder members ever replaced here?
+            |> attempt
+            >>. choice memberDefs
             <?> "member"
 
             types
@@ -837,7 +840,17 @@ let memberDef members types =
             |> choice
         ]
         |> choice
-let memberBlock (members: seq<_>) types =
+let memberBlock label acc members types =
+    accessModifier acc
+    .>>. memberDef
+        members
+        types
+    |> attempt
+    .>> space
+    |> many
+    |> block
+    <?> label
+let memberBody label (members: seq<_>) types =
     blockChoice
         [
             statement
@@ -848,6 +861,7 @@ let memberBlock (members: seq<_>) types =
             .>>. memberDef members types
             |>> Choice2Of2
         ]
+    <?> label
     |>> List.fold
             (fun (body: ImmutableList<_>, members: ImmutableList<_>) item ->
                 match item with
@@ -887,15 +901,11 @@ do
                     |> rest.Add
                     |> def)
     interfaceBodyRef :=
-        accessModifier Access.Internal
-        .>>. memberDef
+        memberBlock
+            "interface body"
+            Access.Internal
             members
             [ interfaceDef Type ]
-        |> attempt
-        .>> space
-        |> many
-        |> block
-        <?> "interface body"
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_ * ImmutableList<_ * ClassMember>, _>()
 let classDef cdef modfs =
@@ -1046,7 +1056,8 @@ do
             |> Concrete
             |> Member
     classBodyRef :=
-        memberBlock
+        memberBody
+            "class body"
             [
                 ctorDef
 
@@ -1059,9 +1070,8 @@ do
                     (Property >> Concrete >> Member |> Some)
             ]
             [ classDef Type ]
-        <?> "class body"
 
-let private moduleBody, private moduleBodyRef = createParserForwardedToRef<ImmutableList<_> * ImmutableList<_>, _>()
+let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
 let moduleDef mdef modfs =
     keyword "module"
     >>. noModifiers modfs
@@ -1069,9 +1079,8 @@ let moduleDef mdef modfs =
         (simpleName .>> space)
         moduleBody
     <?> "module definition"
-    |>> fun (name, (body, members)) ->
-        { Body = List.ofSeq body
-          ModuleName = name
+    |>> fun (name, members) ->
+        { ModuleName = name
           Members = members }
         |> mdef
 do
@@ -1082,6 +1091,8 @@ do
             (paramTupleList typeAnnOpt .>> space)
             (typeAnnOpt .>> space)
             functionBody
+        |> attempt
+        <?> "function definition"
         |>> fun (name, fparams, retType, body) ->
             { Function =
                 { Body = body
@@ -1094,10 +1105,44 @@ do
         Operator.operatorChars
         |> anyOf
         |> many1Chars
+        |> between
+            (lparen >>. space)
+            (space .>> rparen)
+        |> attempt
+        <?> "operator symbol"
+        |>> OperatorStr
     let operatorDef modfs =
-        fail "bad"
+        validateModifiers
+            modfs
+            (fun opkind modf ->
+                match (modf, opkind) with
+                | ("infix", Some _)
+                | ("prefix", Some _) -> badModfier "An operator can only be either an infix or prefix operator"
+                | ("infix", None) -> Some Infix |> Result.Ok
+                | ("prefix", None) -> Some Prefix |> Result.Ok
+                | _ -> Result.Error None)
+            (None)
+        >>= function
+            | None -> fail "An operator must declare whether it is an infix or a prefix operator"
+            | Some opkind ->
+                tuple4
+                    (opName .>> space)
+                    (paramTuple typeAnnOpt .>> space)
+                    (typeAnnOpt .>> space)
+                    functionBody
+                <?> "operator definition"
+                |>> fun (name, oper, retType, body) ->
+                    { Body = body
+                      Kind = opkind
+                      Operands = oper
+                      ReturnType = retType
+                      Symbol = name }
+                    |> Operator
+                    |> Member
     moduleBodyRef :=
         memberBlock
+            "module body"
+            Access.Private
             [
                 functionDef
                 operatorDef
@@ -1107,7 +1152,6 @@ do
                 interfaceDef (Interface >> Type)
                 moduleDef (Module >> Type)
             ]
-        <?> "module body"
 
 do
     let toOp op = op :> Operator<_,_,_>

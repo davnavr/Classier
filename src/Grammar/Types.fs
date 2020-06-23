@@ -42,9 +42,8 @@ type Interface =
 and InterfaceMember = TypeOrMember<Interface, AbstractMember>
 
 type Module<'Type> =
-    { Body: Statement list
-      ModuleName: SimpleName
-      Members: ImmutableList<Access * TypeOrMember<'Type, StaticMember>> }
+    { ModuleName: SimpleName
+      Members: (Access * TypeOrMember<'Type, StaticMember>) list }
 
 type TypeDef =
     | Class of Class

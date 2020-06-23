@@ -31,7 +31,7 @@ let main args =
                 "MyAbstractClass", "this.is.my.space", [ "java.lang"; "java.util" ], [ "MyAbstractClass", 3 ]
                 "MyException1", "", List.empty, [ "MyException1", 2 ]
                 "MyGenericClass", "some.name.collections", [ "blah.interop.clr.SomeClass"; "some.StaticClass<String>.Nested" ], [ "MutableList<T>", 2 ]
-                "MyModule", "blah.blah.blah", [ "system.reflection.Assembly" ], [ "Math", 5 ]
+                "MyModule", "blah.blah.blah", [ "system.reflection.Assembly" ], [ "Math", 6 ]
                 "NoAccessModifiers", "My.Awesome.Project", List.empty, [ "MyModule", 1; "MyModule", 1; "MyInterface", 1 ]
                 "PropertyTest", "", List.empty, [ "PropertyTest", 4 ; "IPropertyTest", 1; ]
             ]
