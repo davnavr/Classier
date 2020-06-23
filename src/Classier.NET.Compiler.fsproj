@@ -31,6 +31,7 @@
     <Compile Include="GlobalType.fs" />
     <Compile Include="GlobalsTable.fs" />
     <Compile Include="LocalsTable.fs" />
+    <Compile Include="Analyzer.fs" />
     <Compile Include="CompilerError.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

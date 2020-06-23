@@ -7,24 +7,29 @@ open Classier.NET.Compiler.Identifier
 
 [<NoComparison>]
 [<CustomEquality>]
-type Local =
+type Variable =
     { Name: IdentifierStr
       Type: TypeName }
 
     override this.Equals obj =
         match obj with
-        | :? Local as other ->
+        | :? Variable as other ->
             this.Name = other.Name
         | _ -> false
 
     override this.GetHashCode() = this.Name.GetHashCode()
-    
+
+type Local =
+    | Local of Variable
+
 type LocalsTable = LocalsTable of ImmutableSortedSet<Local> list
 
 let private emptyScope =
     { new IComparer<Local> with
           member _.Compare(l1, l2) =
-              compare l1.Name l2.Name }
+            match (l1, l2) with
+            | (Local one, Local two) ->
+                compare one.Name two.Name }
     |> ImmutableSortedSet.Empty.WithComparer
 
 let empty = LocalsTable List.empty

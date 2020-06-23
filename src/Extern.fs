@@ -5,7 +5,9 @@ open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
 
-// TODO: How to differentiate between external members and types that are public or protected?
+type EAccess =
+    | EPublic
+    | EPrivate
 
 type EMethod<'Modifier> =
     { MethodName: Identifier
@@ -66,20 +68,22 @@ type EMember =
     | EInstanceMember of EInstanceMember
     | EStaticMember of EStaticMember
 
+type EMemberSet<'Type, 'Member> = ImmutableSortedSet<EAccess * TypeOrMember<'Type, 'Member>>
+
 type EInterface<'Type> =
     { InterfaceName: Identifier
-      Members: ImmutableSortedSet<TypeOrMember<'Type, EAbstractMember>>
+      Members: EMemberSet<'Type, EAbstractMember>
       SuperInterfaces: ImmutableSortedSet<EInterface<'Type>> }
 
 type EClass<'Type> =
     { ClassName: Identifier
       Interfaces: ImmutableSortedSet<EInterface<'Type>>
-      Members: ImmutableSortedSet<TypeOrMember<'Type, EMember>>
+      Members: EMemberSet<'Type, EMember>
       SuperClass: EClass<'Type> option }
 
 type EModule<'Type> =
     { ModuleName: Identifier
-      Members: ImmutableSortedSet<TypeOrMember<'Type, EStaticMember>> }
+      Members: EMemberSet<'Type, EStaticMember> }
 
 type EType =
     | EClass of EClass
@@ -88,3 +92,5 @@ type EType =
 and EClass = EClass<EType>
 and EInterface = EInterface<EType>
 and EModule = EModule<EType>
+
+type ETypeDef = EAccess * EType

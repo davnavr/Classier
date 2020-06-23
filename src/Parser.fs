@@ -1432,6 +1432,12 @@ let compilationUnit: Parser<CompilationUnit, State> =
                 |> Seq.map (fun def -> def modfs)
                 |> choice
         let entrypoint =
+            let eparam =
+                between
+                    (lparen .>> space)
+                    (rparen >>. space)
+                    (param typeAnnExp)
+                .>> space
             getUserState
             >>= fun state ->
                 match state.EntryPoint with
@@ -1443,14 +1449,14 @@ let compilationUnit: Parser<CompilationUnit, State> =
                     position
                     .>> keyword "main"
                     |> attempt
-                    .>>. paramTuple typeAnnExp
+                    .>>. eparam
                     .>> space
                     .>>. functionBody
-                    >>= fun ((pos, eparams), body) ->
+                    >>= fun ((pos, eargs), body) ->
                         let entrypoint =
-                            { Body = body
-                              Origin = pos
-                              Parameters = eparams }
+                            { Arguments = eargs
+                              Body = body
+                              Origin = pos }
                             |> Some
                         setUserState { state with EntryPoint = entrypoint }
         [
@@ -1478,3 +1484,24 @@ let compilationUnit: Parser<CompilationUnit, State> =
           Usings = uses
           Source = pos.StreamName
           Types = types }
+
+let parseFiles paths enc =
+    let parseFile state path =
+        runParserOnFile
+            compilationUnit
+            state
+            path
+            enc
+    fun() ->
+        Seq.fold
+            (fun acc path ->
+                match acc with
+                | Result.Ok (list: ImmutableList<_>, epoint, state) ->
+                    match parseFile state path with
+                    | Success (cu, nstate, _) ->
+                        Result.Ok (list.Add cu, cu.EntryPoint, nstate)
+                    | Failure (_, err, _) -> Result.Error err
+                | Result.Error _ -> acc)
+            (Result.Ok (ImmutableList.Empty, None, defaultState))
+            paths
+        |> Result.map (fun (cunits, epoint, _) -> cunits, epoint)
