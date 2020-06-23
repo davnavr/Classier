@@ -1,6 +1,6 @@
 
 public class PropertyTest {
-    var test;
+    var test = null;
     var other = 0xBL;
 
     public def name: System.String {

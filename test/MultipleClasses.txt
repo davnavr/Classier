@@ -43,7 +43,7 @@ public interface Interface1 {
 /// Or maybe this style is better?
 public class Class3 implements Interface1 {
   private class Nested {
-    var parent: Class3;
+    var parent: Class3 = /*All variables are required to have values!*/ null;
   }
 }
 

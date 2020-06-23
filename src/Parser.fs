@@ -351,12 +351,12 @@ let private pattern =
     [
         identifierStr
         .>> space
+        |> attempt
         .>>. typeAnnOpt
         |>> VarPattern
         <?> "variable pattern"
 
-        typeAnnOpt
-        |> paramTuple
+        paramTuple typeAnnOpt
         |>> TuplePattern
         <?> "tuple deconstruction"
     ]
@@ -368,54 +368,50 @@ do
         .>>. choiceL
             [
                 semicolon >>% Empty <?> "empty statement"
-            
-                skipString "var"
-                >>. space1
-                |> attempt
-                >>. pattern
-                .>> space
-                .>>. opt (equalsExpr .>> space .>> semicolon)
-                <?> "mutable variable"
-                |>> (Local.Var >> LocalVar)
 
-                skipString "let"
-                >>. space1
+                choice
+                    [
+                        keyword "let" >>% LetDecl
+                        keyword "var" >>% VarDecl
+                    ]
                 |> attempt
-                >>. pattern
+                .>>. pattern
                 .>> space
                 <?> "local variable or function"
-                >>= fun p ->
+                >>= fun (decl, p) ->
                     let value =
                         equalsExpr
                         |> attempt
                         .>> space
                         .>> semicolon
+                        <?> "variable value"
                     let rest =
                         match p with
                         | VarPattern (_, vtype) ->
-                            [
-                                value
+                            match vtype with
+                            | None ->
+                                [
+                                    value
 
-                                paramTupleList typeAnnOpt
-                                .>> space
-                                .>>. typeAnnOpt
-                                .>> space
-                                .>>. (statementBlock <?> "local function body")
-                                |>> fun ((parameters, retType), body) ->
-                                    { Body = body
-                                      Parameters = parameters
-                                      ReturnType = retType }
-                                    |> AnonFunc
-                            ]
-                            |> choice
-                            |> Some
+                                    paramTupleList typeAnnOpt
+                                    .>> space
+                                    .>>. typeAnnOpt
+                                    .>> space
+                                    .>>. (statementBlock <?> "local function body")
+                                    |>> fun ((parameters, retType), body) ->
+                                        { Body = body
+                                          Parameters = parameters
+                                          ReturnType = retType }
+                                        |> AnonFunc
+                                ]
+                                |> choice
+                                |> Some
+                            | Some _ -> None
                         | _ -> None
                     rest
                     |> Option.defaultValue value
                     |>> fun value ->
-                        (p, value)
-                        |> Local.Let
-                        |> LocalVar
+                        decl (p, value)
 
                 skipString "while"
                 >>. space
@@ -819,7 +815,7 @@ let classDef cdef modfs =
                 seq {
                     Method
                         { Method =
-                           { Body = List.empty // TODO: Create a body here.
+                           { Body = List.empty // TODO: Create a body for the equals method here.
                              Parameters =
                                [
                                    [
