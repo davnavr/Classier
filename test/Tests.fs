@@ -74,13 +74,17 @@ let main args =
                     "valid entry point"
                     (fun cu _ -> cu.EntryPoint.IsSome |> Assert.isTrue "The entry point is missing")
 
-                parseSource "DuplicateEntryPoint"
-                |> TestCase.pfailure
-                    "existing entry point"
-                    (fun msg _ ->
-                        Assert.hasSubstring
-                            "entry point already exists at (\"DuplicateEntryPoint\", Ln: 4, Col: 1)"
-                            msg)
+                [
+                    "DuplicateEntryPoint", "entry point already exists at (\"DuplicateEntryPoint\", Ln: 4, Col: 1)"
+                    "DuplicateModifier", "Duplicate modifier 'abstract'"
+                ]
+                |> Seq.map
+                    (fun (source, sub) ->
+                        TestCase.pfailure
+                            source
+                            (fun msg _ -> Assert.hasSubstring sub msg)
+                            (parseSource source))
+                |> testList "with error"
             ]
             |> testList "failure tests"
         ]

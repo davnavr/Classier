@@ -156,7 +156,7 @@ let modifiers =
                     | Result.Ok (resultList: ImmutableList<_>) ->
                         if resultList.Contains result then
                             result
-                            |> sprintf "Duplicate modifier %s"
+                            |> sprintf "Duplicate modifier '%s'"
                             |> Result.Error
                         else
                             result
@@ -718,12 +718,16 @@ let methodDef amthd cmthd modfs =
 let propDef aprop cprop modfs =
     validateModifiers
         modfs
-        (fun _ modf ->
-            match modf with
-            | "abstract" -> Result.Ok true
+        (fun (isabst, ispure) modf ->
+            match (modf, isabst, ispure) with
+            | ("abstract", _, IsMutator)
+            | ("mutator", true, _) ->
+                badModfier "An 'abstract' method cannot be a 'mutator' since it does not have a body"
+            | ("abstract", _, IsPure) -> Result.Ok (true, ispure)
+            | ("mutator", _, _) -> Result.Ok (isabst, IsMutator)
             | _ -> Result.Error None)
-        false
-    >>= fun isAbstract ->
+        (false, IsPure)
+    >>= fun (isAbstract, purity) ->
         match cprop with
         | Some cprop when (not isAbstract) ->
             let propBody =
@@ -814,7 +818,7 @@ let propDef aprop cprop modfs =
             |>> fun (name, vtype, accessors) ->
                 { Accessors = accessors
                   PropName = name
-                  Purity = IsPure // TODO: Handle modifiers for properties.
+                  Purity = purity
                   ValueType = vtype }
                 |> aprop
     <?> "property definition"
@@ -1117,13 +1121,13 @@ do
             (fun opkind modf ->
                 match (modf, opkind) with
                 | ("infix", Some _)
-                | ("prefix", Some _) -> badModfier "An operator can only be either an infix or prefix operator"
+                | ("prefix", Some _) -> badModfier "An operator can only be either an 'infix' or 'prefix' operator"
                 | ("infix", None) -> Some Infix |> Result.Ok
                 | ("prefix", None) -> Some Prefix |> Result.Ok
                 | _ -> Result.Error None)
             (None)
         >>= function
-            | None -> fail "An operator must declare whether it is an infix or a prefix operator"
+            | None -> fail "An operator must declare whether it is an 'infix' or a 'prefix' operator"
             | Some opkind ->
                 tuple4
                     (opName .>> space)
