@@ -25,11 +25,11 @@
     <Compile Include="Grammar\MemberDef.fs" />
     <Compile Include="Grammar\TypeDef.fs" />
     <Compile Include="Grammar\CompilationUnit.fs" />
+    <Compile Include="Parser.fs" />
     <Compile Include="Namespace.fs" />
     <Compile Include="Extern.fs" />
     <Compile Include="GlobalType.fs" />
     <Compile Include="GlobalsTable.fs" />
-    <Compile Include="Parser.fs" />
     <Compile Include="LocalsTable.fs" />
     <Compile Include="CompilerError.fs" />
     <Compile Include="Program.fs" />
