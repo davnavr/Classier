@@ -1,8 +1,0 @@
-
-public module MyModule {
-  public def myFunc () {
-    try {
-        throw new system.InvalidOperationException();
-    }
-  }
-}

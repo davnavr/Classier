@@ -4,3 +4,7 @@ obj/
 
 # Visual Studio cache
 .vs/
+
+# FAKE
+.fake/
+/build.fsx.lock

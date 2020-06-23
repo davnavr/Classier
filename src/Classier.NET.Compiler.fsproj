@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Classier.NET.Compiler</AssemblyName>
+    <GenerateDocumentationFile Condition="'$(Configuration)' != 'DEBUG'">false</GenerateDocumentationFile>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+  
+  <!-- Source files -->
+  <ItemGroup>
+    <Compile Include="SortedSet.fs" />
+    <Compile Include="Identifier.fs" />
+    <Compile Include="TypeSystem.fs" />
+    <Compile Include="Generic.fs" />
+    <Compile Include="Grammar\Aliases.fs" />
+    <Compile Include="Grammar\Name.fs" />
+    <Compile Include="Grammar\Numeric.fs" />
+    <Compile Include="Grammar\Param.fs" />
+    <Compile Include="Grammar\Statement.fs" />
+    <Compile Include="Grammar\Expression.fs" />
+    <Compile Include="Grammar\Operator.fs" />
+    <Compile Include="Grammar\Member.fs" />
+    <Compile Include="Grammar\Types.fs" />
+    <Compile Include="Grammar\MemberDef.fs" />
+    <Compile Include="Grammar\TypeDef.fs" />
+    <Compile Include="Grammar\CompilationUnit.fs" />
+    <Compile Include="Parser.fs" />
+    <Compile Include="Namespace.fs" />
+    <Compile Include="Extern.fs" />
+    <Compile Include="GlobalType.fs" />
+    <Compile Include="GlobalsTable.fs" />
+    <Compile Include="LocalsTable.fs" />
+    <Compile Include="CompilerError.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <!-- References -->
+  <ItemGroup>
+    <PackageReference Include="FParsec" Version="1.1.1" />
+  </ItemGroup>
+
+</Project>
