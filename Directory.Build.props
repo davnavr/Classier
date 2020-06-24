@@ -3,24 +3,11 @@
 
   <!-- Common properties -->
   <PropertyGroup>
+    <LangVersion>4.7</LangVersion>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <Product>Classier.NET</Product>
+    <Product>Classier.NET.Compiler</Product>
     <RootNamespace>$(AssemblyName)</RootNamespace>
     <RootDirectory>$(MSBuildThisFileDirectory)</RootDirectory>
-  </PropertyGroup>
-  
-  <!-- C# project properties -->
-  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
-    <LangVersion>8.0</LangVersion>
-    <NoWarn>$(NoWarn);SA1633</NoWarn>
-    <Nullable>enable</Nullable>
-    <ProjectLang>csharp</ProjectLang>
-  </PropertyGroup>
-
-  <!-- F# project properties -->
-  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.fsproj'">
-    <LangVersion>4.7</LangVersion>
-    <ProjectLang>fsharp</ProjectLang>
   </PropertyGroup>
 
 </Project>

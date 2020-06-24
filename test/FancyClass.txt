@@ -1,0 +1,28 @@
+/*
+Copyright (c) 2020
+This is a very long text
+*/
+
+use System;
+
+public class FancyClass() as this implements IDisposable {
+    
+    let myField = this.toString();
+
+    internal def curryingExample (arg1) (arg2) (arg3) {
+        arg1 + arg2 + arg3
+    }
+
+    public def self.selfIdentifier (syntaxExample: string): () {
+        try {
+            throw Exception("I went wrong!");
+        }
+        catch {
+            _ => Console.WriteLine("I catch áll the exceptions!");
+        }
+    }
+
+    override def toString() => {
+        "hello there!"
+    };
+}

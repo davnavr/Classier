@@ -1,0 +1,28 @@
+
+public class PropertyTest {
+    var test = null;
+    var other = 0xBL;
+
+    public def name: System.String {
+        get {
+            test
+        }
+
+        set(value) {
+            test <- value;
+        }
+    }
+
+    public def autoProperty { get; set; } = "Hello"
+
+    public def fancyGet => test + "very fancy";
+
+    public def fancyAccessors: long {
+        get => 32L;
+        set(thing) => other <- thing;
+    }
+}
+
+interface IPropertyTest {
+    def property: System.String { get; }
+}

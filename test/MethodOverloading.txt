@@ -1,0 +1,28 @@
+
+public class OverloadingExample {
+  public def myMethod (one) {
+    while (one) {
+      42 * 2
+    }
+  }
+
+  public def myMethod (one, two) {
+    9 + ((10 * 21) / 4)
+  }
+
+  public def sayHello (to: String): () {
+    System.Console.WriteLine("Hello " + to);
+  }
+
+  public def sayHello (times: int): () {
+    var count = 1;
+    while (count <= times) {
+      System.Console.WriteLine("Hello");
+    }
+  }
+
+  class AbstractOverloads {
+    abstract def thing (one: int) : ();
+    abstract def thing (one: int, two: int) : int;
+  }
+}
