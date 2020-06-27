@@ -9,6 +9,11 @@ module SortedSet =
         then Some ()
         else None
 
+    let (|Empty|_|) (set: ImmutableSortedSet<_>) =
+        if set.IsEmpty
+        then Some ()
+        else None
+
     let add item (set: ImmutableSortedSet<_>) = set.Add item
 
     let tryAdd item (set: ImmutableSortedSet<_>) =

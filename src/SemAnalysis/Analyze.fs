@@ -1,4 +1,4 @@
-﻿module Classier.NET.Compiler.Analyzer
+﻿module Classier.NET.Compiler.SemAnalysis.Analyze
 
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
@@ -7,7 +7,7 @@ type AnalyzerError =
     | BadExpParam of ExpParam * string
     | DuplicateType
 
-let analyzeOutput (cunits: seq<CompilationUnit>, epoint: EntryPoint) gtable =
+let output (cunits: seq<CompilationUnit>, epoint: EntryPoint) gtable = // TODO: Create separate record types and modules to handle analysis of different things.
     let analyzeTypes cunit gtable =
         Seq.fold
             (fun _ _ -> invalidOp "bad")

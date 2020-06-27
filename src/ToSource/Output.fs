@@ -7,6 +7,7 @@ type Output =
     { Definitions: ImmutableList<GenType>
       EntryPoint: EntryPoint option }
 
+[<RequireQualifiedAccess>]
 module Output =
     let write output prnt = // TODO: prnt should instead be a function that doesn't print to a new line.
         let block lines =

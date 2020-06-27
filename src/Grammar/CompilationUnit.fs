@@ -1,8 +1,7 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
 type CompilationUnit =
-    { EntryPoint: EntryPoint option
-      Namespace: FullIdentifier option
+    { Namespace: FullIdentifier option // TODO: Should be IdentifierStr
       Usings: FullIdentifier list
       Source: string
       Types: (Access * TypeDef) list }

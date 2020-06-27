@@ -1472,15 +1472,13 @@ let compilationUnit: Parser<CompilationUnit, State> =
         |> many
         |>> List.choose id
     space
-    >>. tuple5
+    >>. tuple4
         (namespaceDecl .>> space)
         (useStatements .>> space)
         (definitions .>> eof)
         position
-        getUserState
-    |>> fun (ns, uses, types, pos, state) ->
-        { EntryPoint = state.EntryPoint
-          Namespace = ns
+    |>> fun (ns, uses, types, pos) ->
+        { Namespace = ns
           Usings = uses
           Source = pos.StreamName
           Types = types }
@@ -1496,12 +1494,12 @@ let parseFiles enc paths =
         Seq.fold
             (fun acc path ->
                 match acc with
-                | Result.Ok (list: ImmutableList<_>, epoint, state) ->
+                | Result.Ok (list: ImmutableList<_>, state) ->
                     match parseFile state path with
                     | Success (cu, nstate, _) ->
-                        Result.Ok (list.Add cu, cu.EntryPoint, nstate)
+                        Result.Ok (list.Add cu, nstate)
                     | Failure (_, err, _) -> Result.Error err
                 | Result.Error _ -> acc)
-            (Result.Ok (ImmutableList.Empty, None, defaultState))
+            (Result.Ok (ImmutableList.Empty, defaultState))
             paths
-        |> Result.map (fun (cunits, epoint, _) -> cunits, epoint)
+        |> Result.map (fun (cunits, estate) -> cunits, estate.EntryPoint)

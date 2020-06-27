@@ -26,18 +26,18 @@
     <Compile Include="Grammar\TypeDef.fs" />
     <Compile Include="Grammar\CompilationUnit.fs" />
     <Compile Include="Parser.fs" />
-    <Compile Include="Namespace.fs" />
-    <Compile Include="Extern.fs" />
-    <Compile Include="GlobalType.fs" />
-    <Compile Include="GlobalsTable.fs" />
+    <Compile Include="Globals\Extern.fs" />
+    <Compile Include="Globals\Globals.fs" />
+    <Compile Include="Globals\GlobalType.fs" />
+    <Compile Include="Globals\GlobalsTable.fs" />
     <Compile Include="LocalsTable.fs" />
     <Compile Include="ToSource\GenParam.fs" />
     <Compile Include="ToSource\GenMember.fs" />
     <Compile Include="ToSource\GenType.fs" />
     <Compile Include="ToSource\Print.fs" />
     <Compile Include="ToSource\Output.fs" />
-    <Compile Include="Analyzer.fs" />
-    <Compile Include="CompilerError.fs" />
+    <Compile Include="SemAnalysis\GlobalsAnalyzer.fs" />
+    <Compile Include="SemAnalysis\Analyze.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

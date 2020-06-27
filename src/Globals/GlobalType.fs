@@ -1,17 +1,6 @@
-﻿module Classier.NET.Compiler.GlobalType
+﻿module Classier.NET.Compiler.Globals.GlobalType
 
 open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.Extern
-
-[<StructuralEquality>]
-[<NoComparison>]
-type GlobalType<'DType> =
-    | DefinedType of 'DType
-    | ExternType of EType
-
-type GlobalTypeSymbol =
-    { Namespace: FullIdentifier option
-      Type: GlobalType<TypeDef> }
 
 let getName gtype =
     match gtype with

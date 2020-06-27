@@ -1,4 +1,4 @@
-﻿module Classier.NET.Compiler.Extern
+﻿namespace Classier.NET.Compiler.Globals
 
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar

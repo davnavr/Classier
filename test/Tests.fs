@@ -44,7 +44,6 @@ let main args =
                                 "correct namespace"
                                 (fun cu _ ->
                                     cu.Namespace
-                                    |> Namespace.fullId
                                     |> string
                                     |> Assert.equal "namespaces" ns)
 
@@ -72,7 +71,7 @@ let main args =
                 parseSource "HelloWorld"
                 |> TestCase.psuccess
                     "valid entry point"
-                    (fun cu _ -> cu.EntryPoint.IsSome |> Assert.isTrue "The entry point is missing")
+                    (fun _ state -> state.EntryPoint.IsSome |> Assert.isTrue "The entry point is missing")
 
                 [
                     "DuplicateEntryPoint", "entry point already exists at (\"DuplicateEntryPoint\", Ln: 4, Col: 1)"

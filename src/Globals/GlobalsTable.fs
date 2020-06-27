@@ -1,14 +1,14 @@
-﻿namespace Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler.Globals
 
 open System.Collections.Immutable
-open Classier.NET.Compiler.Extern
-open Classier.NET.Compiler.GlobalType
+open Classier.NET.Compiler
+open Classier.NET.Compiler.Globals.GlobalType
 open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.Namespace
 
 /// Stores the namespaces and types declared in compilation units.
 type GlobalsTable<'Namespace> = GlobalsTable of ImmutableSortedDictionary<'Namespace, ImmutableSortedSet<GlobalTypeSymbol>>
 
+[<RequireQualifiedAccess>]
 module GlobalsTable =
     type GlobalsTable = GlobalsTable<Namespace>
 
@@ -48,13 +48,10 @@ module GlobalsTable =
 
     let addType (tsymbol: GlobalTypeSymbol) globals =
         let (GlobalsTable table) = globals
-        let ns =
-            tsymbol.Namespace
-            |> Namespace.fullId
         globals
-        |> getTypes ns
+        |> getTypes tsymbol.Namespace
         |> SortedSet.tryAdd tsymbol
-        |> Option.map (fun types -> table.SetItem(ns, types) |> GlobalsTable)
+        |> Option.map (fun types -> table.SetItem(tsymbol.Namespace, types) |> GlobalsTable)
 
     /// Adds a namespace to the symbol table.
     let addNamespace ns table =
