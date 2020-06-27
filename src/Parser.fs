@@ -1442,8 +1442,8 @@ let compilationUnit: Parser<CompilationUnit, State> =
             >>= fun state ->
                 match state.EntryPoint with
                 | Some existing ->
-                    string existing.Origin
-                    |> sprintf "An entry point already exists at %s"
+                    existing.Origin
+                    |> sprintf "An entry point already exists at %O"
                     |> fail
                 | None ->
                     position

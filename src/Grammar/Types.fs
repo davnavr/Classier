@@ -29,10 +29,7 @@ type Class =
       SuperClass: FullIdentifier option }
 
     override this.ToString() =
-        sprintf
-            "%sclass %s"
-            (string this.Inheritance)
-            (string this.ClassName)
+        sprintf "%Oclass %O" this.Inheritance this.ClassName
 and ClassMember = TypeOrMember<Class, InstanceMember>
 
 type Interface =

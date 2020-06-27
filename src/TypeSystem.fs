@@ -56,7 +56,7 @@ type TypeName<'Generic> =
 
     override this.ToString() =
         match this with
-        | FuncType f -> sprintf "%s => %s" (string f.ParamType) (string f.ReturnType)
+        | FuncType f -> sprintf "%O => %O" f.ParamType f.ReturnType
         | Identifier names -> String.Join('.', names)
         | Primitive p -> p.ToString()
         | Tuple types -> sprintf "(%s)" (String.Join(", ", types))

@@ -13,7 +13,8 @@ type GenClassMember<'Type> =
 type GenMemberSet<'Type, 'Member> = ImmutableSortedSet<Grammar.TypeOrMember<'Type, 'Member>>
 
 type GenClass<'Type> =
-    { Interfaces: ImmutableSortedSet<unit> // Choice between a GenInterface or an external interface.
+    { Access: Grammar.Access
+      Interfaces: ImmutableSortedSet<unit> // Choice between a GenInterface or an external interface.
       Member: GenMemberSet<'Type, GenClassMember<'Type>>
       Name: Identifier<GenericParam>
       SuperClass: unit option // Choice between an external type or a GenType.

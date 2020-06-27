@@ -32,18 +32,13 @@ module Param =
 
     let toExpStr: (seq<ExpParam> -> _) =
         (fun param ->
-            sprintf "%s: %s"
-                (name param)
-                (string param.Type))
+            sprintf "%s: %O" (name param) param.Type)
         |> strHelper
 
     let toInfStr: (seq<InfParam> -> _) =
         (fun param ->
             match param.Type with
             | Some ptype ->
-                sprintf
-                    "%s: %s"
-                    (string param.Name)
-                    (string ptype)
+                sprintf "%O: %O" param.Name ptype
             | None -> string param.Name)
         |> strHelper

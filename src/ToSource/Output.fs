@@ -4,7 +4,7 @@ open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
 
 type Output =
-    { Definitions: ImmutableList<Definition>
+    { Definitions: ImmutableList<GenType>
       EntryPoint: EntryPoint option }
 
 module Output =

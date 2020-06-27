@@ -156,7 +156,7 @@ module Member =
                 mthd.Method.Parameters
                 |> Seq.map Param.toExpStr
                 |> String.concat " "
-                |> sprintf "%s%s" (string mthd.MethodName)
+                |> sprintf "%O%s" mthd.MethodName
             | AProperty prop -> string prop.PropName
         | Concrete cdef ->
             match cdef with
@@ -168,5 +168,5 @@ module Member =
                 mthd.Method.Parameters
                 |> Seq.map Param.toInfStr
                 |> String.concat " "
-                |> sprintf "%s%s" (string mthd.MethodName)
+                |> sprintf "%O%s" mthd.MethodName
             | Property prop -> string prop.PropName
