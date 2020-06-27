@@ -1,12 +1,14 @@
-﻿namespace Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler.ToSource
 
+open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
 
 type Output =
-    { EntryPoint: EntryPoint option }
+    { Definitions: ImmutableList<Definition>
+      EntryPoint: EntryPoint option }
 
 module Output =
-    let write output prnt =
+    let write output prnt = // TODO: prnt should instead be a function that doesn't print to a new line.
         let block lines =
             seq {
                 "{"

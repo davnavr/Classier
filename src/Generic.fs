@@ -6,9 +6,9 @@ open Classier.NET.Compiler.TypeSystem
 [<StructuredFormatDisplay("{Item}")>]
 [<StructuralComparison>]
 [<StructuralEquality>]
-type Generic =
+type Generic = // TODO: Remove this union, make GenericArg a union that is either a TypeName<Generic> or a GenericParam.
     | GenericArg of TypeName<Generic>
-    | GenericParam of GenericParam
+    | GenericParam of GenericParam // TODO: GenericParam should just be its own type.
 
     override this.ToString() =
         match this with
@@ -32,8 +32,3 @@ let gparam str =
       RequiredSuperClass = None
       Variance = NoVariance }
     |> GenericParam
-
-let garg strs =
-    (invalidOp "Neet to get a full name here")
-    |> TypeName.Identifier
-    |> GenericArg

@@ -31,9 +31,12 @@
     <Compile Include="GlobalType.fs" />
     <Compile Include="GlobalsTable.fs" />
     <Compile Include="LocalsTable.fs" />
+    <Compile Include="ToSource\GenParam.fs" />
+    <Compile Include="ToSource\GenMember.fs" />
+    <Compile Include="ToSource\GenType.fs" />
+    <Compile Include="ToSource\Output.fs" />
     <Compile Include="Analyzer.fs" />
     <Compile Include="CompilerError.fs" />
-    <Compile Include="Output.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

@@ -19,7 +19,7 @@ type TypeOrMember<'Type, 'Member> =
     | Member of 'Member
 
 type Class =
-    { ClassName: GenericName
+    { ClassName: GenericName // TODO: Names for types and members should be Identifier<GenericParam> not Identifier<Generic>
       Body: PStatement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier list

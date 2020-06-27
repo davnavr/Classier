@@ -5,13 +5,13 @@ open Classier.NET.Compiler.Extern
 
 [<StructuralEquality>]
 [<NoComparison>]
-type GlobalType =
-    | DefinedType of TypeDef
+type GlobalType<'DType> =
+    | DefinedType of 'DType
     | ExternType of EType
 
 type GlobalTypeSymbol =
     { Namespace: FullIdentifier option
-      Type: GlobalType }
+      Type: GlobalType<TypeDef> }
 
 let getName gtype =
     match gtype with
