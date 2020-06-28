@@ -7,7 +7,7 @@ open Classier.NET.Compiler.Identifier
 
 type EAccess =
     | EPublic
-    | EPrivate
+    | EProtected
 
 type EMethod<'Modifier> =
     { MethodName: Identifier
@@ -92,5 +92,3 @@ type EType =
 and EClass = EClass<EType>
 and EInterface = EInterface<EType>
 and EModule = EModule<EType>
-
-type ETypeDef = EAccess * EType

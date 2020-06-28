@@ -1,7 +1,6 @@
 ﻿namespace Classier.NET.Compiler.Globals
 
 open System
-open Classier.NET.Compiler
 open Classier.NET.Compiler.Identifier
 
 type Namespace =
@@ -13,12 +12,12 @@ type Namespace =
         | Namespace ns -> string ns
         | GlobalNamespace -> String.Empty
 
+type GlobalAccess =
+    | GlobalPublic
+    | GlobalInternal
+
 [<StructuralEquality>]
 [<NoComparison>]
 type GlobalType<'DType> =
-    | DefinedType of 'DType
+    | DefinedType of GlobalAccess * 'DType
     | ExternType of EType
-
-type GlobalTypeSymbol =
-    { Namespace: Namespace
-      Type: GlobalType<Grammar.TypeDef> }
