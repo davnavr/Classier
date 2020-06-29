@@ -3,6 +3,7 @@
 open System
 open System.Collections.Immutable
 open FParsec
+open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Operator
@@ -90,16 +91,11 @@ let keyword word =
     .>> space1
     |> attempt
 
-let accessModifier lowestAccess =
+let accessModifier lowest def modfs =
     let modifiers =
-        [
-            "public", Access.Public
-            "internal", Access.Internal
-            "protected", Access.Protected
-            "private", Access.Private
-        ]
+        modfs
         |> Seq.map (fun (str, vis) ->
-            if vis <= lowestAccess then
+            if vis <= lowest then
                 keyword str >>% vis
             else
                 vis
@@ -112,8 +108,22 @@ let accessModifier lowestAccess =
                 "access modifier"
             |> attempt
 
-            preturn Access.Public
+            preturn def
         ]
+let memberAccess lowest =
+    [
+        "public", Public
+        "internal", Internal
+        "protected", Protected
+        "private", Private
+    ]
+    |> accessModifier lowest Public
+let globalAccess =
+    [
+        "public", GlobalPublic
+        "internal", GlobalInternal
+    ]
+    |> accessModifier GlobalInternal GlobalPublic
 
 let typeName, private typeNameRef = createParserForwardedToRef<TypeName, _>()
 let typeNameOpt =
@@ -488,19 +498,19 @@ let genericParams =
     .>> gtsign
     |> optList
     <?> "generic parameters"
-let genericIdentifier: Parser<Identifier, _> =
-    identifierStr
-    |> attempt
-    .>> space
-    .>>. genericParams
-    .>> space
-    |>> fun (name, gparams) ->
-        { Name = name
-          Generics = List.map GenericParam gparams }
-let genericName =
+let genericName: Parser<GenericName, _> =
+    let identifier =
+        identifierStr
+        |> attempt
+        .>> space
+        .>>. genericParams
+        .>> space
+        |>> fun (name, gparams) ->
+            { Name = name
+              Generics = gparams }
     tuple2
         position
-        genericIdentifier
+        identifier
     .>> space
     |>> fun (pos, id) -> { Identifier = id; Position = pos }
 let simpleName: Parser<SimpleName, _> =
@@ -738,7 +748,7 @@ let memberDef members types =
         ]
         |> choice
 let memberBlock label acc members types =
-    accessModifier acc
+    memberAccess acc
     .>>. memberDef
         members
         types
@@ -754,7 +764,7 @@ let memberBody label (members: seq<_>) types =
             |> attempt
             |>> Choice1Of2
 
-            accessModifier Access.Private
+            memberAccess Access.Private
             .>>. memberDef members types
             |>> Choice2Of2
         ]
@@ -871,7 +881,7 @@ let classDef cdef modfs =
                 | _ -> Result.Error None)
             Sealed
     let classCtor =
-        accessModifier Access.Private
+        memberAccess Access.Private
         .>> space
         |> opt
         |>> Option.defaultValue Access.Public
@@ -1404,11 +1414,10 @@ let compilationUnit: Parser<CompilationUnit, State> =
         skipString "namespace"
         >>. space1
         |> attempt
-        >>. sepBy1 identifier (separator period)
-        |>> FullIdentifier
+        >>. sepBy1 identifierStr (separator period)
         .>> space
         .>> semicolon
-        |> opt
+        |> optList
         <?> "namespace declaration"
     let useStatements =
         skipString "use"
@@ -1460,8 +1469,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
                             |> Some
                         setUserState { state with EntryPoint = entrypoint }
         [
-            Access.Internal
-            |> accessModifier
+            globalAccess
             .>>. typeDef
             |>> Some
 
@@ -1478,7 +1486,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
         (definitions .>> eof)
         position
     |>> fun (ns, uses, types, pos) ->
-        { Namespace = ns
+        { Namespace = Namespace ns
           Usings = uses
           Source = pos.StreamName
           Types = types }

@@ -12,9 +12,9 @@
     <Compile Include="SortedSet.fs" />
     <Compile Include="AccessControl.fs" />
     <Compile Include="Identifier.fs" />
+    <Compile Include="Namespace.fs" />
     <Compile Include="TypeSystem.fs" />
     <Compile Include="Generic.fs" />
-    <Compile Include="Grammar\Aliases.fs" />
     <Compile Include="Grammar\Name.fs" />
     <Compile Include="Grammar\Numeric.fs" />
     <Compile Include="Grammar\Param.fs" />
@@ -28,7 +28,6 @@
     <Compile Include="Grammar\CompilationUnit.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="Globals\Extern.fs" />
-    <Compile Include="Globals\Globals.fs" />
     <Compile Include="LocalsTable.fs" />
     <Compile Include="ToSource\GenParam.fs" />
     <Compile Include="ToSource\GenMember.fs" />

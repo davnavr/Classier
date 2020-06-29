@@ -1,5 +1,8 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
+open Classier.NET.Compiler
+open Classier.NET.Compiler.Identifier
+
 type If<'Expr> =
     { Condition: 'Expr
       Choice1: PStatement<'Expr> list
@@ -34,10 +37,10 @@ type Expression =
            Target: Expression |}
     | PrefixOp of string * Expression
     | InfixOp of Expression * string * Expression
-    | IdentifierRef of Identifier
+    | IdentifierRef of Identifier<Generic.Generic>
     | IfExpr of If<Expression>
     | MatchExpr of Match<Expression>
-    | MemberAccess of Expression * Identifier
+    | MemberAccess of Expression * Identifier<Generic.Generic>
     | Nested of Expression
     | NullLit
     | NumLit of NumericLit

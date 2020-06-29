@@ -3,6 +3,8 @@
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Identifier
 
+type TypeName = TypeSystem.TypeName<Generic.Generic>
+
 type Name<'Identifier> =
     { Identifier: 'Identifier
       Position: FParsec.Position }
@@ -10,7 +12,7 @@ type Name<'Identifier> =
     override this.ToString() = this.Identifier.ToString()
 
 type SimpleName = Name<IdentifierStr>
-type GenericName = Name<Identifier>
+type GenericName = Name<Identifier<Generic.GenericParam>>
 
 module Name =
     let simple pos (str: IdentifierStr) =

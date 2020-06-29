@@ -25,10 +25,8 @@ module GlobalsAnalyzer =
                     | _ -> invalidOp "bad"
                 let add =
                     GlobalsTable.addType
-                        { Namespace =
-                            Namespace.ofOpt cunit.Namespace
-                          Type =
-                            DefinedType (acc, gtype) }
+                        { Namespace = cunit.Namespace
+                          Type = DefinedType (acc, gtype) }
                         state.Table
                 match add with
                 | Some ntable ->

@@ -1,6 +1,8 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
 open System.Collections.Immutable
+open Classier.NET.Compiler.AccessControl
+open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Identifier
 
 type ClassInheritance =
@@ -22,11 +24,11 @@ type Class =
     { ClassName: GenericName // TODO: Names for types and members should be Identifier<GenericParam> not Identifier<Generic>
       Body: PStatement list
       Inheritance: ClassInheritance
-      Interfaces: FullIdentifier list
+      Interfaces: FullIdentifier<Generic> list
       Members: ImmutableList<Access * ClassMember>
       PrimaryCtor: Access * InfParam list * Expression list
       SelfIdentifier: IdentifierStr option
-      SuperClass: FullIdentifier option }
+      SuperClass: FullIdentifier<Generic> option }
 
     override this.ToString() =
         sprintf "%Oclass %O" this.Inheritance this.ClassName
@@ -35,7 +37,7 @@ and ClassMember = TypeOrMember<Class, InstanceMember>
 type Interface =
     { InterfaceName: GenericName
       Members: (Access * InterfaceMember) list
-      SuperInterfaces: FullIdentifier list }
+      SuperInterfaces: FullIdentifier<Generic> list }
 and InterfaceMember = TypeOrMember<Interface, AbstractMember>
 
 type Module<'Type> =

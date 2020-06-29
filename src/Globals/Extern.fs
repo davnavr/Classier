@@ -1,6 +1,7 @@
 ﻿namespace Classier.NET.Compiler.Globals
 
 open System.Collections.Immutable
+open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Operator
@@ -93,6 +94,12 @@ type EType =
 and EClass = EClass<EType>
 and EInterface = EInterface<EType>
 and EModule = EModule<EType>
+
+[<StructuralEquality>]
+[<NoComparison>]
+type GlobalType<'DType> =
+    | DefinedType of GlobalAccess * 'DType
+    | ExternType of EType
 
 module EType =
     let name etype =
