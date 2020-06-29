@@ -8,7 +8,7 @@ open Classier.NET.Compiler.ToSource
 type GlobalsAnalysis =
     { Duplicates: ImmutableList<Grammar.TypeDef * Grammar.CompilationUnit>
       Table: GlobalsTable
-      Valid: ImmutableList<GenType * Grammar.CompilationUnit> }
+      Valid: ImmutableList<GenType> }
 
 module GlobalsAnalyzer =
     let analyze table (cunits: seq<Grammar.CompilationUnit>) =
@@ -32,7 +32,7 @@ module GlobalsAnalyzer =
                 | Some ntable ->
                     { state with
                         Table = ntable
-                        Valid = state.Valid.Add(gtype, cunit) }
+                        Valid = state.Valid.Add gtype }
                 | None ->
                     { state with
                         Duplicates = state.Duplicates.Add(tdef, cunit) })

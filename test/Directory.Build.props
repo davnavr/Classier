@@ -10,6 +10,7 @@
   <!-- Shared files -->
   <ItemGroup>
     <Compile Include="$(RootDirectory)/test/Assert.fs"/>
+    <Compile Include="$(RootDirectory)/test/TestData.fs"/>
     <Compile Include="$(RootDirectory)/test/TestCase.fs"/>
     <Compile Include="$(MSBuildProjectDirectory)/Tests.fs"/>
   </ItemGroup>

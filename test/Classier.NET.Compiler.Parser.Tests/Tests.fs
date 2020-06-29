@@ -79,10 +79,10 @@ let main args =
                 ]
                 |> Seq.map
                     (fun (source, sub) ->
-                        TestCase.pfailure
+                        parseSource source
+                        |> TestCase.pfailure
                             source
-                            (fun msg _ -> Assert.hasSubstring sub msg)
-                            (parseSource source))
+                            (fun msg _ -> Assert.hasSubstring sub msg))
                 |> testList "with error"
             ]
             |> testList "failure tests"
