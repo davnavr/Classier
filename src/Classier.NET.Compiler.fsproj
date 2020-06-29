@@ -27,7 +27,7 @@
     <Compile Include="Grammar\TypeDef.fs" />
     <Compile Include="Grammar\CompilationUnit.fs" />
     <Compile Include="Parser.fs" />
-    <Compile Include="Globals\Extern.fs" />
+    <Compile Include="Extern.fs" />
     <Compile Include="LocalsTable.fs" />
     <Compile Include="ToSource\GenParam.fs" />
     <Compile Include="ToSource\GenMember.fs" />
