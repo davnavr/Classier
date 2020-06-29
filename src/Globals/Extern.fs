@@ -1,6 +1,7 @@
 ﻿namespace Classier.NET.Compiler.Globals
 
 open System.Collections.Immutable
+open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
@@ -10,7 +11,7 @@ type EAccess =
     | EProtected
 
 type EMethod<'Modifier> =
-    { MethodName: Identifier
+    { MethodName: Identifier<GenericParam>
       Modifiers: 'Modifier
       Parameters: ImmutableArray<ImmutableArray<ExpParam>>
       ReturnType: TypeName }
@@ -35,7 +36,7 @@ type EField =
       ValueType: TypeName }
 
 type EFunction =
-    { FunctionName: Identifier
+    { FunctionName: Identifier<GenericParam>
       Parameters: ImmutableArray<ImmutableArray<ExpParam>>
       ReturnType: TypeName }
 
@@ -71,18 +72,18 @@ type EMember =
 type EMemberSet<'Type, 'Member> = ImmutableSortedSet<EAccess * TypeOrMember<'Type, 'Member>>
 
 type EInterface<'Type> =
-    { InterfaceName: Identifier
+    { InterfaceName: Identifier<GenericParam>
       Members: EMemberSet<'Type, EAbstractMember>
       SuperInterfaces: ImmutableSortedSet<EInterface<'Type>> }
 
 type EClass<'Type> =
-    { ClassName: Identifier
+    { ClassName: Identifier<GenericParam>
       Interfaces: ImmutableSortedSet<EInterface<'Type>>
       Members: EMemberSet<'Type, EMember>
       SuperClass: EClass<'Type> option }
 
 type EModule<'Type> =
-    { ModuleName: Identifier
+    { ModuleName: Identifier<GenericParam>
       Members: EMemberSet<'Type, EStaticMember> }
 
 type EType =
@@ -92,3 +93,10 @@ type EType =
 and EClass = EClass<EType>
 and EInterface = EInterface<EType>
 and EModule = EModule<EType>
+
+module EType =
+    let name etype =
+        match etype with
+        | EClass c -> c.ClassName
+        | EInterface i -> i.InterfaceName
+        | EModule m -> m.ModuleName

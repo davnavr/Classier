@@ -1,7 +1,10 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
+open Classier.NET.Compiler.AccessControl
+open Classier.NET.Compiler.Identifier
+
 type CompilationUnit =
-    { Namespace: FullIdentifier option // TODO: Should be IdentifierStr
+    { Namespace: IdentifierStr option
       Usings: FullIdentifier list
       Source: string
-      Types: (Access * TypeDef) list }
+      Types: (GlobalAccess * TypeDef) list }

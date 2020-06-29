@@ -1,14 +1,7 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
+open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Identifier
-
-[<StructuralEquality>]
-[<StructuralComparison>]
-type Access =
-    | Public
-    | Internal
-    | Protected
-    | Private
 
 type MutatorModf =
     | IsMutator

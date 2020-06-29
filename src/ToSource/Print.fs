@@ -3,7 +3,7 @@
 open System
 open Classier.NET.Compiler
 
-let pclass gclass prnt =
+let pclass (acc, gclass: GenClass) prnt =
     fun() ->
         seq {
             let minherit =
@@ -14,9 +14,9 @@ let pclass gclass prnt =
 
             sprintf
                 "%O %sclass %O%O "
-                gclass.Access
+                acc
                 minherit
-                gclass.Name.Name
+                gclass.ClassName
                 () // TODO: Print generic arguments.
 
             match (gclass.Interfaces, gclass.SuperClass) with

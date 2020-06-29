@@ -1,6 +1,7 @@
 ﻿namespace Classier.NET.Compiler.Globals
 
 open System
+open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Identifier
 
 type Namespace =
@@ -12,9 +13,11 @@ type Namespace =
         | Namespace ns -> string ns
         | GlobalNamespace -> String.Empty
 
-type GlobalAccess =
-    | GlobalPublic
-    | GlobalInternal
+module Namespace =
+    let ofOpt str =
+        match str with
+        | Some id -> Namespace id
+        | None -> GlobalNamespace
 
 [<StructuralEquality>]
 [<NoComparison>]

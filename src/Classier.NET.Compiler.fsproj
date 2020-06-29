@@ -10,6 +10,7 @@
   <!-- Source files -->
   <ItemGroup>
     <Compile Include="SortedSet.fs" />
+    <Compile Include="AccessControl.fs" />
     <Compile Include="Identifier.fs" />
     <Compile Include="TypeSystem.fs" />
     <Compile Include="Generic.fs" />

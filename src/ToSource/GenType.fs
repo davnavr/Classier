@@ -34,7 +34,7 @@ type GenClass<'Type> =
     { ClassName: Identifier<GenericParam>
       Interfaces: ImmutableSortedSet<InterfaceInheritance<GenInterface<'Type>>>
       Members: GenMemberSet<GenClass<'Type>, GenClassMember<'Type>>
-      SuperClass: ClassInheritance<'Type>
+      SuperClass: ClassInheritance<'Type> option
       Syntax: Grammar.Class }
 and ClassInheritance<'Type> =
     | DefinedClass of GenClass<'Type>
@@ -49,12 +49,22 @@ type GenModule<'Type, 'Nested> =
       Syntax: Grammar.Module }
 
 type GenType =
-    | GenClass of GenClass<TypeRef>
-    | GenInterface of GenInterface<TypeRef>
-    | GenModule of GenModule<TypeRef, GenType>
+    | GenClass of GenClass
+    | GenInterface of GenInterface
+    | GenModule of GenModule
 and TypeRef =
     | RDefined of GenType
     | RExtern of Globals.EType
     | RFunc of TypeRef * TypeRef
     | RPrimitive of TypeSystem.PrimitiveType
     | RTuple of TypeRef list
+and GenClass = GenClass<TypeRef>
+and GenInterface = GenInterface<TypeRef>
+and GenModule = GenModule<TypeRef, GenType>
+
+module GenType =
+    let name gtype =
+        match gtype with
+        | GenClass gclass -> gclass.ClassName
+        | GenInterface gintf -> gintf.InterfaceName
+        | GenModule gmodl -> Identifier.ofStr gmodl.ModuleName
