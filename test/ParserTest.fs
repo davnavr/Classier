@@ -87,21 +87,21 @@ let tests =
                         }
 
                         try {
-                            throw "Hello!";
                         }
                         catch {
-                            _ => throw;
+                            _ => { };
                         }
                         finally {
                         }
 
-                        while (true) {
+                        while (false) {
                         }
 
                         match (thing) {
-                            1 => "yes";
-                            (one, two) => oh.no;
+                            _ => { };
                         }
+
+                        "Hello"
                     }"""
                     |> parse
                     |> ParserAssert.isSuccess
@@ -116,7 +116,35 @@ let tests =
                         |> NumLit
                         |> IgnoredExpr
 
+                        { Choice1 = List.empty
+                          Choice2 = List.empty
+                          Condition =
+                            BoolLit true
+                            |> List.singleton
+                            |> TupleLit }
+                        |> IfExpr
+                        |> IgnoredExpr
 
+                        { Finally = List.empty
+                          Handlers = [ Expression.emptyCase ]
+                          TryBody = List.empty }
+                        |> TryExpr
+                        |> IgnoredExpr
+
+                        While (BoolLit false, List.empty)
+
+                        { Against =
+                            Identifier.create "thing"
+                            |> Option.get
+                            |> Identifier.ofStr
+                            |> IdentifierRef
+                            |> List.singleton
+                            |> TupleLit
+                          Cases = [ Expression.emptyCase ] }
+                        |> MatchExpr
+                        |> IgnoredExpr
+
+                        StrLit "Hello" |> Return
                     ])
     ]
     |> testList "parser tests"

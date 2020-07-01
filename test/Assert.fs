@@ -1,5 +1,8 @@
 ﻿module Classier.NET.Compiler.Assert
 
+open System
+open System.Collections
+
 let inline fail msg = msg |> Fuchu.AssertException |> raise
 let inline failf format = Printf.ksprintf fail format
 
@@ -9,11 +12,22 @@ let isSome opt =
     | None ->
         fail "The value was unexpectedly None"
 
-let equal exp act =
+let equal (exp: 'T when 'T: equality) act =
+    let format (item: obj) =
+        match item with
+        | :? string as str ->
+            sprintf "\"%s\"" str
+        | :? IEnumerable as items ->
+            items
+            |> Seq.cast<obj>
+            |> Seq.map string
+            |> String.concat ",\n"
+            |> sprintf "%O:\n%s" typeof<'T>
+        | _ -> item.ToString()
     match exp = act with
     | true -> act
     | false ->
         failf
-            "Expected:\n%O\nActual:\n%O"
-            exp
-            act
+            "Expected:\n%s\nActual:\n%s"
+            (format exp)
+            (format act)
