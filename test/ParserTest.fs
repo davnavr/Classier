@@ -52,6 +52,9 @@ let tests =
 
                     public class Class3<T> protected {
                     }
+
+                    public abstract class Class4<T, U implements IThing> {
+                    }
                     """
                     |> parse
                     |> ParserAssert.isSuccess
@@ -68,6 +71,52 @@ let tests =
                         "IThing"
                         "Module1"
                         "Class3<T>"
+                        "Class4<T, U>"
+                    ])
+
+        parseStr
+            Parser.statementBlock
+            "block statements don't need semicolon"
+            (fun parse ->
+                let (statements, _) =
+                    """{
+                        3.14159265; // This ignored expression needs a semicolon.
+                        if (true) {
+                        }
+                        else {
+                        }
+
+                        try {
+                            throw "Hello!";
+                        }
+                        catch {
+                            _ => throw;
+                        }
+                        finally {
+                        }
+
+                        while (true) {
+                        }
+
+                        match (thing) {
+                            1 => "yes";
+                            (one, two) => oh.no;
+                        }
+                    }"""
+                    |> parse
+                    |> ParserAssert.isSuccess
+                statements
+                |> Seq.map snd
+                |> List.ofSeq
+                |> Assert.equal
+                    [
+                        { FracDigits = "14159265"
+                          IntDigits = "3" }
+                        |> NumericLit.FPoint
+                        |> NumLit
+                        |> IgnoredExpr
+
+
                     ])
     ]
     |> testList "parser tests"
