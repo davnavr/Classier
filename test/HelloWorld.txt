@@ -1,7 +1,0 @@
-
-use System.Console;
-
-main (args: Array<String>) {
-  "Hello there!" |> System.Console.WriteLine();
-  0
-}

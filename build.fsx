@@ -57,11 +57,7 @@ Target.create "Lint Bootstrap" (fun _ ->
 )
 
 Target.create "Test Bootstrap" (fun _ ->
-    "./test/"
-    |> DirectoryInfo.ofPath
-    |> DirectoryInfo.getSubDirectories
-    |> Seq.collect (DirectoryInfo.getMatchingFiles "*.fsproj")
-    |> Seq.iter (fun proj -> runProj proj.FullName List.empty)
+    runProj "./test/Classier.NET.Compiler.Tests.fsproj" []
 )
 
 Target.create "Build Samples" (fun _ ->
