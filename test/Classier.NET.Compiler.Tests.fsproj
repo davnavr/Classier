@@ -12,6 +12,7 @@
     <Compile Include="Assert.fs" />
     <Compile Include="ParserAssert.fs" />
     <Compile Include="ParserTest.fs" />
+    <Compile Include="AnalysisTest.fs" />
     <Compile Include="Test.fs" />
   </ItemGroup>
 

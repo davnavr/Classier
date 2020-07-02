@@ -18,11 +18,15 @@ let equal (exp: 'T when 'T: equality) act =
         | :? string as str ->
             sprintf "\"%s\"" str
         | :? IEnumerable as items ->
-            items
-            |> Seq.cast<obj>
-            |> Seq.map string
-            |> String.concat ",\n"
-            |> sprintf "%O:\n%s" typeof<'T>
+            let col = Seq.cast<obj> items
+            let content =
+                if Seq.isEmpty col
+                then "(empty)"
+                else
+                    col
+                    |> Seq.map string
+                    |> String.concat ",\n"
+            sprintf "%O:\n%s" typeof<'T> content
         | _ -> item.ToString()
     match exp = act with
     | true -> act

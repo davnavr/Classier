@@ -5,6 +5,7 @@ open Fuchu
 let runTests =
     [
         ParserTest.tests
+        AnalysisTest.tests
     ]
     |> testList "compiler tests"
     |> defaultMain
