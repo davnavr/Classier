@@ -7,6 +7,8 @@ type Namespace =
 
     override this.ToString() =
         let (Namespace ns) = this
-        ns
-        |> Seq.map string
-        |> String.concat "."
+        match ns with
+        | [] -> "<global namespace>"
+        | _ ->
+            Seq.map string ns
+            |> String.concat "."

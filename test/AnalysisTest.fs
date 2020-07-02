@@ -12,12 +12,19 @@ let tests =
             Parser.compilationUnit
             nsstr
             (fun parse ->
+                let nsst =
+                    match nsstr with
+                    | "<global namespace>" -> "/*global namespace*/";
+                    | _ -> sprintf "namespace %s;" nsstr
                 let (cu, _) =
-                    """
-                    class MyClass {}
-                    interface MyInterface {}
-                    module MyModule {}
-                    """
+                    sprintf
+                        """
+                        %s
+                        class MyClass {}
+                        interface MyInterface {}
+                        module MyModule {}
+                        """
+                        nsst
                     |> parse
                     |> ParserAssert.isSuccess
                 let ptnames =
