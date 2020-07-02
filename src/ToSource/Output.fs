@@ -63,9 +63,7 @@ module Output =
                     "static class ____Program"
                     yield! block
                         [
-                            sprintf
-                                "private static void Main(string[] %s)"
-                                (epoint.Arguments.Name |> Option.map string |> Option.defaultValue "____args")
+                            "private static void Main(string[] ___args)"
                             yield! body epoint.Body
                         ]
                 | None -> "// No entry point"

@@ -1455,13 +1455,11 @@ let compilationUnit: Parser<CompilationUnit, State> =
                     |> sprintf "An entry point already exists at %O"
                     |> fail
                 | None ->
-                    position
-                    .>> keyword "main"
-                    |> attempt
-                    .>>. eparam
-                    .>> space
-                    .>>. functionBody
-                    >>= fun ((pos, eargs), body) ->
+                    tuple3
+                        (position .>> keyword "main" |> attempt)
+                        (paramTuple typeAnnExp .>> space)
+                        functionBody
+                    >>= fun (pos, eargs, body) ->
                         let entrypoint =
                             { Arguments = eargs
                               Body = body
