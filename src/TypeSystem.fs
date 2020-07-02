@@ -47,6 +47,7 @@ type PrimitiveType =
 [<StructuralEquality>]
 [<StructuralComparison>]
 type TypeName<'Generic> =
+    | ArrayType of TypeName<'Generic>
     | FuncType of
         {| ParamType: TypeName<'Generic>
            ReturnType: TypeName<'Generic> |}
@@ -56,6 +57,7 @@ type TypeName<'Generic> =
 
     override this.ToString() =
         match this with
+        | ArrayType itype -> sprintf "%O[]" itype
         | FuncType f -> sprintf "%O => %O" f.ParamType f.ReturnType
         | Identifier names -> String.Join('.', names)
         | Primitive p -> p.ToString()

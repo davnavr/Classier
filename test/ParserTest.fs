@@ -1,6 +1,7 @@
 ﻿module Classier.NET.Compiler.ParserTest
 
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.TypeSystem
 open FParsec
 open Fuchu
 
@@ -154,7 +155,7 @@ let tests =
                     ])
 
         parseStr
-            Parser.expression
+            (Parser.expression .>> eof)
             "test expression"
             (fun parse ->
                 [
@@ -206,5 +207,44 @@ let tests =
                 |> Assert.isSome
                 |> string
                 |> Assert.equal "this")
+
+        parseStr
+            (Parser.typeName .>> eof)
+            "test type name"
+            (fun parse ->
+                let tidentifier names =
+                    names
+                    |> Seq.map
+                        (Identifier.create >> Option.get)
+                    |> Identifier.ofStrSeq
+                    |> Option.get
+                    |> TypeName.Identifier
+
+                [
+                    Primitive PrimitiveType.String |> ArrayType
+
+                    tidentifier [ "java"; "lang"; "Object" ] |> ArrayType |> ArrayType
+
+                    Primitive PrimitiveType.Null
+                    Primitive PrimitiveType.Unit
+                    Primitive PrimitiveType.Byte
+                    Primitive PrimitiveType.Short
+                    Primitive PrimitiveType.Long
+                    Primitive PrimitiveType.Double
+
+                    tidentifier [ "System"; "Object" ]
+
+                    Tuple [ Primitive PrimitiveType.Int; Primitive PrimitiveType.Float ]
+                ]
+                |> Seq.map (fun exp ->
+                    let ename = string exp
+                    test ename {
+                        parse ename
+                        |> ParserAssert.isSuccess
+                        |> fst
+                        |> Assert.equal exp
+                        |> ignore
+                    }))
+        |> testList "simple type name is valid"
     ]
     |> testList "parser tests"

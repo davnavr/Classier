@@ -325,7 +325,7 @@ let parenExpr = tupleExpr |>> TupleLit
 
 do
     let simpleType =
-        choiceL
+        choice
             [
                 PrimitiveType.names
                 |> Seq.map (fun pair -> skipString (pair.Value) >>% pair.Key)
@@ -343,19 +343,43 @@ do
                 | [] -> Primitive PrimitiveType.Unit
                 | items -> Tuple items
             ]
-            "type name"
+    let modifiedType f p prev =
+        prev
+        .>>. opt p
+        |>> fun (btype: TypeName, mtype) ->
+            match mtype with
+            | Some modf -> f btype modf
+            | None -> btype
+    let arrayType =
+        space
+        >>. skipChar '['
+        |> attempt
+        >>. space
+        >>. skipChar ']'
+        |> many1
+        |> modifiedType
+            (fun itype nest ->
+                Seq.fold
+                    (fun prev () ->
+                        ArrayType prev)
+                    itype
+                    nest)
+    let functionType =
+        space
+        >>. lambdaOperator
+        >>. space
+        >>. (typeName <?> "return type")
+        |> attempt
+        |> modifiedType
+            (fun ptype rettype ->
+                FuncType
+                    {| ParamType = ptype
+                       ReturnType = rettype |})
     typeNameRef :=
         simpleType
-        .>>. opt
-            (space
-            >>. lambdaOperator
-            >>. space
-            >>. typeName
-            |> attempt)
-        |>> fun (paramsType, retType) ->
-            match retType with
-            | Some _ -> FuncType {| ParamType = paramsType; ReturnType = retType.Value |}
-            | None -> paramsType
+        |> arrayType
+        |> functionType
+        <?> "type name"
 
 let private pattern =
     [
