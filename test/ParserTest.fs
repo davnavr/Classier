@@ -5,17 +5,23 @@ open FParsec
 open Fuchu
 
 let parseStr parser name f =
+    runParserOnString
+        parser
+        Parser.defaultState
+        name
+    |> f
+
+let testStr parser name f =
     testCase name (fun() ->
-        runParserOnString
+        parseStr
             parser
-            Parser.defaultState
             name
-        |> f
+            f
         |> ignore)
 
 let tests =
     [
-        parseStr
+        testStr
             Parser.compilationUnit
             "hello world"
             (fun parse ->
@@ -33,7 +39,7 @@ let tests =
                 state.EntryPoint
                 |> Assert.isSome)
 
-        parseStr
+        testStr
             Parser.compilationUnit
             "types and modules in compilation unit"
             (fun parse ->
@@ -74,7 +80,7 @@ let tests =
                         "Class4<T, U>"
                     ])
 
-        parseStr
+        testStr
             Parser.statementBlock
             "block statements don't need semicolon"
             (fun parse ->
@@ -146,5 +152,59 @@ let tests =
 
                         StrLit "Hello" |> Return
                     ])
+
+        parseStr
+            Parser.expression
+            "test expression"
+            (fun parse ->
+                [
+                    "\"h\u00E9llo\""
+                    "12345"
+                    "67890L"
+                    "54321l"
+                    "3.14159265"
+                    "2.71828f"
+                    "1.2345D"
+                    "\"hello world\" |> System.Console.WriteLine"
+                    "1 + 2"
+                    "(a, b, c) => {\n    return c;\n}"
+                ]
+                |> Seq.map (fun source ->
+                    test source {
+                        source
+                        |> parse
+                        |> ParserAssert.isSuccess
+                        |> ignore
+                    })
+                |> testList "expression is valid")
+
+        testStr
+            Parser.compilationUnit
+            "class can have self-identifier"
+            (fun parse ->
+                let (cu, _) =
+                    """
+                    /*
+                    Copyright (c) 2020
+                    This is a very long text
+                    */
+
+                    public class FancyClass() as this {
+                        let myField = this.toString();
+                    }
+                    """
+                    |> parse
+                    |> ParserAssert.isSuccess
+                let fclass =
+                    cu.Types
+                    |> List.head
+                    |> snd
+                    |> function
+                    | Class cdef -> cdef
+                    | _ -> Assert.fail "The class was unexpectedly missing"
+                fclass.SelfIdentifier
+                |> Assert.isSome
+                |> string
+                |> Assert.equal "this")
     ]
     |> testList "parser tests"

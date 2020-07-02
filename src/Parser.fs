@@ -292,7 +292,7 @@ let paramTupleList typeAnn =
     |> many1
     <?> "parameter list"
 
-let expressionRef = OperatorPrecedenceParser<_,_,_>()
+let private expressionRef = OperatorPrecedenceParser<_,_,_>()
 let expression = expressionRef.ExpressionParser <?> "expression"
 let equalsExpr =
     skipChar '='

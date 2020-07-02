@@ -1,6 +1,5 @@
 ﻿module Classier.NET.Compiler.Assert
 
-open System
 open System.Collections
 
 let inline fail msg = msg |> Fuchu.AssertException |> raise
