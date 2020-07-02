@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Classier.NET.Compiler.Tests</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Classier.NET.Compiler</RootNamespace>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+  
+  <!-- Source files -->
+  <ItemGroup>
+    <Compile Include="Assert.fs" />
+    <Compile Include="ParserAssert.fs" />
+    <Compile Include="ParserTest.fs" />
+    <Compile Include="AnalysisTest.fs" />
+    <Compile Include="Test.fs" />
+  </ItemGroup>
+
+  <!-- References -->
+  <ItemGroup>
+    <PackageReference Include="Fuchu" Version="1.1.0" />
+    <ProjectReference Include="$(RootDirectory)/src/Classier.NET.Compiler.fsproj" />
+  </ItemGroup>
+
+</Project>

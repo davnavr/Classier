@@ -65,3 +65,7 @@ type InfFunction = Signature<PStatement list, TypeName option>
 
 module Expression =
     let withPos pos expr = pos, expr
+
+    let emptyCase =
+        { Body = List.empty
+          Patterns = [ Pattern.Default ] }

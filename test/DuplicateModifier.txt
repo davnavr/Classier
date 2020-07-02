@@ -1,4 +1,0 @@
-
-public class DuplicateModifier private {
-	public abstract abstract myMethod();
-}
