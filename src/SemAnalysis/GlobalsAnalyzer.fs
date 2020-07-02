@@ -11,7 +11,7 @@ type GlobalsAnalysis =
       Valid: ImmutableList<GenType> }
 
 module GlobalsAnalyzer =
-    let analyze table (cunits: seq<Grammar.CompilationUnit>) =
+    let analyze table (cunits: seq<Grammar.CompilationUnit>) = // TODO: Rename this function to something like "addGlobalTypesToTable".
         cunits
         |> Seq.collect
             (fun cunit ->
@@ -22,7 +22,24 @@ module GlobalsAnalyzer =
             (fun state (cunit, (acc, tdef)) ->
                 let gtype =
                     match tdef with
-                    | _ -> invalidOp "bad"
+                    | Grammar.Class clss ->
+                        { ClassName = clss.ClassName.Identifier
+                          Interfaces = ImmutableSortedSet.Empty
+                          Members = ImmutableSortedSet.Empty // TODO: Create empty variants for GenClass members set and the members set of other types.
+                          SuperClass = None
+                          Syntax = clss }
+                        |> GenClass
+                    | Grammar.Interface intf ->
+                        { InterfaceName = intf.InterfaceName.Identifier
+                          Members = ImmutableSortedSet.Empty
+                          SuperInterfaces = ImmutableSortedSet.Empty
+                          Syntax = intf }
+                        |> GenInterface
+                    | Grammar.Module modl ->
+                        { Members = ImmutableSortedSet.Empty
+                          ModuleName = modl.ModuleName.Identifier
+                          Syntax = modl }
+                        |> GenModule
                 let add =
                     GlobalsTable.addType
                         { Namespace = cunit.Namespace
@@ -39,3 +56,6 @@ module GlobalsAnalyzer =
             { Duplicates = ImmutableList.Empty
               Table = table
               Valid = ImmutableList.Empty }
+
+    // TODO: Add other function that resolves super classes and interfaces?
+    // NOTE: You can get a TypeDef from a GenType by using the Syntax property.

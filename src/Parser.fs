@@ -1441,7 +1441,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
                 |> Seq.map (fun def -> def modfs)
                 |> choice
         let entrypoint =
-            let eparam =
+            let eparam = // TODO: Be less strict with parameters, allow none or more than one.
                 between
                     (lparen .>> space)
                     (rparen >>. space)

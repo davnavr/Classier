@@ -17,11 +17,12 @@ type GenInterfaceMember<'Type> =
 type GenInterface<'Type> =
     { InterfaceName: Identifier<GenericParam>
       Members: ImmutableSortedSet<Grammar.TypeOrMember<GenInterface<'Type>, GenInterfaceMember<'Type>>>
-      SuperInterfaces: ImmutableSortedSet<InterfaceInheritance<'Type>>
+      SuperInterfaces: InterfaceSet<'Type>
       Syntax: Grammar.Interface }
 and InterfaceInheritance<'Type> =
     | DefinedInterface of GenInterface<'Type>
     | ExternInterface of Globals.EInterface
+and InterfaceSet<'Type> = ImmutableSortedSet<InterfaceInheritance<'Type>>
 
 type GenMemberSet<'Type, 'Member> =
     ImmutableSortedSet<GenAccess * Grammar.TypeOrMember<'Type, 'Member>>
@@ -32,7 +33,7 @@ type GenClassMember<'Type> =
     | ClassProp
 type GenClass<'Type> =
     { ClassName: Identifier<GenericParam>
-      Interfaces: ImmutableSortedSet<InterfaceInheritance<GenInterface<'Type>>>
+      Interfaces: InterfaceSet<'Type>
       Members: GenMemberSet<GenClass<'Type>, GenClassMember<'Type>>
       SuperClass: ClassInheritance<'Type> option
       Syntax: Grammar.Class }
@@ -68,3 +69,9 @@ module GenType =
         | GenClass gclass -> gclass.ClassName
         | GenInterface gintf -> gintf.InterfaceName
         | GenModule gmodl -> Identifier.ofStr gmodl.ModuleName
+
+    let syntax gtype =
+        match gtype with
+        | GenClass gclass -> Grammar.Class gclass.Syntax
+        | GenInterface gintf -> Grammar.Interface gintf.Syntax
+        | GenModule gmodl -> Grammar.Module gmodl.Syntax
