@@ -33,14 +33,29 @@ module MemberSet =
                   | _ -> overload }
         |> ImmutableSortedSet.Empty.WithComparer
 
+    let private paramOverload f =
+        function
+        | TypeOrMember.Type _ -> List.empty
+        | TypeOrMember.Member mdef -> f mdef
+
     let classSet =
-        memberSet
+        paramOverload
+            (fun mdef ->
+                match mdef with
+                | _ -> List.empty)
+        |> memberSet
             (fun cdef -> Some cdef.ClassName)
             (function
             | _ -> None)
+
+    let interfaceSet =
+        memberSet
+            (fun idef -> Some idef.InterfaceName)
             (function
-            | TypeOrMember.Type _ -> List.empty
-            | TypeOrMember.Member mdef ->
-                match mdef with
-                | ClassCtor ctor -> ctor.Parameters; invalidOp "bad"
-                | _ -> List.empty)
+            | _ -> None)
+
+    let moduleSet =
+        memberSet
+            (fun mdle -> Some mdle.ModuleName)
+            (function
+            | _ -> None)

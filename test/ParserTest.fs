@@ -218,7 +218,7 @@ let tests =
                         (Identifier.create >> Option.get)
                     |> Identifier.ofStrSeq
                     |> Option.get
-                    |> TypeName.Identifier
+                    |> TypeName.Named
 
                 [
                     Primitive PrimitiveType.String |> ArrayType

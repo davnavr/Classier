@@ -332,7 +332,7 @@ do
                 |> choice
                 |>> Primitive
 
-                identifierFull |>> Identifier
+                identifierFull |>> Named
 
                 between
                     lparen
@@ -1387,7 +1387,7 @@ do
                 |>> (fun (ctype, args) ->
                     CtorCall
                         {| Arguments = args
-                           Type = Identifier ctype |})
+                           Type = Named ctype |})
 
                 [
                     pstring "true"

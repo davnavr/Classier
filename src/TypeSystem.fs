@@ -46,12 +46,12 @@ type PrimitiveType =
 
 [<StructuralEquality>]
 [<StructuralComparison>]
-type TypeName<'Generic> =
+type TypeName<'Generic> = // TODO: Make this TypeName<'NamedType> instead.
     | ArrayType of TypeName<'Generic>
     | FuncType of
         {| ParamType: TypeName<'Generic>
            ReturnType: TypeName<'Generic> |}
-    | Identifier of FullIdentifier<'Generic>
+    | Named of FullIdentifier<'Generic> // TODO: Replace case with a case named 'Defined', and add a corresponding generic parameter 'Defined?
     | Primitive of PrimitiveType
     | Tuple of TypeName<'Generic> list
 
@@ -59,6 +59,6 @@ type TypeName<'Generic> =
         match this with
         | ArrayType itype -> sprintf "%O[]" itype
         | FuncType f -> sprintf "%O => %O" f.ParamType f.ReturnType
-        | Identifier names -> String.Join('.', names)
+        | Named ntype -> string ntype
         | Primitive p -> p.ToString()
         | Tuple types -> sprintf "(%s)" (String.Join(", ", types))
