@@ -1,30 +1,30 @@
 ﻿module Classier.NET.Compiler.Generic
 
 open Classier.NET.Compiler.Identifier
-open Classier.NET.Compiler.TypeSystem
 
-[<StructuredFormatDisplay("{Item}")>]
-[<StructuralComparison>]
-[<StructuralEquality>]
-type Generic =
-    | GenericArg of TypeName<Generic>
-    | GenericParam of GenericParam
-
-    override this.ToString() =
-        match this with
-        | GenericArg arg -> string arg
-        | GenericParam gparam -> string gparam
-and GenericVariance =
+type GenericVariance =
     | NoVariance
     | Covariant
     | Contravariant
-and GenericParam =
+
+type GenericParam<'Interface, 'SuperClass> =
     { Name: IdentifierStr
-      RequiredInterfaces: FullIdentifier<Generic> list // TODO: Make interfaces and superclass generic params?
-      RequiredSuperClass: FullIdentifier<Generic> option
+      RequiredInterfaces: FullIdentifier<'Interface> list
+      RequiredSuperClass: FullIdentifier<'SuperClass> option
       Variance: GenericVariance }
 
     override this.ToString() = string this.Name
+
+[<StructuralComparison>]
+[<StructuralEquality>]
+type Generic<'GenericArg, 'Interface, 'SuperClass> =
+    | GenericArg of 'GenericArg
+    | GenericParam of GenericParam<'Interface, 'SuperClass>
+
+    override this.ToString() =
+        match this with
+        | GenericArg arg -> arg.ToString()
+        | GenericParam gparam -> string gparam
 
 let gparam str =
     { Name = str

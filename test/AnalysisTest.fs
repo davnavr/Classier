@@ -1,6 +1,6 @@
 ﻿module Classier.NET.Compiler.AnalysisTest
 
-open Classier.NET.Compiler.Globals
+open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.SemAnalysis
 open Classier.NET.Compiler.ToSource
 open Fuchu
@@ -53,8 +53,8 @@ let tests =
                         |> GlobalsTable.getTypes ns
                         |> Seq.map (fun gtype ->
                             match gtype.Type with
-                            | DefinedType (_, dtype) -> GenType.name dtype
-                            | ExternType etype -> EType.name etype)
+                            | DefinedGlobal (_, dtype) -> GenType.name dtype
+                            | ExternGlobal etype -> EType.name etype)
                         |> List.ofSeq
                         |> Assert.equal ptnames
                         |> ignore

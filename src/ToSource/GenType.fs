@@ -11,13 +11,13 @@ type GenInterfaceMember<'GenType> =
     | InterfaceMthd
     | InterfaceProp
 type GenInterface<'GenType> =
-    { InterfaceName: Identifier<unit>
+    { InterfaceName: Identifier<unit> // TODO: Create a new type for generic parameters that are validated.
       Members: InterfaceMembers<'GenType>
       SuperInterfaces: InterfaceSet<'GenType>
       Syntax: Grammar.Interface }
 and InterfaceInheritance<'GenType> =
     | DefinedInterface of GenInterface<'GenType>
-    | ExternInterface of Globals.EInterface
+    | ExternInterface of Extern.EInterface
 and InterfaceMembers<'GenType> =
     ImmutableSortedSet<TypeOrMember<GenInterface<'GenType>, GenInterfaceMember<'GenType>>>
 and InterfaceSet<'GenType> = ImmutableSortedSet<InterfaceInheritance<'GenType>>
@@ -36,7 +36,7 @@ and ClassMembers<'GenType> =
     ImmutableSortedSet<Access * TypeOrMember<GenClass<'GenType>, GenClassMember<'GenType>>>
 and ClassInheritance<'GenType> =
     | DefinedClass of GenClass<'GenType>
-    | ExternClass of Globals.EClass
+    | ExternClass of Extern.EClass
 
 type GenModuleMember =
     | ModuleFunc

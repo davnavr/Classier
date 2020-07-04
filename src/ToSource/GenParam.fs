@@ -1,12 +1,11 @@
 ﻿namespace Classier.NET.Compiler.ToSource
 
 open System.Collections.Immutable
-open Classier.NET.Compiler.Globals
 open Classier.NET.Compiler.Identifier
 
 type GenParam<'GenType> =
     { Name: IdentifierStr option
-      Type: GlobalType<TypeRef<'GenType>> }
+      Type: TypeRef<'GenType> }
 
 type GenParamTuple<'GenType> =
     | GenParamTuple of ImmutableList<GenParam<'GenType>>

@@ -1,9 +1,11 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
 open Classier.NET.Compiler
+open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Identifier
 
-type TypeName = TypeSystem.TypeName<Generic.Generic>
+type TypeName<'Interface, 'SuperClass> =
+    TypeSystem.TypeName<FullIdentifier<Generic<TypeName<'Interface, 'SuperClass>, 'Interface, 'SuperClass>>>
 
 type Name<'Identifier> =
     { Identifier: 'Identifier
@@ -12,7 +14,7 @@ type Name<'Identifier> =
     override this.ToString() = this.Identifier.ToString()
 
 type SimpleName = Name<IdentifierStr>
-type GenericName = Name<Identifier<Generic.GenericParam>>
+type GenericName = Name<Identifier<GenericParam>>
 
 module Name =
     let simple pos (str: IdentifierStr) =
