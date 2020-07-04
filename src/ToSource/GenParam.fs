@@ -4,14 +4,18 @@ open System.Collections.Immutable
 open Classier.NET.Compiler.Globals
 open Classier.NET.Compiler.Identifier
 
-type GenParam<'Type> =
+type GenParam<'GenType> =
     { Name: IdentifierStr option
-      Type: GlobalType<'Type> }
+      Type: GlobalType<TypeRef<'GenType>> }
 
-type GenParamTuple<'Type> =
-    private
-    | GenParamTuple of ImmutableList<GenParam<'Type>>
+type GenParamTuple<'GenType> =
+    | GenParamTuple of ImmutableList<GenParam<'GenType>>
 
-type GenParamList<'Type> =
-    private
-    | GenParamList of ImmutableList<GenParamTuple<'Type>>
+type GenParamList<'GenType> =
+    | GenParamList of ImmutableList<GenParamTuple<'GenType>>
+
+module GenParam =
+    let tupleTypes (GenParamTuple ptuple) =
+        ptuple
+        |> Seq.map (fun p -> p.Type)
+        |> List.ofSeq

@@ -5,10 +5,10 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.Globals
 open Classier.NET.Compiler.ToSource
 
-type GlobalsAnalysis =
-    { Duplicates: ImmutableList<Grammar.TypeDef * Grammar.CompilationUnit>
+type GlobalsAnalysis<'Errors> =
+    { Errors: 'Errors
       Table: GlobalsTable
-      Valid: ImmutableList<GenType> }
+      Valid: ImmutableList<GenType * Grammar.CompilationUnit> }
 
 module GlobalsAnalyzer =
     let analyze table (cunits: seq<Grammar.CompilationUnit>) = // TODO: Rename this function to something like "addGlobalTypesToTable".
@@ -49,13 +49,14 @@ module GlobalsAnalyzer =
                 | Some ntable ->
                     { state with
                         Table = ntable
-                        Valid = state.Valid.Add gtype }
+                        Valid = state.Valid.Add(gtype, cunit) }
                 | None ->
-                    { state with
-                        Duplicates = state.Duplicates.Add(tdef, cunit) })
-            { Duplicates = ImmutableList.Empty
+                    let errors: ImmutableList<Grammar.TypeDef * Grammar.CompilationUnit> = state.Errors
+                    { state with Errors = errors.Add(tdef, cunit) })
+            { Errors = ImmutableList.Empty
               Table = table
               Valid = ImmutableList.Empty }
 
-    // TODO: Add other function that resolves super classes and interfaces?
     // NOTE: You can get a TypeDef from a GenType by using the Syntax property.
+    let resolveSuperClass table gtypes =
+        invalidOp "no impl to find super classes"

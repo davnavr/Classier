@@ -42,7 +42,7 @@ let tests =
                     test "types are valid" {
                         let gtnames =
                             result.Valid
-                            |> Seq.map (GenType.name)
+                            |> Seq.map (fst >> GenType.name)
                             |> List.ofSeq
                         Assert.equal gtnames ptnames
                         |> ignore

@@ -2,11 +2,11 @@
 
 open System.Collections.Immutable
 
-type GenPrimaryCtor<'Type> =
+type GenPrimaryCtor<'GenType> =
     { Body: ImmutableList<unit>
-      Parameters: GenParamTuple<'Type>
+      Parameters: GenParamTuple<'GenType>
        }
 
-type GenCtor<'Type> =
-    { Parameters: GenParamTuple<'Type>
+type GenCtor<'GenType> =
+    { Parameters: GenParamTuple<'GenType>
        }

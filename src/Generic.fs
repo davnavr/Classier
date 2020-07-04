@@ -20,7 +20,7 @@ and GenericVariance =
     | Contravariant
 and GenericParam =
     { Name: IdentifierStr
-      RequiredInterfaces: FullIdentifier<Generic> list
+      RequiredInterfaces: FullIdentifier<Generic> list // TODO: Make interfaces and superclass generic params?
       RequiredSuperClass: FullIdentifier<Generic> option
       Variance: GenericVariance }
 
