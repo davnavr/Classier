@@ -6,6 +6,6 @@ open Classier.NET.Compiler.Identifier
 
 type CompilationUnit =
     { Namespace: Namespace
-      Usings: FullIdentifier<Generic.Generic> list
+      Usings: FullIdentifier<TypeArgOrParam> list
       Source: string
       Types: (GlobalAccess * TypeDef) list }

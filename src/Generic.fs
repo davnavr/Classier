@@ -9,8 +9,8 @@ type GenericVariance =
 
 type GenericParam<'Interface, 'SuperClass> =
     { Name: IdentifierStr
-      RequiredInterfaces: FullIdentifier<'Interface> list
-      RequiredSuperClass: FullIdentifier<'SuperClass> option
+      RequiredInterfaces: 'Interface list
+      RequiredSuperClass: 'SuperClass option
       Variance: GenericVariance }
 
     override this.ToString() = string this.Name

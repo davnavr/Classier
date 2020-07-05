@@ -1,6 +1,5 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
-open Classier.NET.Compiler
 open Classier.NET.Compiler.Identifier
 
 type If<'Expr> =
@@ -37,10 +36,10 @@ type Expression =
            Target: Expression |}
     | PrefixOp of string * Expression
     | InfixOp of Expression * string * Expression
-    | IdentifierRef of Identifier<Generic.Generic>
+    | IdentifierRef of Identifier<TypeArgOrParam>
     | IfExpr of If<Expression>
     | MatchExpr of Match<Expression>
-    | MemberAccess of Expression * Identifier<Generic.Generic>
+    | MemberAccess of Expression * Identifier<TypeArgOrParam>
     | Nested of Expression
     | NullLit
     | NumLit of NumericLit

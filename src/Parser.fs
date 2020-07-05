@@ -255,7 +255,7 @@ let identifier =
     |>> fun (name, gparams) ->
         { Name = name
           Generics = List.map GenericArg gparams }
-let identifierFull =
+let identifierFull: Parser<FullIdentifier<TypeArgOrParam>, _> =
     sepBy1 identifier (separator period |> attempt)
     |>> FullIdentifier
     <?> "fully qualified name"
@@ -324,7 +324,7 @@ let tupleExpr =
 let parenExpr = tupleExpr |>> TupleLit
 
 do
-    let simpleType =
+    let simpleType: Parser<TypeName, _> =
         choice
             [
                 PrimitiveType.names
@@ -341,12 +341,16 @@ do
                 <?> "tuple"
                 |>> function
                 | [] -> Primitive PrimitiveType.Unit
-                | items -> Tuple items
+                | items ->
+                    items
+                    |> List.map (fun (TypeName tname) -> tname)
+                    |> Tuple
             ]
-    let modifiedType f p prev =
+        |>> TypeName
+    let modifiedType (f: TypeName -> _ -> _) p prev =
         prev
         .>>. opt p
-        |>> fun (btype: TypeName, mtype) ->
+        |>> fun (btype, mtype) ->
             match mtype with
             | Some modf -> f btype modf
             | None -> btype
@@ -360,8 +364,8 @@ do
         |> modifiedType
             (fun itype nest ->
                 Seq.fold
-                    (fun prev () ->
-                        ArrayType prev)
+                    (fun (TypeName prev) () ->
+                        ArrayType prev |> TypeName)
                     itype
                     nest)
     let functionType =
@@ -371,10 +375,11 @@ do
         >>. (typeName <?> "return type")
         |> attempt
         |> modifiedType
-            (fun ptype rettype ->
+            (fun (TypeName ptype) (TypeName rettype) ->
                 FuncType
                     {| ParamType = ptype
-                       ReturnType = rettype |})
+                       ReturnType = rettype |}
+                |> TypeName)
     typeNameRef :=
         simpleType
         |> arrayType
@@ -489,7 +494,7 @@ do
             ]
             "statement"
 
-let genericParams =
+let genericParams = // TODO: Rename this?
     let genericParam =
         choice
             [
@@ -516,6 +521,7 @@ let genericParams =
               RequiredInterfaces = iimpl
               RequiredSuperClass = super
               Variance = variance }
+            |> TypeParam
     ltsign
     |> attempt
     >>. sepBy1 genericParam (separator comma)
@@ -861,7 +867,8 @@ let classDef cdef modfs =
                                ]
                              ReturnType =
                                PrimitiveType.Boolean
-                               |> TypeName.Primitive
+                               |> Type.Primitive
+                               |> TypeName
                                |> Some }
                           MethodName = "equals" |> IdentifierStr |> Name.ofStr pos
                           Modifiers = MethodModifiers.Default
@@ -1387,7 +1394,7 @@ do
                 |>> (fun (ctype, args) ->
                     CtorCall
                         {| Arguments = args
-                           Type = Named ctype |})
+                           Type = Named ctype |> TypeName |})
 
                 [
                     pstring "true"
