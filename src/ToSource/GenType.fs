@@ -1,57 +1,67 @@
-﻿namespace Classier.NET.Compiler.ToSource
+﻿namespace rec Classier.NET.Compiler.ToSource
 
 open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Identifier
+open Classier.NET.Compiler.Generic
 
-type TypeOrMember<'Type, 'Member> = Grammar.TypeOrMember<'Type, 'Member>
+type GenName = Identifier<GenericParam<GenInterface, GenClass>>
 
-type GenInterfaceMember<'GenType> =
+type MemberSet<'Type, 'Member> =
+    ImmutableSortedSet<Access * Grammar.TypeOrMember<'Type, 'Member>>
+
+type GenInterfaceMember =
     | InterfaceMthd
     | InterfaceProp
-type GenInterface<'GenType> =
-    { InterfaceName: Identifier<unit> // TODO: Create a new type for generic parameters that are validated.
-      Members: InterfaceMembers<'GenType>
-      SuperInterfaces: InterfaceSet<'GenType>
-      Syntax: Grammar.Interface }
-and InterfaceInheritance<'GenType> =
-    | DefinedInterface of GenInterface<'GenType>
-    | ExternInterface of Extern.EInterface
-and InterfaceMembers<'GenType> =
-    ImmutableSortedSet<TypeOrMember<GenInterface<'GenType>, GenInterfaceMember<'GenType>>>
-and InterfaceSet<'GenType> = ImmutableSortedSet<InterfaceInheritance<'GenType>>
 
-type GenClassMember<'GenType> =
-    | ClassCtor of GenCtor<'GenType>
+type GenInterface =
+    { InterfaceName: GenName
+      Members: InterfaceMembers
+      SuperInterfaces: InterfaceSet
+      Syntax: Grammar.Interface }
+
+type InterfaceInheritance =
+    | DefinedInterface of GenInterface
+    | ExternInterface of Extern.EInterface
+
+type InterfaceMembers = MemberSet<GenInterface, GenInterfaceMember>
+
+type InterfaceSet = ImmutableSortedSet<InterfaceInheritance>
+
+type GenClassMember =
+    | ClassCtor of GenCtor<GenType>
     | ClassMthd
     | ClassProp
-type GenClass<'GenType> =
-    { ClassName: Identifier<unit>
-      Interfaces: InterfaceSet<'GenType>
-      Members: ClassMembers<'GenType>
-      SuperClass: ClassInheritance<'GenType> option
+
+type GenClass =
+    { ClassName: GenName
+      Interfaces: InterfaceSet
+      Members: ClassMembers
+      SuperClass: ClassInheritance option
       Syntax: Grammar.Class }
-and ClassMembers<'GenType> =
-    ImmutableSortedSet<Access * TypeOrMember<GenClass<'GenType>, GenClassMember<'GenType>>>
-and ClassInheritance<'GenType> =
-    | DefinedClass of GenClass<'GenType>
+
+type ClassMembers = MemberSet<GenClass, GenClassMember>
+
+type ClassInheritance =
+    | DefinedClass of GenClass
     | ExternClass of Extern.EClass
 
 type GenModuleMember =
     | ModuleFunc
     | ModuleOper
-type GenModule<'GenType> =
-    { Members: ModuleMembers<'GenType>
+
+type GenModule =
+    { Members: ModuleMembers
       ModuleName: IdentifierStr
       Syntax: Grammar.Module }
-and ModuleMembers<'GenType> =
-    ImmutableSortedSet<Access * TypeOrMember<'GenType, GenModuleMember>>
+
+type ModuleMembers = MemberSet<GenType, GenModuleMember>
 
 type GenType =
-    | GenClass of GenClass<GenType>
-    | GenInterface of GenInterface<GenType>
-    | GenModule of GenModule<GenType>
+    | GenClass of GenClass
+    | GenInterface of GenInterface
+    | GenModule of GenModule
 
 module GenType =
     let name gtype =

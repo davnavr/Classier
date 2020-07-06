@@ -2,7 +2,6 @@
 
 open System.Collections.Immutable
 open Classier.NET.Compiler
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.ToSource
 
 type GlobalsAnalysis<'Errors> =
@@ -23,20 +22,24 @@ module GlobalsAnalyzer =
                 let gtype =
                     match tdef with
                     | Grammar.Class clss ->
-                        { ClassName = clss.ClassName.Identifier
-                          Interfaces = ImmutableSortedSet.Empty
-                          Members = ImmutableSortedSet.Empty // TODO: Create empty variants for GenClass members set and the members set of other types.
+                        { ClassName =
+                            clss.ClassName.Identifier
+                            |> GenName.ofIdentifier
+                          Interfaces = ImmutableSortedSet.Empty // TODO: Create way to handle creation of interface sets.
+                          Members = MemberSet.classSet
                           SuperClass = None
                           Syntax = clss }
                         |> GenClass
                     | Grammar.Interface intf ->
-                        { InterfaceName = intf.InterfaceName.Identifier
-                          Members = ImmutableSortedSet.Empty
+                        { InterfaceName =
+                            intf.InterfaceName.Identifier
+                            |> GenName.ofIdentifier
+                          Members = MemberSet.interfaceSet
                           SuperInterfaces = ImmutableSortedSet.Empty
                           Syntax = intf }
                         |> GenInterface
                     | Grammar.Module modl ->
-                        { Members = ImmutableSortedSet.Empty
+                        { Members = MemberSet.moduleSet
                           ModuleName = modl.ModuleName.Identifier
                           Syntax = modl }
                         |> GenModule

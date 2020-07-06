@@ -23,11 +23,11 @@ type Class =
     { ClassName: GenericName
       Body: PStatement list
       Inheritance: ClassInheritance
-      Interfaces: FullIdentifier<TypeArgOrParam> list
+      Interfaces: FullIdentifier<TypeArg> list
       Members: ImmutableList<Access * ClassMember>
       PrimaryCtor: Access * InfParam list * Expression list
       SelfIdentifier: IdentifierStr option
-      SuperClass: FullIdentifier<TypeArgOrParam> option }
+      SuperClass: FullIdentifier<TypeArg> option }
 
     override this.ToString() =
         sprintf "%Oclass %O" this.Inheritance this.ClassName
@@ -36,7 +36,7 @@ and ClassMember = TypeOrMember<Class, InstanceMember>
 type Interface =
     { InterfaceName: GenericName
       Members: (Access * InterfaceMember) list
-      SuperInterfaces: FullIdentifier<TypeArgOrParam> list }
+      SuperInterfaces: FullIdentifier<TypeArg> list }
 and InterfaceMember = TypeOrMember<Interface, AbstractMember>
 
 type Module<'Type> =

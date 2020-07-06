@@ -36,10 +36,10 @@ type Expression =
            Target: Expression |}
     | PrefixOp of string * Expression
     | InfixOp of Expression * string * Expression
-    | IdentifierRef of Identifier<TypeArgOrParam>
+    | IdentifierRef of Identifier<TypeArg>
     | IfExpr of If<Expression>
     | MatchExpr of Match<Expression>
-    | MemberAccess of Expression * Identifier<TypeArgOrParam>
+    | MemberAccess of Expression * Identifier<TypeArg>
     | Nested of Expression
     | NullLit
     | NumLit of NumericLit

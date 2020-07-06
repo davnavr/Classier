@@ -1,15 +1,7 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
 open Classier.NET.Compiler
-open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Identifier
-open Classier.NET.Compiler.TypeSystem
-
-type TypeParam = // TODO: Come up with better name for these three types, and maybe move them to a separate file?
-    | TypeParam of GenericParam<FullIdentifier<TypeArgOrParam>, FullIdentifier<TypeArgOrParam>>
-and TypeArgOrParam = Generic<TypeName, FullIdentifier<TypeParam>, FullIdentifier<TypeParam>>
-and TypeName =
-    | TypeName of Type<FullIdentifier<TypeArgOrParam>>
 
 type Name<'Identifier> =
     { Identifier: 'Identifier

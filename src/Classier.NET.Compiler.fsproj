@@ -15,6 +15,7 @@
     <Compile Include="Namespace.fs" />
     <Compile Include="TypeSystem.fs" />
     <Compile Include="Generic.fs" />
+    <Compile Include="Grammar\TypeParam.fs" />
     <Compile Include="Grammar\Name.fs" />
     <Compile Include="Grammar\Numeric.fs" />
     <Compile Include="Grammar\Param.fs" />
@@ -32,6 +33,7 @@
     <Compile Include="ToSource\GenParam.fs" />
     <Compile Include="ToSource\GenMember.fs" />
     <Compile Include="ToSource\GenType.fs" />
+    <Compile Include="ToSource\GenName.fs" />
     <Compile Include="ToSource\MemberSet.fs" />
     <Compile Include="ToSource\Print.fs" />
     <Compile Include="ToSource\Output.fs" />

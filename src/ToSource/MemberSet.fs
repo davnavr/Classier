@@ -6,12 +6,15 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
 
 type MemberSet =
-    | ClassMembers of ClassMembers<GenType>
-    | InterfaceMembers of InterfaceMembers<GenType>
-    | ModuleMembers of ModuleMembers<GenType>
+    | ClassMembers of ClassMembers
+    | InterfaceMembers of InterfaceMembers
+    | ModuleMembers of ModuleMembers
 
 module MemberSet =
-    let private memberSet ctype cmember omember =
+    type private TypeOrMember<'Type, 'Member> =
+        Grammar.TypeOrMember<'Type, 'Member>
+
+    let private memberSet ctype cmember omember = // TODO: Simplify this function.
         { new IComparer<Access * _> with
               member _.Compare((_, m1), (_, m2)) =
                   let overload =
@@ -38,24 +41,37 @@ module MemberSet =
         | TypeOrMember.Type _ -> List.empty
         | TypeOrMember.Member mdef -> f mdef
 
+    let private tname name = Identifier.noGenerics name |> Some
+
     let classSet =
         paramOverload
             (fun mdef ->
                 match mdef with
+                | ClassCtor _
                 | _ -> List.empty)
         |> memberSet
-            (fun cdef -> Some cdef.ClassName)
+            (fun cdef -> tname cdef.ClassName)
             (function
             | _ -> None)
 
     let interfaceSet =
-        memberSet
-            (fun idef -> Some idef.InterfaceName)
+        paramOverload
+            (fun mdef ->
+                match mdef with
+                | InterfaceMthd _
+                | _ -> List.empty)
+        |> memberSet
+            (fun idef -> tname idef.InterfaceName)
             (function
             | _ -> None)
 
     let moduleSet =
-        memberSet
+        paramOverload
+            (fun mdef ->
+                match mdef with
+                | ModuleFunc _
+                | _ -> List.empty)
+        |> memberSet
             (fun mdle -> Some mdle.ModuleName)
             (function
             | _ -> None)

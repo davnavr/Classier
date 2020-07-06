@@ -58,3 +58,10 @@ let ofStrSeq strs =
             Seq.map ofStr strs
             |> Seq.toList
             |> FullIdentifier)
+
+let mapGenerics gmapper id =
+    { Name = id.Name
+      Generics =
+          List.map gmapper id.Generics }
+
+let noGenerics<'Generic> = mapGenerics (fun (_: 'Generic) -> ())

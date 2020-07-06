@@ -35,8 +35,12 @@ module GlobalsTable =
                       let (type1, type2) = (symbol1.Type, symbol2.Type)
                       let tname tdef =
                           match tdef with
-                          | DefinedGlobal (_, def) -> GenType.name def
-                          | ExternGlobal ext -> EType.name ext
+                          | DefinedGlobal (_, def) ->
+                              GenType.name def
+                              |> Identifier.noGenerics
+                          | ExternGlobal ext ->
+                              EType.name ext
+                              |> Identifier.noGenerics
                       let name =
                           compare
                               (tname type1)
