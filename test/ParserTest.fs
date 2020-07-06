@@ -242,7 +242,7 @@ let tests =
                         parse ename
                         |> ParserAssert.isSuccess
                         |> fst
-                        |> Assert.equal exp
+                        |> Assert.equal (TypeName exp)
                         |> ignore
                     }))
         |> testList "simple type name is valid"

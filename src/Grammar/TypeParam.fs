@@ -7,6 +7,10 @@ open Classier.NET.Compiler.TypeSystem
 type TypeParam =
     | TypeParam of GenericParam<FullIdentifier<TypeArg>, FullIdentifier<TypeArg>>
 
+    override this.ToString() =
+        let (TypeParam id) = this
+        id.ToString()
+
 type TypeArg = Generic<TypeName, FullIdentifier<TypeParam>, FullIdentifier<TypeParam>>
 
 type TypeName =

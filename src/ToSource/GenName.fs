@@ -1,4 +1,5 @@
-﻿module internal Classier.NET.Compiler.ToSource.GenName
+﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module internal Classier.NET.Compiler.ToSource.GenName
 
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Grammar

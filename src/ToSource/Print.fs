@@ -3,7 +3,7 @@
 open System
 open Classier.NET.Compiler
 
-let pclass (acc, gclass: GenClass<GenType>) prnt =
+let pclass (acc, gclass: GenClass) prnt =
     fun() ->
         seq {
             let minherit =
