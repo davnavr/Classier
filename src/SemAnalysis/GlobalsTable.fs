@@ -83,7 +83,7 @@ module GlobalsTable =
         | (true, symbols) -> symbols
         | (false, _) -> emptySymbols
 
-    let addType (tsymbol: GlobalTypeSymbol) globals =
+    let addSymbol (tsymbol: GlobalTypeSymbol) globals =
         let (GlobalsTable table) = globals
         globals
         |> getTypes tsymbol.Namespace
@@ -91,3 +91,5 @@ module GlobalsTable =
         |> Option.map
             (fun types ->
                 table.SetItem(tsymbol.Namespace, types) |> GlobalsTable)
+
+

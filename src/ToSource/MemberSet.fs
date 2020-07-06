@@ -79,3 +79,30 @@ module MemberSet =
                 match mdef with
                 | ModuleFunc _
                 | _ -> List.empty)
+
+    let fromSyntax tdef =
+        let rec classm (clss: GenClass) =
+            match clss.Syntax.Members with
+            | [] -> clss
+            | (acc, msyntax) :: mtail ->
+                let nmember =
+                    match msyntax with
+                    | TypeOrMember.Type nested ->
+                        nested
+                        |> GenType.gclass
+                            ImmutableSortedSet.Empty // TODO: Create way to handle creation of interface sets.
+                            classSet
+                        |> classm
+                        |> TypeOrMember.Type
+                    | TypeOrMember.Member mdef ->
+                        
+                        invalidOp "bad"
+                { clss with
+                    Members = clss.Members.Add(acc, nmember)
+                    Syntax = { clss.Syntax with Members = mtail } }
+
+        match tdef with
+        | GenClass clss ->
+            GenClass { clss with Members = clss.Members } // TODO: How will the primary constructor and class body be handled?
+        | GenInterface intf -> invalidOp "bad"
+        | GenModule mdle -> invalidOp "bad"

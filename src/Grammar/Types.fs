@@ -1,6 +1,5 @@
 ﻿namespace Classier.NET.Compiler.Grammar
 
-open System.Collections.Immutable
 open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Identifier
 
@@ -19,35 +18,34 @@ type TypeOrMember<'Type, 'Member> =
     | Type of 'Type
     | Member of 'Member
 
+type MemberList<'Type, 'Member> = (Access * TypeOrMember<'Type, 'Member>) list
+
 type Class =
     { ClassName: GenericName
       Body: PStatement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier<TypeArg> list
-      Members: ImmutableList<Access * ClassMember>
+      Members: MemberList<Class, InstanceMember>
       PrimaryCtor: Access * InfParam list * Expression list
       SelfIdentifier: IdentifierStr option
       SuperClass: FullIdentifier<TypeArg> option }
 
     override this.ToString() =
         sprintf "%Oclass %O" this.Inheritance this.ClassName
-and ClassMember = TypeOrMember<Class, InstanceMember>
 
 type Interface =
     { InterfaceName: GenericName
-      Members: (Access * InterfaceMember) list
+      Members: MemberList<Interface, AbstractMember>
       SuperInterfaces: FullIdentifier<TypeArg> list }
-and InterfaceMember = TypeOrMember<Interface, AbstractMember>
 
 type Module<'Type> =
     { ModuleName: SimpleName
-      Members: (Access * TypeOrMember<'Type, StaticMember>) list }
+      Members: MemberList<'Type, StaticMember> }
 
 type TypeDef =
     | Class of Class
     | Interface of Interface
-    | Module of Module
-and Module = Module<TypeDef>
+    | Module of Module<TypeDef>
 
 type EntryPoint =
     { Arguments: ExpParam list

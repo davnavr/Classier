@@ -5,7 +5,7 @@ open Classier.NET.Compiler.Identifier
 
 type GenParam<'GenType> =
     { Name: IdentifierStr option
-      Type: TypeRef<'GenType> }
+      Type: ResolvedType<'GenType> }
 
 type GenParamTuple<'GenType> =
     | GenParamTuple of ImmutableList<GenParam<'GenType>>

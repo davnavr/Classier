@@ -844,7 +844,7 @@ do
             members
             [ interfaceDef Type ]
 
-let private classBody, private classBodyRef = createParserForwardedToRef<_ * ImmutableList<_ * ClassMember>, _>()
+let private classBody, private classBodyRef = createParserForwardedToRef<_ * _, _>()
 let classDef cdef modfs =
     let dataMembers =
         keyword "data"
@@ -897,7 +897,7 @@ let classDef cdef modfs =
                                     |> Some)
                         |> Seq.choose id
                 }
-                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> ClassMember.Member)
+                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> Member)
         |> opt
     let classModf =
         validateModifiers
@@ -963,8 +963,10 @@ let classDef cdef modfs =
           Interfaces = ilist
           Members =
             match rmembers with
-            | Some toadd -> cmembers.InsertRange(0, toadd ctorparams)
+            | Some toadd ->
+                cmembers.InsertRange(0, toadd ctorparams)
             | None -> cmembers
+            |> List.ofSeq
           PrimaryCtor = (ctoracc, ctorparams, baseargs)
           SelfIdentifier = selfid
           SuperClass = basec }

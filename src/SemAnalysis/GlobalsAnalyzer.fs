@@ -10,25 +10,16 @@ type GlobalsAnalysis<'Errors> =
       Valid: ImmutableList<GenType * Grammar.CompilationUnit> }
 
 module GlobalsAnalyzer =
-    let analyze table (cunits: seq<Grammar.CompilationUnit>) = // TODO: Rename this function to something like "addGlobalTypesToTable".
-        cunits
-        |> Seq.collect
-            (fun cunit ->
-                Seq.map
-                    (fun tdef -> cunit, tdef)
-                    cunit.Types)
-        |> Seq.fold
-            (fun state (cunit, (acc, tdef)) ->
+    let init table =
+        Seq.fold
+            (fun state (cunit: Grammar.CompilationUnit, acc, tdef) ->
                 let gtype =
                     match tdef with
                     | Grammar.Class clss ->
-                        { ClassName =
-                            clss.ClassName.Identifier
-                            |> GenName.ofIdentifier
-                          Interfaces = ImmutableSortedSet.Empty // TODO: Create way to handle creation of interface sets.
-                          Members = MemberSet.classSet
-                          SuperClass = None
-                          Syntax = clss }
+                        GenType.gclass
+                            ImmutableSortedSet.Empty
+                            MemberSet.classSet
+                            clss
                         |> GenClass
                     | Grammar.Interface intf ->
                         { InterfaceName =
@@ -44,7 +35,7 @@ module GlobalsAnalyzer =
                           Syntax = modl }
                         |> GenModule
                 let add =
-                    GlobalsTable.addType
+                    GlobalsTable.addSymbol
                         { Namespace = cunit.Namespace
                           Type = DefinedGlobal (acc, gtype) }
                         state.Table
@@ -59,6 +50,19 @@ module GlobalsAnalyzer =
             { Errors = ImmutableList.Empty
               Table = table
               Valid = ImmutableList.Empty }
+
+    (*
+    Steps should be:
+    
+    1. Add all global types to symbol table
+    NOTE: There should be a function to replace a GenType in the GlobalsTable.
+    2. Temporarily process all members to allow resolution of nested types in the next 2 steps
+    3. Validate SuperClasses for all classes
+    4. Validate Interfaces for all classes and interfaces
+    5. Check generic parameters of all members and types to ensure no duplicates and validation of required interfaces or superclass
+    
+    After that, bodies of methods, constructors, etc. should be processed by another module or function, with the validated bodies of the member replacing the temporary version created in step 2
+    *)
 
     // NOTE: You can get a TypeDef from a GenType by using the Syntax property.
     let resolveSuperClass table gtypes =

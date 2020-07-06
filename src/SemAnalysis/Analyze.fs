@@ -8,8 +8,8 @@ type AnalyzerError =
     | DuplicateType
 
 module Analyze =
-    let output (cunits: seq<CompilationUnit>, epoint: EntryPoint) gtable = // TODO: Create separate record types and modules to handle analysis of different things.
-        let globals = GlobalsAnalyzer.analyze gtable cunits
+    let output (cunits: seq<CompilationUnit>, epoint: EntryPoint) gtable =
+        //let globals = GlobalsAnalyzer.analyze gtable cunits
         
 
 
