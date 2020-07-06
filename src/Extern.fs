@@ -1,4 +1,4 @@
-﻿namespace Classier.NET.Compiler.Extern
+﻿namespace rec Classier.NET.Compiler.Extern
 
 open System.Collections.Immutable
 open Classier.NET.Compiler.Generic
@@ -6,14 +6,14 @@ open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
 
-type EGenericName<'EInterface, 'EClass> = Identifier<GenericParam<'EInterface, 'EClass>>
+type EGenericName = Identifier<GenericParam<EInterface, EClass>>
 
 type EAccess =
     | EPublic
     | EProtected
 
-type EMethod<'Modifier, 'EInterface, 'EClass> =
-    { MethodName: EGenericName<'EInterface, 'EClass>
+type EMethod<'Modifier> =
+    { MethodName: EGenericName
       Modifiers: 'Modifier
       Parameters: ImmutableArray<ImmutableArray<ExpParam>>
       ReturnType: TypeName }
@@ -37,8 +37,8 @@ type EField =
       Readonly: FieldReadonly
       ValueType: TypeName }
 
-type EFunction<'EInterface, 'EClass> =
-    { FunctionName: EGenericName<'EInterface, 'EClass>
+type EFunction =
+    { FunctionName: EGenericName
       Parameters: ImmutableArray<ImmutableArray<ExpParam>>
       ReturnType: TypeName }
 
@@ -48,51 +48,50 @@ type EOperator =
       Symbol: OperatorStr
       ReturnType: TypeName }
 
-type EAbstractMember<'EInterface, 'EClass> =
-    | EAMethod of EMethod<unit, 'EInterface, 'EClass>
+type EAbstractMember =
+    | EAMethod of EMethod<unit>
     | EAProperty of EProperty
 
-type EConcreteMember<'EInterface, 'EClass> =
+type EConcreteMember =
     | EConstructor of ImmutableArray<ExpParam>
-    | EMethod of EMethod<MethodModifiers, 'EInterface, 'EClass>
+    | EMethod of EMethod<MethodModifiers>
     | EProperty of EProperty
     | EField of EField
 
-type EInstanceMember<'EInterface, 'EClass> =
-    | EAbstract of EAbstractMember<'EInterface, 'EClass>
-    | EConcrete of EConcreteMember<'EInterface, 'EClass>
+type EInstanceMember =
+    | EAbstract of EAbstractMember
+    | EConcrete of EConcreteMember
 
-type EStaticMember<'EInterface, 'EClass> =
+type EStaticMember =
     | EStaticField of EField
-    | EFunction of EFunction<'EInterface, 'EClass>
+    | EFunction of EFunction
     | EOperator of EOperator
 
-type EMember<'EInterface, 'EClass> =
-    | EInstanceMember of EInstanceMember<'EInterface, 'EClass>
-    | EStaticMember of EStaticMember<'EInterface, 'EClass>
+type EMember =
+    | EInstanceMember of EInstanceMember
+    | EStaticMember of EStaticMember
 
 type EMemberSet<'Type, 'Member> = ImmutableSortedSet<EAccess * TypeOrMember<'Type, 'Member>>
 
-type EInterface<'EType> =
-    { InterfaceName: EGenericName<EInterface<'EType>, EClass<'EType>>
-      Members: EMemberSet<'EType, EAbstractMember<EInterface<'EType>, EClass<'EType>>>
-      SuperInterfaces: ImmutableSortedSet<EInterface<'EType>> }
-and EClass<'EType> =
-    { ClassName: EGenericName<EInterface<'EType>, EClass<'EType>>
-      Interfaces: ImmutableSortedSet<EInterface<'EType>>
-      Members: EMemberSet<'EType, EMember<EInterface<'EType>, EClass<'EType>>>
-      SuperClass: EClass<'EType> option }
-and EModule<'EType> =
-    { ModuleName: EGenericName<EInterface<'EType>, EClass<'EType>>
-      Members: EMemberSet<'EType, EStaticMember<EInterface<'EType>, EClass<'EType>>> }
+type EInterface =
+    { InterfaceName: EGenericName
+      Members: EMemberSet<EType, EAbstractMember>
+      SuperInterfaces: ImmutableSortedSet<EInterface> }
+
+type EClass =
+    { ClassName: EGenericName
+      Interfaces: ImmutableSortedSet<EInterface>
+      Members: EMemberSet<EType, EMember>
+      SuperClass: EClass option }
+
+type EModule =
+    { ModuleName: EGenericName
+      Members: EMemberSet<EType, EStaticMember> }
 
 type EType =
     | EClass of EClass
     | EInterface of EInterface
     | EModule of EModule
-and EClass = EClass<EType>
-and EInterface = EInterface<EType>
-and EModule = EModule<EType>
 
 module EType =
     let name etype =

@@ -16,7 +16,6 @@ type GlobalTypeSymbol =
     { Namespace: Namespace
       Type: GlobalType<GenType> }
 
-// TODO: How will a name conflict between a type and namespace be treated?
 /// Stores the namespaces and types declared in compilation units.
 type GlobalsTable =
     private
