@@ -18,7 +18,7 @@ module GlobalsAnalyzer =
                     | Grammar.Class clss ->
                         GenType.gclass
                             ImmutableSortedSet.Empty
-                            MemberSet.classSet
+                            MemberSet.classSet // TODO: Add the member placeholders from MemberAnalyzer in this step.
                             clss
                         |> GenClass
                     | Grammar.Interface intf ->

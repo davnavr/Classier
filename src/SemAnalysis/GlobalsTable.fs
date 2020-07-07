@@ -78,7 +78,7 @@ module GlobalsTable =
 
     let getNamespaces (GlobalsTable table) = table.Keys
 
-    let getTypes ns (GlobalsTable table) =
+    let getSymbols ns (GlobalsTable table) =
         match table.TryGetValue ns with
         | (true, symbols) -> symbols
         | (false, _) -> emptySymbols
@@ -86,10 +86,23 @@ module GlobalsTable =
     let addSymbol (tsymbol: GlobalTypeSymbol) globals =
         let (GlobalsTable table) = globals
         globals
-        |> getTypes tsymbol.Namespace
+        |> getSymbols tsymbol.Namespace
         |> SortedSet.tryAdd tsymbol
         |> Option.map
             (fun types ->
                 table.SetItem(tsymbol.Namespace, types) |> GlobalsTable)
 
-
+    let replaceSymbol replacement globals =
+        let (GlobalsTable table) = globals
+        let types =
+            getSymbols replacement.Namespace globals
+        let added =
+            match types.TryGetValue replacement with
+            | (true, _) ->
+                types
+                |> SortedSet.remove replacement
+                |> SortedSet.add replacement
+            | _ ->
+                types.Add replacement
+        table.SetItem(replacement.Namespace, added)
+        |> GlobalsTable

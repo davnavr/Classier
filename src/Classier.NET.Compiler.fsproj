@@ -30,7 +30,7 @@
     <Compile Include="Extern.fs" />
     <Compile Include="ToSource\ResolvedType.fs" />
     <Compile Include="ToSource\GenParam.fs" />
-    <Compile Include="ToSource\Members.fs" />
+    <Compile Include="ToSource\GenMember.fs" />
     <Compile Include="ToSource\Types.fs" />
     <Compile Include="ToSource\GenName.fs" />
     <Compile Include="ToSource\GenType.fs" />
@@ -38,6 +38,7 @@
     <Compile Include="ToSource\Print.fs" />
     <Compile Include="ToSource\Output.fs" />
     <Compile Include="SemAnalysis\GlobalsTable.fs" />
+    <Compile Include="SemAnalysis\GenericAnalyzer.fs" />
     <Compile Include="SemAnalysis\MemberAnalyzer.fs" />
     <Compile Include="SemAnalysis\GlobalsAnalyzer.fs" />
     <Compile Include="SemAnalysis\LocalsTable.fs" />
