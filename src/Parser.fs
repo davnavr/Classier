@@ -1494,7 +1494,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
                         functionBody
                     >>= fun (pos, eargs, body) ->
                         let entrypoint =
-                            { Arguments = eargs
+                            { Parameters = eargs
                               Body = body
                               Origin = pos }
                             |> Some

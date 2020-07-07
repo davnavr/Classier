@@ -1,4 +1,4 @@
-﻿namespace rec Classier.NET.Compiler.ToSource
+﻿namespace rec Classier.NET.Compiler.ToSource // TODO: Merge files containing types into one single file?
 
 open System.Collections.Immutable
 open Classier.NET.Compiler
@@ -62,3 +62,13 @@ type GenType =
     | GenClass of GenClass
     | GenInterface of GenInterface
     | GenModule of GenModule
+
+type EntryPointReturn =
+    | ExitCode
+    | ImplicitZero
+
+type GenEntryPoint =
+    { Parameter: IdentifierStr option
+      Body: unit
+      Return: EntryPointReturn
+      Syntax: Grammar.EntryPoint }

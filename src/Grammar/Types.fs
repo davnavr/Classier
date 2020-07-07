@@ -48,6 +48,6 @@ type TypeDef =
     | Module of Module<TypeDef>
 
 type EntryPoint =
-    { Arguments: ExpParam list
+    { Parameters: ExpParam list
       Body: PStatement list
       Origin: FParsec.Position }

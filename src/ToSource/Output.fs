@@ -9,6 +9,7 @@ type Output =
 
 [<RequireQualifiedAccess>]
 module Output =
+    [<System.Obsolete>]
     let write output prnt = // TODO: prnt should instead be a function that doesn't print to a new line.
         let block lines =
             seq {
