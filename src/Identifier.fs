@@ -40,12 +40,12 @@ let private nameRegex = "^[A-Za-z][A-Za-z_0-9]*$" |> Regex
 let defaultSelfId = IdentifierStr "this"
 
 let create str =
-    if nameRegex.IsMatch str then
+    match str with
+    | Regex.Matches nameRegex ->
         str
         |> IdentifierStr
         |> Some
-    else
-        None
+    | _ -> None
 
 let ofStr str =
     { Name = str

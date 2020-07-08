@@ -1,6 +1,5 @@
 ﻿namespace Classier.NET.Compiler.SemAnalysis
 
-open System.Collections.Generic
 open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Extern
@@ -23,8 +22,7 @@ type GlobalsTable =
 
 module GlobalsTable =
     let private emptySymbols =
-        { new IComparer<GlobalTypeSymbol> with
-              member _.Compare(symbol1, symbol2) =
+        let compare symbol1 symbol2 =
                   let ns =
                       compare
                           symbol1.Namespace
@@ -71,8 +69,10 @@ module GlobalsTable =
                               | (EModule _, _) -> 1
                               | _ -> 0
                       | _ -> name
-                  | _ -> ns }
-        |> ImmutableSortedSet.Empty.WithComparer
+                  | _ -> ns
+        SortedSet.withComparison
+            compare
+            ImmutableSortedSet.Empty
 
     let empty = GlobalsTable ImmutableSortedDictionary.Empty
 

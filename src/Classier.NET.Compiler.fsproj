@@ -9,7 +9,7 @@
   
   <!-- Source files -->
   <ItemGroup>
-    <Compile Include="SortedSet.fs" />
+    <Compile Include="Utilities.fs" />
     <Compile Include="AccessControl.fs" />
     <Compile Include="Identifier.fs" />
     <Compile Include="Namespace.fs" />
