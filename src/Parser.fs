@@ -824,11 +824,11 @@ do
     let members =
         [
             methodDef
-                (AMethod >> Member)
+                (AMethod >> TypeOrMember.Member)
                 None
 
             propDef
-                (AProperty >> Member)
+                (AProperty >> TypeOrMember.Member)
                 None
         ]
         |> Seq.map
@@ -842,7 +842,7 @@ do
             "interface body"
             Access.Internal
             members
-            [ interfaceDef Type ]
+            [ interfaceDef TypeOrMember.Type ]
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_ * _, _>()
 let classDef cdef modfs =
@@ -897,7 +897,7 @@ let classDef cdef modfs =
                                     |> Some)
                         |> Seq.choose id
                 }
-                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> Member)
+                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> TypeOrMember.Member)
         |> opt
     let classModf =
         validateModifiers
@@ -994,7 +994,7 @@ do
               SelfIdentifier = selfid }
             |> Constructor
             |> Concrete
-            |> Member
+            |> TypeOrMember.Member
     classBodyRef :=
         memberBody
             "class body"
@@ -1002,14 +1002,14 @@ do
                 ctorDef
 
                 methodDef
-                    (AMethod >> Abstract >> Member)
-                    (Method >> Concrete >> Member |> Some)
+                    (AMethod >> Abstract >> TypeOrMember.Member)
+                    (Method >> Concrete >> TypeOrMember.Member |> Some)
 
                 propDef
-                    (AProperty >> Abstract >> Member)
-                    (Property >> Concrete >> Member |> Some)
+                    (AProperty >> Abstract >> TypeOrMember.Member)
+                    (Property >> Concrete >> TypeOrMember.Member |> Some)
             ]
-            [ classDef Type ]
+            [ classDef TypeOrMember.Type ]
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
 let moduleDef mdef modfs =
@@ -1040,7 +1040,7 @@ do
                   ReturnType = retType }
               FunctionName = name }
             |> Function
-            |> Member
+            |> TypeOrMember.Member
     let opName =
         Operator.operatorChars
         |> anyOf
@@ -1078,7 +1078,7 @@ do
                       ReturnType = retType
                       Symbol = name }
                     |> Operator
-                    |> Member
+                    |> TypeOrMember.Member
     moduleBodyRef :=
         memberBlock
             "module body"
@@ -1088,9 +1088,9 @@ do
                 operatorDef
             ]
             [
-                classDef (Class >> Type)
-                interfaceDef (Interface >> Type)
-                moduleDef (Module >> Type)
+                classDef (Class >> TypeOrMember.Type)
+                interfaceDef (Interface >> TypeOrMember.Type)
+                moduleDef (Module >> TypeOrMember.Type)
             ]
 
 let private optionalEnd =

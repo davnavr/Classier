@@ -2,6 +2,11 @@
 
 open System.Collections.Immutable
 
+[<RequireQualifiedAccess>]
+type TypeOrMember<'Type, 'Member> =
+    | Type of 'Type
+    | Member of 'Member
+
 module Bool =
     let toOpt b =
         if b

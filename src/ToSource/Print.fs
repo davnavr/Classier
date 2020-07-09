@@ -2,6 +2,9 @@
 
 open System
 open Classier.NET.Compiler
+open Classier.NET.Compiler.IR
+
+module Ast = Grammar.Ast
 
 type Print = Print of ((string -> unit) -> unit)
 
@@ -39,9 +42,9 @@ module Print =
             seq {
                 let minherit =
                     match gclass.Syntax.Inheritance with
-                    | Grammar.CanInherit -> String.Empty
-                    | Grammar.MustInherit -> "abstract "
-                    | Grammar.Sealed -> "sealed "
+                    | Ast.CanInherit -> String.Empty
+                    | Ast.MustInherit -> "abstract "
+                    | Ast.Sealed -> "sealed "
 
                 sprintf
                     "%O %sclass %O%O "

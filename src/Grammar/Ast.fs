@@ -225,10 +225,6 @@ type ClassInheritance =
         | CanInherit -> "inheritable "
         | _ -> ""
 
-type TypeOrMember<'Type, 'Member> =
-    | Type of 'Type
-    | Member of 'Member
-
 type MemberList<'Type, 'Member> = (Access * TypeOrMember<'Type, 'Member>) list
 
 type Class =

@@ -3,6 +3,7 @@
 open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Extern
+open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.ToSource
 
 // TODO: Make everything in this file part of the module?
@@ -37,7 +38,7 @@ module GlobalsTable =
                               GenType.name def
                               |> Identifier.noGenerics
                           | ExternGlobal ext ->
-                              EType.name ext
+                              Extern.typeName ext
                               |> Identifier.noGenerics
                       let name =
                           compare

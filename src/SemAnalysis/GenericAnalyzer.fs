@@ -4,15 +4,16 @@ open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Identifier
+open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.ToSource
 
-let validateName (name: Grammar.GenericName) =
+let validateName (name: Grammar.Ast.GenericName) =
     let gname = GenName.ofIdentifier name.Identifier
     match name.Identifier.Generics with
     | [] -> Result.Ok gname
     | generics ->
         Seq.fold
-            (fun (mem, res) (Grammar.TypeParam gparam) ->
+            (fun (mem, res) (Grammar.Ast.TypeParam gparam) ->
                 match res with
                 | Result.Ok (buildp: ImmutableList<_>) ->
                     match SortedSet.tryAdd gparam.Name mem with

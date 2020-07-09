@@ -3,6 +3,7 @@
 open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.ToSource
 
 type MemberAnalyzer<'Errors> =

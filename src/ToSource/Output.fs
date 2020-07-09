@@ -1,6 +1,7 @@
 ﻿namespace Classier.NET.Compiler.ToSource
 
 open System.Collections.Immutable
+open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.Grammar
 
 type Output =

@@ -1,4 +1,5 @@
-﻿namespace rec Classier.NET.Compiler.ToSource // TODO: Merge files containing types into one single file?
+﻿[<AutoOpen>]
+module rec Classier.NET.Compiler.IR.Types
 
 open System.Collections.Immutable
 open Classier.NET.Compiler
@@ -6,10 +7,33 @@ open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.Generic
 
+module Ast = Classier.NET.Compiler.Grammar.Ast
+
+type NamedType =
+    | DefinedType of AccessControl.Access * GenType
+    | ExternType of Extern.EType
+
+type ResolvedType = TypeSystem.Type<NamedType>
+
+type GenParam =
+    { Name: IdentifierStr option
+      Type: ResolvedType }
+type GenParamTuple = ImmutableList<GenParam>
+type GenParamList = ImmutableList<GenParamTuple>
+
 type GenName = Identifier<GenericParam<GenInterface, GenClass>> // TODO: Should also allow the use of EClass and EInterface here!
 
+type GenPrimaryCtor =
+    { Body: ImmutableList<unit>
+      Parameters: GenParamTuple
+       }
+
+type GenCtor<'GenType> =
+    { Parameters: GenParamTuple
+       }
+
 type MemberSet<'Type, 'Member> =
-    ImmutableSortedSet<Access * Grammar.TypeOrMember<'Type, 'Member>>
+    ImmutableSortedSet<Access * TypeOrMember<'Type, 'Member>>
 
 type GenInterfaceMember =
     | InterfaceMthd
@@ -19,7 +43,7 @@ type GenInterface =
     { InterfaceName: GenName
       Members: InterfaceMembers
       SuperInterfaces: InterfaceSet
-      Syntax: Grammar.Interface }
+      Syntax: Ast.Interface }
 
 type InterfaceInheritance =
     | DefinedInterface of GenInterface
@@ -39,7 +63,7 @@ type GenClass =
       Interfaces: InterfaceSet
       Members: ClassMembers
       SuperClass: ClassInheritance option
-      Syntax: Grammar.Class }
+      Syntax: Ast.Class }
 
 type ClassMembers = MemberSet<GenClass, GenClassMember>
 
@@ -54,9 +78,14 @@ type GenModuleMember =
 type GenModule =
     { Members: ModuleMembers
       ModuleName: IdentifierStr
-      Syntax: Grammar.Module<Grammar.TypeDef> }
+      Syntax: Ast.Module }
 
 type ModuleMembers = MemberSet<GenType, GenModuleMember>
+
+type MemberSet =
+    | ClassMembers of ClassMembers
+    | InterfaceMembers of InterfaceMembers
+    | ModuleMembers of ModuleMembers
 
 type GenType =
     | GenClass of GenClass
@@ -71,4 +100,4 @@ type GenEntryPoint =
     { Parameter: IdentifierStr option
       Body: unit
       Return: EntryPointReturn
-      Syntax: Grammar.EntryPoint }
+      Syntax: Ast.EntryPoint }

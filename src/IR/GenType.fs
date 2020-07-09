@@ -1,7 +1,8 @@
 ﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Classier.NET.Compiler.ToSource.GenType
+module Classier.NET.Compiler.IR.GenType
 
 open Classier.NET.Compiler
+open Classier.NET.Compiler.Grammar.Ast
 
 let name gtype =
     match gtype with
@@ -11,11 +12,11 @@ let name gtype =
 
 let syntax gtype =
     match gtype with
-    | GenClass gclass -> Grammar.Class gclass.Syntax
-    | GenInterface gintf -> Grammar.Interface gintf.Syntax
-    | GenModule gmodl -> Grammar.Module gmodl.Syntax
+    | GenClass gclass -> Class gclass.Syntax
+    | GenInterface gintf -> Interface gintf.Syntax
+    | GenModule gmodl -> Module gmodl.Syntax
 
-let gclass interfaces members (syntax: Grammar.Class) =
+let gclass interfaces members (syntax: Class) =
     { ClassName =
         syntax.ClassName.Identifier
         |> GenName.ofIdentifier

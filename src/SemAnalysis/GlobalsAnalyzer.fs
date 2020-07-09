@@ -2,26 +2,27 @@
 
 open System.Collections.Immutable
 open Classier.NET.Compiler
+open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.ToSource
 
 type GlobalsAnalysis<'Errors> =
     { Errors: 'Errors
       Table: GlobalsTable
-      Valid: ImmutableList<GenType * Grammar.CompilationUnit> }
+      Valid: ImmutableList<GenType * Grammar.Ast.CompilationUnit> } // TODO: If Grammar.Ast.* keeps needing to be referenced, maybe create further separation of types?
 
 module GlobalsAnalyzer =
     let init table =
         Seq.fold
-            (fun state (cunit: Grammar.CompilationUnit, acc, tdef) ->
+            (fun state (cunit: Grammar.Ast.CompilationUnit, acc, tdef) ->
                 let gtype =
                     match tdef with
-                    | Grammar.Class clss ->
+                    | Grammar.Ast.Class clss ->
                         GenType.gclass
                             ImmutableSortedSet.Empty
                             MemberSet.classSet // TODO: Add the member placeholders from MemberAnalyzer in this step.
                             clss
                         |> GenClass
-                    | Grammar.Interface intf ->
+                    | Grammar.Ast.Interface intf ->
                         { InterfaceName =
                             intf.InterfaceName.Identifier
                             |> GenName.ofIdentifier
@@ -29,7 +30,7 @@ module GlobalsAnalyzer =
                           SuperInterfaces = ImmutableSortedSet.Empty
                           Syntax = intf }
                         |> GenInterface
-                    | Grammar.Module modl ->
+                    | Grammar.Ast.Module modl ->
                         { Members = MemberSet.moduleSet
                           ModuleName = modl.ModuleName.Identifier
                           Syntax = modl }
@@ -45,7 +46,7 @@ module GlobalsAnalyzer =
                         Table = ntable
                         Valid = state.Valid.Add(gtype, cunit) }
                 | None ->
-                    let errors: ImmutableList<Grammar.TypeDef * Grammar.CompilationUnit> = state.Errors
+                    let errors: ImmutableList<Grammar.Ast.TypeDef * Grammar.Ast.CompilationUnit> = state.Errors
                     { state with Errors = errors.Add(tdef, cunit) })
             { Errors = ImmutableList.Empty
               Table = table

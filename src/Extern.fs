@@ -1,9 +1,8 @@
-﻿namespace rec Classier.NET.Compiler.Extern
+﻿module rec Classier.NET.Compiler.Extern
 
 open System.Collections.Immutable
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
 
 type EGenericName = Identifier<GenericParam<EInterface, EClass>>
@@ -93,9 +92,8 @@ type EType =
     | EInterface of EInterface
     | EModule of EModule
 
-module EType =
-    let name etype =
-        match etype with
-        | EClass c -> c.ClassName
-        | EInterface i -> i.InterfaceName
-        | EModule m -> m.ModuleName
+let typeName etype =
+    match etype with
+    | EClass c -> c.ClassName
+    | EInterface i -> i.InterfaceName
+    | EModule m -> m.ModuleName
