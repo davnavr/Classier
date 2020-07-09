@@ -17,7 +17,7 @@ type GenericParam<'Interface, 'SuperClass> =
 
 [<StructuralComparison>]
 [<StructuralEquality>]
-type Generic<'GenericArg, 'Interface, 'SuperClass> =
+type Generic<'GenericArg, 'Interface, 'SuperClass> = // TODO: Something being either a type param or type arg doesn't make sense, maybe remove this type?
     | GenericArg of 'GenericArg
     | GenericParam of GenericParam<'Interface, 'SuperClass>
 

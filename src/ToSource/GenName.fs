@@ -7,9 +7,8 @@ open Classier.NET.Compiler.Generic
 
 let ofIdentifier id: GenName =
     id
-    |> TypeParam.identifierMap
     |> Identifier.mapGenerics
-        (fun (gen: GenericParam<_, _>) ->
+        (fun (TypeParam gen) ->
             { Name = gen.Name
               RequiredInterfaces = List.empty
               RequiredSuperClass = None

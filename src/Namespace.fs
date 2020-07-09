@@ -2,7 +2,7 @@
 
 open Classier.NET.Compiler.Identifier
 
-type Namespace =
+type Namespace = // TODO: Move this type to GlobalsTable file?
     | Namespace of IdentifierStr list
 
     override this.ToString() =

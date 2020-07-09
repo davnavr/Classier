@@ -5,6 +5,7 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.ToSource
 
+// TODO: Make everything in this file part of the module?
 [<StructuralEquality>]
 [<NoComparison>]
 type GlobalType<'DType> =
