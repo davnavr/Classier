@@ -39,4 +39,4 @@ let isOk result =
     match result with
     | Result.Ok ok -> ok
     | Result.Error err ->
-        failf "The value was an error: %o" err
+        failf "The value was an error: %O" err

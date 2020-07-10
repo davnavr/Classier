@@ -78,7 +78,7 @@ module GlobalsTable =
         | (true, symbols) -> symbols
         | (false, _) -> emptySymbols
 
-    let addSymbol (tsymbol: GlobalTypeSymbol) globals =
+    let addSymbol (tsymbol: GlobalTypeSymbol) globals = // TODO: Maybe return Error containing already existing type instead of None
         let (GlobalsTable table) = globals
         globals
         |> getSymbols tsymbol.Namespace

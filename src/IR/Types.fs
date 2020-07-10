@@ -22,9 +22,9 @@ type GenParamTuple = ImmutableList<GenParam>
 type GenParamList = ImmutableList<GenParamTuple>
 
 type ResolvedInterface =
-    DefinedOrExtern<GenInterface, EInterface>
+    Namespace * DefinedOrExtern<GenInterface, EInterface>
 type ResolvedClass =
-    DefinedOrExtern<GenClass, EClass>
+    DefinedOrExtern<GenClass, EClass> // TODO: Add namespace for here too?
 
 type GenName = Identifier<GenericParam<ResolvedInterface, ResolvedClass>>
 
@@ -87,8 +87,7 @@ type GenInterface =
 
 type InterfaceMembers =
     MemberSet<GenInterface, GenInterfaceMember>
-type InterfaceSet =
-    ImmutableSortedSet<DefinedOrExtern<GenInterface, EInterface>>
+type InterfaceSet = ImmutableSortedSet<ResolvedInterface>
 
 type GenClassMember =
     | ClassCtor of GenCtor
@@ -132,7 +131,7 @@ type EntryPointReturn =
 
 type GenEntryPoint =
     { Parameter: IdentifierStr option
-      Body: unit
+      Body: GenBody
       Return: EntryPointReturn
       Syntax: Ast.EntryPoint }
 

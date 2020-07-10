@@ -56,6 +56,9 @@ module ImmList =
     let (|Contains|_|) item (list: ImmutableList<_>) =
         list.Contains item |> Bool.toOpt
 
+    let (|Empty|_|) (list: ImmutableList<_>) =
+        Bool.toOpt list.IsEmpty
+
     let map mapping (list: ImmutableList<_>) =
         new System.Func<_, _>(mapping) |> list.ConvertAll
 

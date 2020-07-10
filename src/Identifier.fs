@@ -3,8 +3,7 @@
 open System
 open System.Text.RegularExpressions
 
-[<StructuralComparison>]
-[<StructuralEquality>]
+[<StructuralComparison; StructuralEquality>]
 type IdentifierStr =
     | IdentifierStr of string
 
@@ -12,8 +11,7 @@ type IdentifierStr =
         let (IdentifierStr str) = this
         str
 
-[<StructuralComparison>]
-[<StructuralEquality>]
+[<StructuralComparison; StructuralEquality>]
 type Identifier<'Generic> =
     { Name: IdentifierStr
       Generics: 'Generic list }
@@ -26,8 +24,7 @@ type Identifier<'Generic> =
             String.Join(", ", this.Generics)
             |> sprintf "%s<%s>" name
 
-[<StructuralComparison>]
-[<StructuralEquality>]
+[<StructuralComparison; StructuralEquality>]
 type FullIdentifier<'Generic> =
     | FullIdentifier of Identifier<'Generic> list
 

@@ -2,7 +2,8 @@
 
 open Classier.NET.Compiler.Identifier
 
-type Namespace = // TODO: Move this type to GlobalsTable file?
+[<StructuralComparison; StructuralEquality>]
+type Namespace =
     | Namespace of IdentifierStr list
 
     override this.ToString() =
