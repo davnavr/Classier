@@ -2,17 +2,18 @@
 
 open System.Collections.Immutable
 open Classier.NET.Compiler
+open Classier.NET.Compiler.Grammar.Ast
 open Classier.NET.Compiler.IR
 
 type GlobalsAnalysis<'Errors> =
     { Errors: 'Errors
       Table: GlobalsTable
-      Valid: ImmutableList<GenType * Grammar.Ast.CompilationUnit> } // TODO: If Grammar.Ast.* keeps needing to be referenced, maybe create further separation of types?
+      Valid: ImmutableList<GenType * CompilationUnit> }
 
 module GlobalsAnalyzer =
     let init table =
         Seq.fold
-            (fun state (cunit: Grammar.Ast.CompilationUnit, acc, tdef) ->
+            (fun state (cunit: CompilationUnit, acc, tdef) ->
                 let gtype =
                     match tdef with
                     | Grammar.Ast.Class clss ->
@@ -45,7 +46,7 @@ module GlobalsAnalyzer =
                         Table = ntable
                         Valid = state.Valid.Add(gtype, cunit) }
                 | None ->
-                    let errors: ImmutableList<Grammar.Ast.TypeDef * Grammar.Ast.CompilationUnit> = state.Errors
+                    let errors: ImmutableList<TypeDef * CompilationUnit> = state.Errors
                     { state with Errors = errors.Add(tdef, cunit) })
             { Errors = ImmutableList.Empty
               Table = table

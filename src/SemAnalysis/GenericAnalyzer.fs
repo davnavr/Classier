@@ -34,4 +34,4 @@ let validateName (name: Grammar.Ast.GenericName) =
         |> Result.map
             (fun valid -> { gname with Generics = List.ofSeq valid })
 
-// TODO: Create function to resolve the RequiredInterfaces and RequiredSuperClass.
+// TODO: Create function to resolve the RequiredInterfaces and RequiredSuperClass of a generic parameter.

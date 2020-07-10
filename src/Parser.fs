@@ -325,6 +325,7 @@ let parenExpr =
     tupleExpr
     |>> function
     | [] -> UnitLit
+    | [ nested ] -> nested
     | head::tail -> TupleLit(head, tail)
 
 do
@@ -1349,13 +1350,7 @@ do
                       ReturnType = None }
                     |> AnonFunc
 
-                tupleExpr
-                <?> "tuple"
-                |>> (fun ex ->
-                    match ex with
-                    | [] -> UnitLit
-                    | [ nested ] -> nested
-                    | head::tail -> TupleLit(head, tail))
+                parenExpr <?> "tuple"
 
                 ifExpr
 

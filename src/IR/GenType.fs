@@ -1,6 +1,7 @@
 ﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Classier.NET.Compiler.IR.GenType
 
+open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Grammar.Ast
 
@@ -22,5 +23,9 @@ let gclass interfaces members (syntax: Class) =
         |> GenName.ofIdentifier
       Interfaces = interfaces
       Members = members
+      PrimaryCtor =
+        { Body = GenBody ImmutableList.Empty
+          Parameters = ImmutableList.Empty
+          Syntax = syntax.PrimaryCtor }
       SuperClass = None
       Syntax = syntax }

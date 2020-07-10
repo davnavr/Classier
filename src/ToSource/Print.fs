@@ -9,7 +9,7 @@ module Ast = Grammar.Ast
 
 type Print = Print of ((string -> unit) -> unit)
 
-let nothing = Print (fun _ -> ())
+let nothing = Print ignore
 
 let it out (Print p) = p out
 

@@ -125,10 +125,7 @@ let tests =
 
                         { Choice1 = List.empty
                           Choice2 = List.empty
-                          Condition =
-                            BoolLit true
-                            |> List.singleton
-                            |> TupleLit }
+                          Condition = BoolLit true }
                         |> IfExpr
                         |> IgnoredExpr
 
@@ -145,8 +142,6 @@ let tests =
                             |> Option.get
                             |> Identifier.ofStr
                             |> IdentifierRef
-                            |> List.singleton
-                            |> TupleLit
                           Cases = [ Expression.emptyCase ] }
                         |> MatchExpr
                         |> IgnoredExpr
