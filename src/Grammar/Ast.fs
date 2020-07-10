@@ -104,7 +104,7 @@ type Expression =
     | StrLit of string
     | ThrowExpr of Expression option
     | TryExpr of Try
-    | TupleLit of Expression list
+    | TupleLit of Expression * Expression list
     | UnitLit
     | VarAssignment of
         {| Target: Expression
@@ -136,6 +136,8 @@ type Ctor =
     { Call: Expression
       Parameters: InfParam list
       SelfIdentifier: IdentifierStr option }
+
+type PrimaryCtor = Access * InfParam list * Expression list
 
 [<RequireQualifiedAccess>]
 type MethodImpl =
@@ -233,7 +235,7 @@ type Class =
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier<TypeArg> list
       Members: MemberList<Class, InstanceMember>
-      PrimaryCtor: Access * InfParam list * Expression list
+      PrimaryCtor: PrimaryCtor
       SelfIdentifier: IdentifierStr option
       SuperClass: FullIdentifier<TypeArg> option }
 

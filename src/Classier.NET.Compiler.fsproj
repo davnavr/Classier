@@ -27,17 +27,18 @@
     <Compile Include="Extern.fs" />
     <Compile Include="IR\Types.fs" />
     <Compile Include="IR\GenParam.fs" />
+    <Compile Include="IR\GenExpression.fs" />
     <Compile Include="IR\GenName.fs" />
     <Compile Include="IR\GenType.fs" />
     <Compile Include="IR\MemberSet.fs" />
-    <Compile Include="ToSource\Print.fs" />
-    <Compile Include="ToSource\Output.fs" />
     <Compile Include="SemAnalysis\GlobalsTable.fs" />
     <Compile Include="SemAnalysis\GenericAnalyzer.fs" />
     <Compile Include="SemAnalysis\MemberAnalyzer.fs" />
     <Compile Include="SemAnalysis\GlobalsAnalyzer.fs" />
     <Compile Include="SemAnalysis\LocalsTable.fs" />
     <Compile Include="SemAnalysis\Analyze.fs" />
+    <Compile Include="ToSource\Print.fs" />
+    <Compile Include="ToSource\Output.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

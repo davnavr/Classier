@@ -5,7 +5,6 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.IR
-open Classier.NET.Compiler.ToSource
 
 let validateName (name: Grammar.Ast.GenericName) =
     let gname = GenName.ofIdentifier name.Identifier

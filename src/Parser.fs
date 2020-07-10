@@ -321,7 +321,11 @@ let tupleExpr =
     >>. sepBy expression (separator comma)
     .>> rparen
     <?> "tuple"
-let parenExpr = tupleExpr |>> TupleLit
+let parenExpr =
+    tupleExpr
+    |>> function
+    | [] -> UnitLit
+    | head::tail -> TupleLit(head, tail)
 
 do
     let simpleType: Parser<TypeName, _> =
@@ -1351,7 +1355,7 @@ do
                     match ex with
                     | [] -> UnitLit
                     | [ nested ] -> nested
-                    | _ -> TupleLit ex)
+                    | head::tail -> TupleLit(head, tail))
 
                 ifExpr
 

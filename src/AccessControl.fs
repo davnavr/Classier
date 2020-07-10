@@ -1,13 +1,11 @@
 ﻿module Classier.NET.Compiler.AccessControl
 
-[<StructuralEquality>]
-[<StructuralComparison>]
+[<StructuralComparison; StructuralEquality>]
 type GlobalAccess =
     | GlobalPublic
     | GlobalInternal
 
-[<StructuralEquality>]
-[<StructuralComparison>]
+[<StructuralComparison; StructuralEquality>]
 type Access =
     | Public
     | Internal

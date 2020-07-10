@@ -4,18 +4,11 @@ open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.IR
-open Classier.NET.Compiler.ToSource
 
 // TODO: Make everything in this file part of the module?
-[<StructuralEquality>]
-[<NoComparison>]
-type GlobalType<'DType> =
-    | DefinedGlobal of AccessControl.GlobalAccess * 'DType
-    | ExternGlobal of EType
-
 type GlobalTypeSymbol =
     { Namespace: Namespace
-      Type: GlobalType<GenType> }
+      Type: DefinedOrExtern<AccessControl.GlobalAccess * GenType, EType> }
 
 /// Stores the namespaces and types declared in compilation units.
 type GlobalsTable =
@@ -34,10 +27,10 @@ module GlobalsTable =
                       let (type1, type2) = (symbol1.Type, symbol2.Type)
                       let tname tdef =
                           match tdef with
-                          | DefinedGlobal (_, def) ->
+                          | Defined (_, def) ->
                               GenType.name def
                               |> Identifier.noGenerics
-                          | ExternGlobal ext ->
+                          | Extern ext ->
                               Extern.typeName ext
                               |> Identifier.noGenerics
                       let name =
@@ -47,24 +40,24 @@ module GlobalsTable =
                       match name with
                       | 0 ->
                           match (type1, type2) with
-                          | (DefinedGlobal (_, def), ExternGlobal ext)
-                          | (ExternGlobal ext, DefinedGlobal (_, def)) ->
+                          | (Defined (_, def), Extern ext)
+                          | (Extern ext, Defined (_, def)) ->
                               let value =
                                   match type1 with
-                                  | DefinedGlobal _ -> 1
+                                  | Defined _ -> 1
                                   | _ -> -1
                               match (def, ext) with
                               | (GenModule _, EModule _) -> 0
                               | (GenModule _, _) -> value
                               | (_, EModule _) -> value * -1
                               | _ -> 0
-                          | (DefinedGlobal (_, def1), DefinedGlobal (_, def2)) ->
+                          | (Defined (_, def1), Defined (_, def2)) ->
                               match (def1, def2) with
                               | (GenModule _, GenModule _) -> 0
                               | (_, GenModule _) -> -1
                               | (GenModule _, _) -> 1
                               | _ -> 0
-                          | (ExternGlobal ext1, ExternGlobal ext2) ->
+                          | (Extern ext1, Extern ext2) ->
                               match (ext1, ext2) with
                               | (EModule _, EModule _) -> 0
                               | (_, EModule _) -> -1

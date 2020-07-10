@@ -22,7 +22,9 @@ type Variable =
 type Local =
     | Local of Variable
 
-type LocalsTable = LocalsTable of ImmutableSortedSet<Local> list
+type LocalsTable =
+    private
+    | LocalsTable of ImmutableSortedSet<Local> list
 
 let private emptyScope =
     { new IComparer<Local> with

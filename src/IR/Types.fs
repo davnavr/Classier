@@ -4,33 +4,73 @@ module rec Classier.NET.Compiler.IR.Types
 open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
+open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.Generic
 
 module Ast = Classier.NET.Compiler.Grammar.Ast
 
-type NamedType =
-    | DefinedType of AccessControl.Access * GenType
-    | ExternType of Extern.EType
-
-type ResolvedType = TypeSystem.Type<NamedType>
+type ResolvedType =
+    TypeSystem.Type<DefinedOrExtern<GenType, EType>>
 
 type GenParam =
     { Name: IdentifierStr option
       Type: ResolvedType }
+
 type GenParamTuple = ImmutableList<GenParam>
 type GenParamList = ImmutableList<GenParamTuple>
 
-type GenName = Identifier<GenericParam<GenInterface, GenClass>> // TODO: Should also allow the use of EClass and EInterface here!
+type ResolvedInterface =
+    DefinedOrExtern<GenInterface, EInterface>
+type ResolvedClass =
+    DefinedOrExtern<GenClass, EClass>
+
+type GenName = Identifier<GenericParam<ResolvedInterface, ResolvedClass>>
+
+type GenSignature =
+    { Body: GenBody
+      Parameters: GenParamList
+      ReturnType: ResolvedType }
+
+type CallExpression<'Target> =
+    { Arguments: ImmutableList<GenExpression>
+      Target: 'Target }
+
+type ComplexExpression =
+    | CtorCall of CallExpression<ResolvedClass>
+
+type GenExpression =
+    | BoolLit of bool
+    | ComplexExpr of ComplexExpression
+
+type GenStatement =
+    | Empty
+    | IgnoredExpr of GenExpression
+
+type GenBody =
+    | GenBody of ImmutableList<GenStatement * Ast.Statement>
 
 type GenPrimaryCtor =
-    { Body: ImmutableList<unit>
+    { Body: GenBody
       Parameters: GenParamTuple
-       }
+      Syntax: Ast.PrimaryCtor }
 
-type GenCtor<'GenType> =
+type PrimaryCtorCall =
+    | PrimaryCtorCall of ImmutableList<GenExpression>
+
+type GenCtor =
     { Parameters: GenParamTuple
-       }
+      SelfCall: PrimaryCtorCall
+      Syntax: Ast.Ctor }
+
+type GenMethod =
+    | AbstractMthd
+    | ConcreteMthd
+
+type GenFunction =
+    { FunctionName: GenName
+      Signature: GenSignature
+      Syntax: Ast.StaticFunction }
 
 type MemberSet<'Type, 'Member> =
     ImmutableSortedSet<Access * TypeOrMember<'Type, 'Member>>
@@ -45,34 +85,28 @@ type GenInterface =
       SuperInterfaces: InterfaceSet
       Syntax: Ast.Interface }
 
-type InterfaceInheritance =
-    | DefinedInterface of GenInterface
-    | ExternInterface of Extern.EInterface
-
-type InterfaceMembers = MemberSet<GenInterface, GenInterfaceMember>
-
-type InterfaceSet = ImmutableSortedSet<InterfaceInheritance>
+type InterfaceMembers =
+    MemberSet<GenInterface, GenInterfaceMember>
+type InterfaceSet =
+    ImmutableSortedSet<DefinedOrExtern<GenInterface, EInterface>>
 
 type GenClassMember =
-    | ClassCtor of GenCtor<GenType>
-    | ClassMthd
+    | ClassCtor of GenCtor
+    | ClassMthd of GenMethod
     | ClassProp
 
 type GenClass =
     { ClassName: GenName
       Interfaces: InterfaceSet
       Members: ClassMembers
-      SuperClass: ClassInheritance option
+      PrimaryCtor: GenPrimaryCtor
+      SuperClass: DefinedOrExtern<GenClass, EClass> option
       Syntax: Ast.Class }
 
 type ClassMembers = MemberSet<GenClass, GenClassMember>
 
-type ClassInheritance =
-    | DefinedClass of GenClass
-    | ExternClass of Extern.EClass
-
 type GenModuleMember =
-    | ModuleFunc
+    | ModuleFunc of GenFunction
     | ModuleOper
 
 type GenModule =

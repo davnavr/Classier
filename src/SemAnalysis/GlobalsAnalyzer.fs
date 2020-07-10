@@ -3,7 +3,6 @@
 open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.IR
-open Classier.NET.Compiler.ToSource
 
 type GlobalsAnalysis<'Errors> =
     { Errors: 'Errors
@@ -38,7 +37,7 @@ module GlobalsAnalyzer =
                 let add =
                     GlobalsTable.addSymbol
                         { Namespace = cunit.Namespace
-                          Type = DefinedGlobal (acc, gtype) }
+                          Type = Defined (acc, gtype) }
                         state.Table
                 match add with
                 | Some ntable ->
