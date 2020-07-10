@@ -15,6 +15,7 @@ type ResolvedType =
 
 type GenParam =
     { Name: IdentifierStr option
+      Syntax: Ast.InfParam
       Type: ResolvedType }
 
 type GenParamTuple = ImmutableList<GenParam>
@@ -38,7 +39,6 @@ type CallExpression<'Target> =
 
 type ComplexExpression =
     | CtorCall of CallExpression<ResolvedClass>
-
 type GenExpression =
     | BoolLit of bool
     | ComplexExpr of ComplexExpression
@@ -116,7 +116,7 @@ type GenModule =
 
 type ModuleMembers = MemberSet<GenType, GenModuleMember>
 
-type MemberSet =
+type MemberSet = // TODO: Is this type necessary?
     | ClassMembers of ClassMembers
     | InterfaceMembers of InterfaceMembers
     | ModuleMembers of ModuleMembers
@@ -135,3 +135,7 @@ type GenEntryPoint =
       Body: unit
       Return: EntryPointReturn
       Syntax: Ast.EntryPoint }
+
+type GenOutput =
+    { GlobalTypes: seq<GenType>
+      EntryPoint: GenEntryPoint option }

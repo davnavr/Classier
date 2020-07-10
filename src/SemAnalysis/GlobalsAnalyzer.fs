@@ -19,19 +19,19 @@ module GlobalsAnalyzer =
                     | Grammar.Ast.Class clss ->
                         GenType.gclass
                             ImmutableSortedSet.Empty
-                            MemberSet.classSet // TODO: Add the member placeholders from MemberAnalyzer in this step.
+                            MemberSet.emptyClass // TODO: Add the member placeholders from MemberAnalyzer in this step.
                             clss
                         |> GenClass
                     | Grammar.Ast.Interface intf ->
                         { InterfaceName =
                             intf.InterfaceName.Identifier
                             |> GenName.ofIdentifier
-                          Members = MemberSet.interfaceSet
+                          Members = MemberSet.emptyInterface
                           SuperInterfaces = ImmutableSortedSet.Empty
                           Syntax = intf }
                         |> GenInterface
                     | Grammar.Ast.Module modl ->
-                        { Members = MemberSet.moduleSet
+                        { Members = MemberSet.emptyModule
                           ModuleName = modl.ModuleName.Identifier
                           Syntax = modl }
                         |> GenModule

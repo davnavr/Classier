@@ -21,7 +21,7 @@ module MemberAnalyzer =
                         nested
                         |> GenType.gclass
                             ImmutableSortedSet.Empty // TODO: Create way to handle creation of interface sets.
-                            MemberSet.classSet
+                            MemberSet.emptyClass
                         |> classm
                         |> TypeOrMember.Type
                     | TypeOrMember.Member mdef ->

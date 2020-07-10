@@ -65,3 +65,13 @@ module Regex =
 
     let (|Matches|_|) (reg: Regex) str =
         reg.IsMatch str |> Bool.toOpt
+
+[<AutoOpen>]
+module ResultBuilder =
+    type ResultBuilder() =
+        member _.Bind(r, binder) =
+            Result.bind binder r
+        member _.Return(r) = Result.Ok r
+        member _.ReturnFrom(r: Result<_, _>) = r
+
+    let result = ResultBuilder()

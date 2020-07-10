@@ -1,17 +1,16 @@
-﻿namespace Classier.NET.Compiler.SemAnalysis
+﻿module Classier.NET.Compiler.SemAnalysis.Analyze
 
+open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.IR
 
-type AnalyzerError =
-    | BadExpParam of ExpParam * string
-    | DuplicateType
+type private Analysis<'Result, 'Error> = 'Result * 'Error
 
-module Analyze =
-    let globals =
-        ()
+let private globals gtable =
+    Seq.fold
+        (fun (valid, err, table) (acc, tdef) ->
+            invalidOp "bad")
+        (ImmutableList.Empty, ImmutableList.Empty, gtable)
 
-    let output (cunits: seq<CompilationUnit>, epoint: EntryPoint option) gtable =
-        //let globals = GlobalsAnalyzer.analyze gtable cunits
-        
-
-        invalidOp "no"
+let output (cunits: seq<CompilationUnit>, epoint: EntryPoint option) gtable: Result<GenOutput, _> =
+    invalidOp "no"

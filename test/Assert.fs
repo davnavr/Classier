@@ -34,3 +34,9 @@ let equal (exp: 'T when 'T: equality) act =
             "Expected:\n%s\nActual:\n%s"
             (format exp)
             (format act)
+
+let isOk result =
+    match result with
+    | Result.Ok ok -> ok
+    | Result.Error err ->
+        failf "The value was an error: %o" err

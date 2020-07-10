@@ -29,8 +29,10 @@
     <Compile Include="IR\GenParam.fs" />
     <Compile Include="IR\GenExpression.fs" />
     <Compile Include="IR\GenName.fs" />
+    <Compile Include="IR\GenMember.fs" />
     <Compile Include="IR\GenType.fs" />
     <Compile Include="IR\MemberSet.fs" />
+    <Compile Include="SemAnalysis\AnalyzerError.fs" />
     <Compile Include="SemAnalysis\GlobalsTable.fs" />
     <Compile Include="SemAnalysis\GenericAnalyzer.fs" />
     <Compile Include="SemAnalysis\MemberAnalyzer.fs" />

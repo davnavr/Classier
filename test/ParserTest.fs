@@ -1,4 +1,5 @@
-﻿module Classier.NET.Compiler.ParserTest
+﻿[<RequireQualifiedAccess>]
+module Classier.NET.Compiler.ParserTest
 
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.TypeSystem

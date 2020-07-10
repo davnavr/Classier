@@ -37,7 +37,7 @@ let private memberSet tname mname mparams =
             | _ -> overload }
     |> ImmutableSortedSet.Empty.WithComparer
 
-let classSet =
+let emptyClass =
     memberSet
         (fun cdef -> cdef.ClassName)
         (function
@@ -47,7 +47,7 @@ let classSet =
             | ClassCtor _
             | _ -> List.empty)
 
-let interfaceSet =
+let emptyInterface =
     memberSet
         (fun idef -> idef.InterfaceName)
         (function
@@ -57,16 +57,44 @@ let interfaceSet =
             | InterfaceMthd _
             | _ -> List.empty)
 
-let moduleSet =
+let emptyModule =
     memberSet
-        (function
-        | GenClass clss -> clss.ClassName
-        | GenInterface intf -> intf.InterfaceName
-        | GenModule mdle ->
-            Identifier.ofStr mdle.ModuleName)
+        GenType.name
         (function
         | _ -> None)
         (fun mdef ->
             match mdef with
             | ModuleFunc _
             | _ -> List.empty)
+
+let rec ofClass (gclass: GenClass) = // TODO: Should this take a GenClass or a Grammar.Ast.Class?
+    let nextmem acc (macc, mdef) =
+        let gmember = // TODO: Maybe have functions elsewhere that handle creation of placeholder members?
+            match mdef with
+            | TypeOrMember.Type nested ->
+                nested
+                |> GenType.gclass
+                    ImmutableSortedSet.Empty // TODO: Create way to handle creation of interface sets.
+                    emptyClass
+                |> ofClass
+                |> ignore
+                //|> TypeOrMember.Type
+                invalidOp "bad"
+            | TypeOrMember.Member mdef ->
+                invalidOp "bad"
+        Result.bind
+            (fun (set: ImmutableSortedSet<_>) -> // TODO: Error can also occur if mdef is a nested class with invalid members, since ofClass needs to be called recursively.
+                let add =
+                    SortedSet.tryAdd (macc, gmember) set
+                match add with
+                | Some nset -> Result.Ok nset
+                | None -> Result.Error gmember)
+            acc
+    Seq.fold
+        (fun acc (macc, mdef) ->
+            result {
+                let! set = acc
+                return set
+            })
+        (Result.Ok emptyClass)
+        gclass.Syntax.Members
