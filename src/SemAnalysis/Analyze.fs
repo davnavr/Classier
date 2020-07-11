@@ -6,16 +6,30 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 
-type private Analysis<'Result, 'Error> =
-    | Success of 'Result
-    | WithError of 'Result * 'Error
+type private Analysis<'Result> =
+    { Result: 'Result
+      Errors: ImmutableList<AnalyzerError> }
 
 [<RequireQualifiedAccess>]
 module private Analysis =
-    let toResult =
-        function
-        | Success success -> Result.Ok success
-        | WithError(_, err) -> Result.Error err
+    let toResult a =
+        match a.Errors with
+        | ImmList.Empty -> Result.Ok a.Result
+        | err -> Result.Error err
+
+    let bind binder a =
+        let part = binder a.Result
+        { part with Errors = part.Errors.AddRange a.Errors }
+
+    let retn r =
+        { Result = r
+          Errors = ImmutableList.Empty }
+
+type private AnalysisBuilder() =
+    member _.Bind(a, binder) = Analysis.bind binder a
+    member _.Return r = Analysis.retn r
+
+let private analysis = AnalysisBuilder()
 
 let private globals gtable cunits =
     let ctypes cunit =
@@ -27,7 +41,7 @@ let private globals gtable cunits =
         cunits
         |> Seq.collect ctypes
         |> Seq.fold
-            (fun (tlist, err, table) (cunit, acc, tdef) ->
+            (fun (tlist, elist, table) (cunit, acc, tdef) ->
                 let gtype =
                     match tdef with
                     | Class cdef ->
@@ -49,18 +63,25 @@ let private globals gtable cunits =
                         table
                 match result with
                 | Result.Ok ntable ->
-                    (ImmList.add (gtype, cunit) tlist, err, ntable)
+                    (ImmList.add (gtype, cunit) tlist, elist, ntable)
                 | Result.Error dup ->
-                    (tlist, ImmList.add dup err, table))
+                    let err = DuplicateGlobalType (tdef, dup)
+                    (tlist, ImmList.add err elist, table))
             (ImmutableList.Empty, ImmutableList.Empty, gtable)
-    let result = valid, ntable
-    match dups with
-    | ImmList.Empty -> Success result
-    | _ ->
-        WithError(result, dups)
+    { Result = valid, ntable
+      Errors = dups }
 
-let output (cunits: seq<CompilationUnit>, epoint: EntryPoint option) gtable: Result<GenOutput, _> =
-    let gtypes = globals gtable cunits
+let private ntypes gtypes =
+    
+    invalidOp "bad"
+
+let output (cunits: seq<CompilationUnit>, epoint: EntryPoint option) table: Result<GenOutput, _> =
+    analysis {
+        let! (gtypes, gtable) = globals table cunits
+        return 0
+    }
+
+    let gtypes = globals table cunits
     gtypes
     |> Analysis.toResult
     |> Result.map
