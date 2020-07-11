@@ -62,6 +62,13 @@ module ImmList =
     let map mapping (list: ImmutableList<_>) =
         new System.Func<_, _>(mapping) |> list.ConvertAll
 
+    let add item (list: ImmutableList<_>) = list.Add item
+
+[<RequireQualifiedAccess>]
+module ImmSortedDict =
+    let setItem key value (dict: ImmutableSortedDictionary<_, _>) =
+        dict.SetItem(key, value)
+
 [<RequireQualifiedAccess>]
 module Regex =
     open System.Text.RegularExpressions

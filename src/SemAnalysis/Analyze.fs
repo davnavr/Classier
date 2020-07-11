@@ -28,8 +28,31 @@ let private globals gtable cunits =
         |> Seq.collect ctypes
         |> Seq.fold
             (fun (tlist, err, table) (cunit, acc, tdef) ->
-                invalidOp "g analysis no impl")
-            (ImmutableList<GenType * CompilationUnit>.Empty, ImmutableList.Empty, gtable)
+                let gtype =
+                    match tdef with
+                    | Class cdef ->
+                        cdef
+                        |> GenType.gclass MemberSet.emptyClass
+                        |> GenClass
+                    | Interface intf ->
+                        intf
+                        |> GenType.ginterface MemberSet.emptyInterface
+                        |> GenInterface
+                    | Module mdle ->
+                        mdle
+                        |> GenType.gmodule MemberSet.emptyModule
+                        |> GenModule
+                let result =
+                    GlobalsTable.addSymbol
+                        { Namespace = cunit.Namespace
+                          Type = Defined (acc, gtype) }
+                        table
+                match result with
+                | Result.Ok ntable ->
+                    (ImmList.add (gtype, cunit) tlist, err, ntable)
+                | Result.Error dup ->
+                    (tlist, ImmList.add dup err, table))
+            (ImmutableList.Empty, ImmutableList.Empty, gtable)
     let result = valid, ntable
     match dups with
     | ImmList.Empty -> Success result

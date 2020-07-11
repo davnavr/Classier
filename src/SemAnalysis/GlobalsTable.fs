@@ -78,14 +78,22 @@ module GlobalsTable =
         | (true, symbols) -> symbols
         | (false, _) -> emptySymbols
 
-    let addSymbol (tsymbol: GlobalTypeSymbol) globals = // TODO: Maybe return Error containing already existing type instead of None
+    let addSymbol tsymbol globals =
         let (GlobalsTable table) = globals
-        globals
-        |> getSymbols tsymbol.Namespace
-        |> SortedSet.tryAdd tsymbol
-        |> Option.map
-            (fun types ->
-                table.SetItem(tsymbol.Namespace, types) |> GlobalsTable)
+        let set =
+            getSymbols
+                tsymbol.Namespace
+                globals
+        match set.TryGetValue tsymbol with
+        | (true, existing) ->
+            Result.Error existing
+        | (false, _) ->
+            table
+            |> ImmSortedDict.setItem
+                tsymbol.Namespace
+                (SortedSet.add tsymbol set)
+            |> GlobalsTable
+            |> Result.Ok
 
     let replaceSymbol replacement globals =
         let (GlobalsTable table) = globals

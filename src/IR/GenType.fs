@@ -17,15 +17,26 @@ let syntax gtype =
     | GenInterface gintf -> Interface gintf.Syntax
     | GenModule gmodl -> Module gmodl.Syntax
 
-let gclass interfaces members (syntax: Class) =
+let gclass members syntax =
     { ClassName =
-        syntax.ClassName.Identifier
-        |> GenName.ofIdentifier
-      Interfaces = interfaces
+        GenName.ofIdentifier syntax.ClassName.Identifier
+      Interfaces = InterfaceSet.empty
       Members = members
       PrimaryCtor =
         { Body = GenBody ImmutableList.Empty
           Parameters = ImmutableList.Empty
           Syntax = syntax.PrimaryCtor }
       SuperClass = None
+      Syntax = syntax }
+
+let ginterface members syntax =
+    { InterfaceName =
+        GenName.ofIdentifier syntax.InterfaceName.Identifier
+      Members = members
+      SuperInterfaces = InterfaceSet.empty
+      Syntax = syntax }
+
+let gmodule members syntax =
+    { Members = members
+      ModuleName = syntax.ModuleName.Identifier
       Syntax = syntax }

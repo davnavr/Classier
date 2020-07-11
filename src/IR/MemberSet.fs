@@ -73,9 +73,7 @@ let rec ofClass (gclass: GenClass) = // TODO: Should this take a GenClass or a G
             match mdef with
             | TypeOrMember.Type nested ->
                 nested
-                |> GenType.gclass
-                    ImmutableSortedSet.Empty // TODO: Create way to handle creation of interface sets.
-                    emptyClass
+                |> GenType.gclass emptyClass
                 |> ofClass
                 |> ignore
                 //|> TypeOrMember.Type
