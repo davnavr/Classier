@@ -14,12 +14,13 @@ let parseStr parser name f =
     |> f
 
 let testStr parser name f =
-    testCase name (fun() ->
+    test name {
         parseStr
             parser
             name
             f
-        |> ignore)
+        |> ignore
+    }
 
 let tests =
     [

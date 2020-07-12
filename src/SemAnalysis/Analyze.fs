@@ -17,17 +17,13 @@ module private Analysis =
         | ImmList.Empty -> Result.Ok a.Result
         | err -> Result.Error err
 
-    let bind binder a =
+type private AnalysisBuilder() =
+    member _.Bind(a, binder) =
         let part = binder a.Result
         { part with Errors = part.Errors.AddRange a.Errors }
-
-    let retn r =
+    member _.Return r =
         { Result = r
           Errors = ImmutableList.Empty }
-
-type private AnalysisBuilder() =
-    member _.Bind(a, binder) = Analysis.bind binder a
-    member _.Return r = Analysis.retn r
 
 let private analysis = AnalysisBuilder()
 
