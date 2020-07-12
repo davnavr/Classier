@@ -2,6 +2,7 @@
 module Classier.NET.Compiler.AnalysisTest
 
 open System.Collections.Immutable
+open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.SemAnalysis
 open FParsec
 open Fuchu
@@ -35,52 +36,56 @@ let testStrs name sources f =
             (Assert.isOk result, state.EntryPoint)
             GlobalsTable.empty
         |> Assert.isOk
+        |> f
         |> ignore
     }
 
 let tests =
     [
-        ParserTest.testStr
-            Parser.compilationUnit
+        testStrs
             "valid types are returned as result"
-            (fun parse ->
-                let (cu, _) =
-                    """
-                    class Global1 {
-                    }
+            [
+                """
+                class Classy {
+                }
 
-                    interface Global2 { }
+                interface IAmSomething { }
 
-                    module Global3
-                    {
-                    }
-                    """
-                    |> parse
-                    |> ParserAssert.isSuccess
-                Analyze.output
-                    (List.singleton cu, None)
-                    GlobalsTable.empty
-                |> Assert.isOk)
+                module Maths
+                {
+                }
+                """
+            ]
+            (fun result ->
+                result.GlobalTypes
+                |> Seq.map (GenType.name >> string)
+                |> List.ofSeq
+                |> Assert.equal
+                    [
+                        "Classy"
+                        "IAmSomething"
+                        "Maths"
+                    ])
 
-        ParserTest.testStr
-            Parser.compilationUnit
+        testStrs
             "empty nested interface is included"
-            (fun parse ->
-                let (cu, _) =
-                    """
-                    module Parent {
-                        interface Child { }
-                    }
-                    """
-                    |> parse
-                    |> ParserAssert.isSuccess
-                let output =
-                    Analyze.output
-                        (List.singleton cu, None)
-                        GlobalsTable.empty
-                    |> Assert.isOk
+            [
+                """
+                module Parent {
+                    interface Child { }
+                }
+                """
+            ]
+            (fun output ->
                 let parent =
-                    Seq.head output.GlobalTypes
-                invalidOp "TODO: Check that the nested interface is there")
+                    match Assert.head output.GlobalTypes with
+                    | GenModule mdle -> mdle
+                    | _ -> Assert.fail "The parent module does not exist"
+                match Assert.head parent.Members with
+                | (_, TypeOrMember.Type ntype) -> ntype
+                | _ -> Assert.fail "Expected the nested child type."
+                |> GenType.name
+                |> string
+                |> Assert.equal "Child")
     ]
     |> testList "analysis tests"

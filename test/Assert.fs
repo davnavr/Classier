@@ -1,4 +1,5 @@
-﻿module Classier.NET.Compiler.Assert
+﻿[<RequireQualifiedAccess>]
+module Classier.NET.Compiler.Assert
 
 open System.Collections
 
@@ -40,3 +41,9 @@ let isOk result =
     | Result.Ok ok -> ok
     | Result.Error err ->
         failf "The value was an error: %O" err
+
+let head s =
+    match Seq.tryHead s with
+    | Some h -> h
+    | None ->
+        fail "The head of the sequence could not be retrieved since the sequence is empty"
