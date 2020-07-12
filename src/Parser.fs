@@ -1512,7 +1512,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
     space
     >>. tuple4
         (namespaceDecl .>> space)
-        (useStatements .>> space)
+        (useStatements .>> space) // TODO: Consider moving use statements before namespace decl.
         (definitions .>> eof)
         position
     |>> fun (ns, uses, types, pos) ->

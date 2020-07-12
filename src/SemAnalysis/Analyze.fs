@@ -6,26 +6,11 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 
-type private Analysis<'Result> =
-    { Result: 'Result
-      Errors: ImmutableList<AnalyzerError> }
-
-[<RequireQualifiedAccess>]
-module private Analysis =
-    let toResult a =
-        match a.Errors with
-        | ImmList.Empty -> Result.Ok a.Result
-        | err -> Result.Error err
-
-type private AnalysisBuilder() =
-    member _.Bind(a, binder) =
-        let part = binder a.Result
-        { part with Errors = part.Errors.AddRange a.Errors }
-    member _.Return r =
-        { Result = r
-          Errors = ImmutableList.Empty }
-
-let private analysis = AnalysisBuilder()
+type private Analysis =
+    { EntryPoint: GenEntryPoint option
+      Errors: ImmutableList<AnalyzerError>
+      GlobalTable: GlobalsTable
+      GlobalTypes: ImmutableList<GenType * CompilationUnit> }
 
 let private globals gtable cunits =
     let ctypes cunit =
@@ -64,23 +49,33 @@ let private globals gtable cunits =
                     let err = DuplicateGlobalType (tdef, dup)
                     (tlist, ImmList.add err elist, table))
             (ImmutableList.Empty, ImmutableList.Empty, gtable)
-    { Result = valid, ntable
-      Errors = dups }
+    { EntryPoint = None
+      Errors = dups
+      GlobalTable = ntable
+      GlobalTypes = valid }
 
-let private ntypes gtypes =
-    
-    invalidOp "bad"
+let private ntypes acc =
+    Seq.fold
+        (fun state (gtype, cu) ->
+            match gtype with
+            | GenClass clss ->
+                invalidOp "bad class"
+            | GenInterface intf ->
+                invalidOp "bad interface"
+            | GenModule mdle ->
+                invalidOp "bad module")
+        acc
+        acc.GlobalTypes
+    // TODO: Somehow replace the generated types in the GlobalTable with GlobalTypes.
 
-let output (cunits: seq<CompilationUnit>, epoint: EntryPoint option) table: Result<GenOutput, _> =
-    analysis {
-        let! (gtypes, gtable) = globals table cunits
-        return 0
-    }
-
-    let gtypes = globals table cunits
-    gtypes
-    |> Analysis.toResult
-    |> Result.map
-        (fun (valid, _) ->
-            { GlobalTypes = Seq.map fst valid
-              EntryPoint = None })
+let output (cunits, epoint: EntryPoint option) table =
+    let result =
+        globals table cunits
+        |> ntypes
+    match result.Errors with
+    | ImmList.Empty ->
+        { GlobalTypes =
+            Seq.map fst result.GlobalTypes
+          EntryPoint = result.EntryPoint }
+        |> Result.Ok
+    | err -> Result.Error err
