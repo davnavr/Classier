@@ -8,6 +8,7 @@ open Classier.NET.Compiler.IR
 module Ast = Grammar.Ast
 
 type Print = Print of ((string -> unit) -> unit)
+// TODO: Make a computation expression for this.
 
 let nothing = Print ignore
 

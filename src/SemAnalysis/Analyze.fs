@@ -168,10 +168,25 @@ let private ntypes anl =
                     mdle)
         anl
 
+let private gbody body =
+    
+    invalidOp "bad"
+
+let private members anl =
+    invalidOp "bad"
+
+let private entryPoint epoint anl =
+    match epoint with
+    | Some epoint ->
+        invalidOp "no impl for entrypoint"
+    | None -> anl
+
 let output (cunits, epoint: EntryPoint option) table =
     let result =
         globals table cunits
         |> ntypes
+        // |> members
+        |> entryPoint epoint
     match result.Errors with
     | ImmList.Empty ->
         { GlobalTypes =

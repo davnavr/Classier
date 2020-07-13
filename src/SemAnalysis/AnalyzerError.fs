@@ -5,7 +5,6 @@ open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 
 type AnalyzerError =
-    | BadExpParam of ExpParam * string
     | DuplicateGlobalType of TypeDef * GlobalTypeSymbol
     | DuplicateClassMember of GenClass * TypeOrMember<Class, InstanceMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>
@@ -26,3 +25,4 @@ module AnalyzerError =
                 "The class '%O' contains duplicate definitions for %s"
                 parent.ClassName
                 mtext
+        | err -> sprintf "%A" err

@@ -130,7 +130,7 @@ type EntryPointReturn =
     | ImplicitZero
 
 type GenEntryPoint =
-    { Parameter: IdentifierStr option
+    { Parameters: GenParamTuple
       Body: GenBody
       Return: EntryPointReturn
       Syntax: Ast.EntryPoint }

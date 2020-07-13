@@ -88,5 +88,16 @@ let tests =
                 |> GenType.name
                 |> string
                 |> Assert.equal "Child")
+
+        testStrs
+            "entry point exists"
+            [
+                "main (args: String[]) { }"
+            ]
+            (fun output ->
+                let epoint = Option.get output.EntryPoint
+                Assert.equal
+                    EntryPointReturn.ImplicitZero
+                    epoint.Return)
     ]
     |> testList "analysis tests"
