@@ -9,6 +9,7 @@ type AnalyzerError =
     | DuplicateGlobalType of TypeDef * GlobalTypeSymbol
     | DuplicateClassMember of GenClass * TypeOrMember<Class, InstanceMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>
+    | DuplicateModuleMember of GenModule * TypeOrMember<TypeDef, StaticMember>
 
 module AnalyzerError =
     let print =

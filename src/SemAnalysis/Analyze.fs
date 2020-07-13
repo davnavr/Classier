@@ -55,13 +55,10 @@ let private globals gtable cunits =
       GlobalTypes = valid }
 
 let private ntypes anl =
-    let ntype1 =
-        function
-        | (acc: AccessControl.Access, TypeOrMember.Type nested) ->
-            Some(acc, nested)
-        | (_, TypeOrMember.Member _) -> None
-    let rec ntype syntaxm ctype typem update duperr gtype =
-        let inner = ntype syntaxm ctype typem update duperr
+    let tclass = GenType.gclass MemberSet.emptyClass
+    let tinterface = GenType.ginterface MemberSet.emptyInterface
+
+    let nested syntaxm gtype =
         gtype
         |> syntaxm
         |> Seq.choose
@@ -69,6 +66,10 @@ let private ntypes anl =
             | (acc: AccessControl.Access, TypeOrMember.Type nested) ->
                 Some(acc, nested)
             | (_, TypeOrMember.Member _) -> None)
+    let rec ntype syntaxm ctype typem update duperr gtype =
+        let inner = ntype syntaxm ctype typem update duperr
+        gtype
+        |> nested syntaxm
         |> Seq.fold
             (fun (parent, err) (acc, nested) ->
                 let (gnested, nerr) =
@@ -85,60 +86,86 @@ let private ntypes anl =
                     let dup = duperr(parent, TypeOrMember.Type nested)
                     parent, ImmList.add dup err)
             (gtype, ImmutableList.Empty)
-    let rec nclass (clss: GenClass) =
-        clss.Syntax.Members
-        |> Seq.choose ntype1
+
+    let nclass =
+        ntype
+            (fun (clss: GenClass) -> clss.Syntax.Members)
+            tclass
+            (fun clss -> clss.Members)
+            (fun added parent -> { parent with Members = added })
+            DuplicateClassMember
+    let ninterface =
+        ntype
+            (fun (intf: GenInterface) -> intf.Syntax.Members)
+            tinterface
+            (fun intf -> intf.Members)
+            (fun added parent -> { parent with Members = added })
+            DuplicateInterfaceMember
+    let rec nmodule (mdle: GenModule) =
+        nested
+            (fun _ -> mdle.Syntax.Members)
+            mdle
         |> Seq.fold
-            (fun (parent: GenClass, err) (acc, nested) ->
+            (fun (parent, err) (acc, nested) ->
                 let (gnested, nerr) =
-                    GenType.gclass
-                        MemberSet.emptyClass
-                        nested
-                    |> nclass
+                    let atype (tmap: _ -> GenType) (ntype, err) =
+                        tmap ntype, err
+                    match nested with
+                    | Class clss ->
+                        tclass clss
+                        |> nclass
+                        |> atype GenClass
+                    | Interface intf ->
+                        tinterface intf
+                        |> ninterface
+                        |> atype GenInterface
+                    | Module nmdle ->
+                        GenType.gmodule
+                            MemberSet.emptyModule
+                            nmdle
+                        |> nmodule
+                        |> atype GenModule
                 let add =
                     SortedSet.tryAdd
                         (acc, TypeOrMember.Type gnested)
                         parent.Members
                 match add with
                 | Some added ->
-                    let errors = ImmList.addRange nerr err
-                    { parent with Members = added }, errors
+                    { parent with Members = added }, err.AddRange nerr
                 | None ->
-                    let dup = DuplicateClassMember(parent, TypeOrMember.Type nested)
-                    parent, ImmList.add dup err)
-            (clss, ImmutableList.Empty)
-    let rec ninterface =
-        ntype
-            (fun (idef: GenInterface) -> idef.Syntax.Members)
-            (GenType.ginterface MemberSet.emptyInterface)
-            (fun intf -> intf.Members)
-            (fun added parent -> { parent with Members = added })
-            DuplicateInterfaceMember
+                    let dup = DuplicateModuleMember(parent, TypeOrMember.Type nested)
+                    parent, err.Add dup)
+            (mdle, ImmutableList.Empty)
+
     anl.GlobalTypes
     |> Seq.indexed
     |> Seq.fold
         (fun state (i, (gtype, cu)) ->
+            let addNested create t tdef =
+                let (gen, err) = create tdef
+                { state with
+                    Errors = state.Errors.AddRange err
+                    GlobalTypes =
+                        ImmList.setItem
+                            i
+                            (t gen, cu)
+                            state.GlobalTypes }
             match gtype with
             | GenClass clss ->
-                let (gen, err) = nclass clss // TODO: Create function for this block.
-                { state with
-                    Errors = state.Errors.AddRange err
-                    GlobalTypes =
-                        ImmList.setItem
-                            i
-                            (GenClass gen, cu)
-                            state.GlobalTypes }
+                addNested
+                    nclass
+                    GenClass
+                    clss
             | GenInterface intf ->
-                let (gen, err) = ninterface intf
-                { state with
-                    Errors = state.Errors.AddRange err
-                    GlobalTypes =
-                        ImmList.setItem
-                            i
-                            (GenInterface gen, cu)
-                            state.GlobalTypes }
+                addNested
+                    ninterface
+                    GenInterface
+                    intf
             | GenModule mdle ->
-                invalidOp "bad module")
+                addNested
+                    nmodule
+                    GenModule
+                    mdle)
         anl
     // TODO: Somehow replace the generated types in the GlobalTable with GlobalTypes.
 
