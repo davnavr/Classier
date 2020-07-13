@@ -51,6 +51,15 @@ module SortedSet =
                   comparer one two }
         |> set.WithComparer
 
+    let replace item (set: ImmutableSortedSet<_>) =
+        match set.TryGetValue item with
+        | (true, _) ->
+            set
+            |> remove item
+            |> add item
+        | (false, _) ->
+            set
+
 [<RequireQualifiedAccess>]
 module ImmList =
     let (|Contains|_|) item (list: ImmutableList<_>) =
@@ -63,6 +72,9 @@ module ImmList =
         new System.Func<_, _>(mapping) |> list.ConvertAll
 
     let add item (list: ImmutableList<_>) = list.Add item
+    let addRange items (list: ImmutableList<_>) = list.AddRange items
+
+    let setItem index item (list: ImmutableList<_>) = list.SetItem(index, item)
 
 [<RequireQualifiedAccess>]
 module ImmSortedDict =

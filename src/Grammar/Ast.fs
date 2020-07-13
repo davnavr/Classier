@@ -208,10 +208,6 @@ type StaticMember =
     | Function of StaticFunction
     | Operator of Operator
 
-type Member =
-    | Instance of InstanceMember
-    | Static of StaticMember
-
 type MemberName =
     | IdentifierName of GenericName
     | OperatorName of OperatorStr

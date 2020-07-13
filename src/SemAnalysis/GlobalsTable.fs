@@ -98,14 +98,8 @@ module GlobalsTable =
     let replaceSymbol replacement globals =
         let (GlobalsTable table) = globals
         let types =
-            getSymbols replacement.Namespace globals
-        let added =
-            match types.TryGetValue replacement with
-            | (true, _) ->
-                types
-                |> SortedSet.remove replacement
-                |> SortedSet.add replacement
-            | _ ->
-                types.Add replacement
-        table.SetItem(replacement.Namespace, added)
+            globals
+            |> getSymbols replacement.Namespace
+            |> SortedSet.replace replacement
+        table.SetItem(replacement.Namespace, types)
         |> GlobalsTable

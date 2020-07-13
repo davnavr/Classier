@@ -70,22 +70,22 @@ type EMember =
     | EInstanceMember of EInstanceMember
     | EStaticMember of EStaticMember
 
-type EMemberSet<'Type, 'Member> = ImmutableSortedSet<EAccess * TypeOrMember<'Type, 'Member>>
+type EMemberSet<'Member> = ImmutableSortedSet<EAccess * TypeOrMember<EType, 'Member>>
 
 type EInterface =
     { InterfaceName: EGenericName
-      Members: EMemberSet<EType, EAbstractMember>
+      Members: EMemberSet<EAbstractMember>
       SuperInterfaces: ImmutableSortedSet<EInterface> }
 
 type EClass =
     { ClassName: EGenericName
       Interfaces: ImmutableSortedSet<EInterface>
-      Members: EMemberSet<EType, EMember>
+      Members: EMemberSet<EMember>
       SuperClass: EClass option }
 
 type EModule =
     { ModuleName: EGenericName
-      Members: EMemberSet<EType, EStaticMember> }
+      Members: EMemberSet<EStaticMember> }
 
 type EType =
     | EClass of EClass
