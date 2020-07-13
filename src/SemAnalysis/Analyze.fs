@@ -7,64 +7,73 @@ open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.TypeSystem
 
-type private Analysis =
-    { EntryPoint: GenEntryPoint option
+type private Analysis<'Data> =
+    { Data: 'Data 
+      EntryPoint: GenEntryPoint option
       Errors: ImmutableList<AnalyzerError>
       GlobalTable: GlobalsTable
       GlobalTypes: ImmutableList<GenType * CompilationUnit> }
 
 module private Analyzer =
-    let error anl err =
+    let init table =
+        { Data = ()
+          EntryPoint = None
+          Errors = ImmutableList.Empty
+          GlobalTable = table
+          GlobalTypes = ImmutableList.Empty }
+    let setData data anl =
+        // Copy expression is not used in order to allow different types for 'Data
+        { Data = data
+          EntryPoint = anl.EntryPoint
+          Errors = anl.Errors
+          GlobalTable = anl.GlobalTable
+          GlobalTypes = anl.GlobalTypes }
+    let error err anl =
         { anl with Errors = anl.Errors.Add err }
     let check checker anl =
         match checker anl with
-        | Some err -> error anl err
+        | Some err -> error err anl
         | None -> anl
-    let next (f: Analysis -> Analysis) anl =
-        f anl
 
-// TODO: Maybe pass in an empty 'Analysis' and create and use new functions in the Analyzer module to chain together the work?
-let private globals gtable cunits =
-    let ctypes cunit =
+let private globals anl =
+    let ctypes (cunit: CompilationUnit) =
         Seq.map
             (fun (acc, tdef) ->
                 (cunit, acc, tdef))
             cunit.Types
-    let (valid, dups, ntable) =
-        cunits
-        |> Seq.collect ctypes
-        |> Seq.fold
-            (fun (tlist, elist, table) (cunit, acc, tdef) ->
-                let gtype =
-                    match tdef with
-                    | Class cdef ->
-                        cdef
-                        |> GenType.gclass MemberSet.emptyClass
-                        |> GenClass
-                    | Interface intf ->
-                        intf
-                        |> GenType.ginterface MemberSet.emptyInterface
-                        |> GenInterface
-                    | Module mdle ->
-                        mdle
-                        |> GenType.gmodule MemberSet.emptyModule
-                        |> GenModule
-                let result =
-                    GlobalsTable.addSymbol
-                        { Namespace = cunit.Namespace
-                          Type = Defined (acc, gtype) }
-                        table
-                match result with
-                | Result.Ok ntable ->
-                    (ImmList.add (gtype, cunit) tlist, elist, ntable)
-                | Result.Error dup ->
-                    let err = DuplicateGlobalType (tdef, dup)
-                    (tlist, ImmList.add err elist, table))
-            (ImmutableList.Empty, ImmutableList.Empty, gtable)
-    { EntryPoint = None
-      Errors = dups
-      GlobalTable = ntable
-      GlobalTypes = valid }
+    anl.Data
+    |> Seq.collect ctypes
+    |> Seq.fold
+        (fun state (cunit, acc, tdef) ->
+            let gtype =
+                match tdef with
+                | Class cdef ->
+                    cdef
+                    |> GenType.gclass MemberSet.emptyClass
+                    |> GenClass
+                | Interface intf ->
+                    intf
+                    |> GenType.ginterface MemberSet.emptyInterface
+                    |> GenInterface
+                | Module mdle ->
+                    mdle
+                    |> GenType.gmodule MemberSet.emptyModule
+                    |> GenModule
+            let result =
+                GlobalsTable.addSymbol
+                    { Namespace = cunit.Namespace
+                      Type = Defined (acc, gtype) }
+                    state.GlobalTable
+            match result with
+            | Result.Ok ntable ->
+                { state with
+                    GlobalTable = ntable
+                    GlobalTypes = state.GlobalTypes.Add (gtype, cunit) }
+            | Result.Error dup ->
+                Analyzer.error
+                    (DuplicateGlobalType (tdef, dup))
+                    state)
+        anl
 
 let private ntypes anl =
     let tclass = GenType.gclass MemberSet.emptyClass
@@ -180,17 +189,15 @@ let private ntypes anl =
                     mdle)
         anl
 
-let private gbody (body: PStatement list) ltable anl = // TODO: Maybe make Analysis generic so it can pass data around to different analyzer functions?
+let private gbody (body: PStatement list) ltable anl =
     List.fold
         (fun (state, locals) (pos, st) ->
             match st with
             | _ ->
                 let err =
-                    st
-                    |> sprintf "analyzer for statement %A"
+                    sprintf "analyzer for statement %A" st
                     |> FeatureNotImplemented
-                    |> Analyzer.error state
-                err, locals)
+                Analyzer.error err state, locals)
         (anl, ltable)
         body
     |> fst
@@ -203,32 +210,27 @@ let private entryPoint epoint =
     | Some (epoint: EntryPoint) ->
         Analyzer.check
             (fun _ ->
-                let err = BadEntryPointSignature epoint |> Some
-                match (epoint.Parameters) with // TODO: Come up with way to make this chain of matches shorter.
-                | [ args ] ->
-                    let (TypeName ptype) = args.Type
-                    match ptype with
-                    | ArrayType oftype ->
-                        match oftype with
-                        | Primitive prim ->
-                            match prim with
-                            | PrimitiveType.String -> None
-                            | _ -> err
-                        | _ -> err
-                    | _ -> err
-                | _ -> err)
-        >> Analyzer.next
-            (fun anl ->
+                let expected = 
+                    PrimitiveType.String
+                    |> Primitive
+                    |> ArrayType
+                    |> TypeName
+                match (epoint.Parameters) with
+                | [ args ] when args.Type = expected -> None
+                | _ -> BadEntryPointSignature epoint |> Some)
+        >> (fun anl ->
                 let body =
                     LocalsTable.empty
                     // |> LocalsTable.addLocal
-                    // |> gbody 
+                    // |> gbody
                 invalidOp "TODO: Validate the body of the entrypoint")
     | None -> id
 
 let output (cunits, epoint) table =
     let result =
-        globals table cunits
+        Analyzer.init table
+        |> Analyzer.setData cunits
+        |> globals
         |> ntypes
         // |> members
         |> entryPoint epoint

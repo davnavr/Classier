@@ -29,7 +29,7 @@ type ResolvedClass =
 type GenName = Identifier<GenericParam<ResolvedInterface, ResolvedClass>>
 
 type GenSignature =
-    { Body: GenBody
+    { Body: GenBody<ResolvedType>
       Parameters: GenParamList
       ReturnType: ResolvedType }
 
@@ -47,12 +47,12 @@ type GenStatement =
     | Empty
     | IgnoredExpr of GenExpression
 
-type GenBody =
+type GenBody<'ReturnType> =
     { Statements: ImmutableList<GenStatement * Ast.Statement>
-      ReturnType: ResolvedType }
+      ReturnType: 'ReturnType }
 
 type GenPrimaryCtor =
-    { Body: GenBody
+    { Body: GenBody<unit>
       Parameters: GenParamTuple
       Syntax: Ast.PrimaryCtor }
 
@@ -132,7 +132,7 @@ type EntryPointReturn =
 
 type GenEntryPoint =
     { Parameters: GenParamTuple
-      Body: GenBody
+      Body: GenBody<unit>
       Return: EntryPointReturn
       Syntax: Ast.EntryPoint }
 
