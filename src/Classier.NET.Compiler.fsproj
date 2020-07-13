@@ -34,9 +34,8 @@
     <Compile Include="IR\GenType.fs" />
     <Compile Include="IR\MemberSet.fs" />
     <Compile Include="SemAnalysis\GlobalsTable.fs" />
-    <Compile Include="SemAnalysis\AnalyzerError.fs" />
-    <Compile Include="SemAnalysis\GenericAnalyzer.fs" />
     <Compile Include="SemAnalysis\LocalsTable.fs" />
+    <Compile Include="SemAnalysis\AnalyzerError.fs" />
     <Compile Include="SemAnalysis\Analyze.fs" />
     <Compile Include="ToSource\Print.fs" />
     <Compile Include="ToSource\Output.fs" />

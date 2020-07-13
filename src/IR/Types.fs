@@ -136,5 +136,5 @@ type GenEntryPoint =
       Syntax: Ast.EntryPoint }
 
 type GenOutput =
-    { GlobalTypes: seq<GenType>
+    { GlobalTypes: seq<Namespace * GenType>
       EntryPoint: GenEntryPoint option }

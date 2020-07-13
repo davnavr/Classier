@@ -58,7 +58,7 @@ let private ntypes anl =
     let tclass = GenType.gclass MemberSet.emptyClass
     let tinterface = GenType.ginterface MemberSet.emptyInterface
 
-    let nested syntaxm gtype =
+    let nested (syntaxm: _ -> MemberList<_, _>) gtype =
         gtype
         |> syntaxm
         |> Seq.choose
@@ -167,7 +167,6 @@ let private ntypes anl =
                     GenModule
                     mdle)
         anl
-    // TODO: Somehow replace the generated types in the GlobalTable with GlobalTypes.
 
 let output (cunits, epoint: EntryPoint option) table =
     let result =
@@ -176,7 +175,9 @@ let output (cunits, epoint: EntryPoint option) table =
     match result.Errors with
     | ImmList.Empty ->
         { GlobalTypes =
-            Seq.map fst result.GlobalTypes // TODO: Should instead return a sequence of GenType with Namespace.
+            Seq.map
+                (fun (tdef, cu) -> cu.Namespace, tdef)
+                result.GlobalTypes
           EntryPoint = result.EntryPoint }
         |> Result.Ok
     | err -> Result.Error err

@@ -58,7 +58,7 @@ let tests =
             ]
             (fun result ->
                 result.GlobalTypes
-                |> Seq.map (GenType.name >> string)
+                |> Seq.map (snd >> GenType.name >> string)
                 |> List.ofSeq
                 |> Assert.equal
                     [
@@ -79,8 +79,9 @@ let tests =
             (fun output ->
                 let parent =
                     match Assert.head output.GlobalTypes with
-                    | GenModule mdle -> mdle
-                    | _ -> Assert.fail "The parent module does not exist"
+                    | (_, GenModule mdle) -> mdle
+                    | _ ->
+                        Assert.fail "The parent module does not exist"
                 match Assert.head parent.Members with
                 | (_, TypeOrMember.Type ntype) -> ntype
                 | _ -> Assert.fail "Expected the nested child type."
