@@ -7,48 +7,29 @@ open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.TypeSystem
 
-type private Analysis<'Data> =
-    { Data: 'Data 
-      EntryPoint: GenEntryPoint option
+type private Analysis =
+    { EntryPoint: GenEntryPoint option
       Errors: ImmutableList<AnalyzerError>
       GlobalTable: GlobalsTable
-      GlobalTypes: ImmutableList<GenType * CompilationUnit> }
+      GlobalTypes: ImmutableList<GenType * CompilationUnit * Usings> }
 
 module private Analyzer =
     let init table =
-        { Data = ()
-          EntryPoint = None
+        { EntryPoint = None
           Errors = ImmutableList.Empty
           GlobalTable = table
           GlobalTypes = ImmutableList.Empty }
 
-    let setData data anl =
-        // Copy expression is not used in order to allow different types for 'Data
-        { Data = data
-          EntryPoint = anl.EntryPoint
-          Errors = anl.Errors
-          GlobalTable = anl.GlobalTable
-          GlobalTypes = anl.GlobalTypes }
-
     let error err anl =
         { anl with Errors = anl.Errors.Add err }
-    let check checker success failure anl: Analysis<_> =
-        match checker anl with
-        | Result.Ok data ->
-            setData data anl
-            |> success
-        | Result.Error err ->
-            anl
-            |> error err
-            |> failure
 
-let private globals anl =
+let private globals cunits anl =
     let ctypes (cunit: CompilationUnit) =
         Seq.map
             (fun (acc, tdef) ->
                 (cunit, acc, tdef))
             cunit.Types
-    anl.Data
+    cunits
     |> Seq.collect ctypes
     |> Seq.fold
         (fun state (cunit, acc, tdef) ->
@@ -75,7 +56,7 @@ let private globals anl =
             | Result.Ok ntable ->
                 { state with
                     GlobalTable = ntable
-                    GlobalTypes = state.GlobalTypes.Add (gtype, cunit) }
+                    GlobalTypes = state.GlobalTypes.Add (gtype, cunit, Usings.empty) }
             | Result.Error dup ->
                 Analyzer.error
                     (DuplicateGlobalType (tdef, dup))
@@ -168,7 +149,7 @@ let private ntypes anl =
     anl.GlobalTypes
     |> Seq.indexed
     |> Seq.fold
-        (fun state (i, (gtype, cu)) ->
+        (fun state (i, (gtype, cu, us)) ->
             let addNested create t tdef =
                 let (gen, err) = create tdef
                 { state with
@@ -176,7 +157,7 @@ let private ntypes anl =
                     GlobalTypes =
                         ImmList.setItem
                             i
-                            (t gen, cu)
+                            (t gen, cu, us)
                             state.GlobalTypes }
             match gtype with
             | GenClass clss ->
@@ -196,64 +177,65 @@ let private ntypes anl =
                     mdle)
         anl
 
-let private gbody anl =
-    let result =
-        List.fold
-            (fun state (pos, st) ->
-                match state with
-                | Result.Ok (ltable, body) ->
-                    match st with
-                    | _ ->
-                        sprintf "analyzer for statement %A" st
-                        |> FeatureNotImplemented
-                        |> Result.Error
-                | Result.Error _ -> state)
-            (Result.Ok (snd anl.Data, GenBody.empty))
-            (fst anl.Data)
+let private tresolution anl =
+    anl.GlobalTypes
+    |> Seq.indexed
+    |> Seq.fold
+        (fun state _ ->
+            invalidOp "TODO: Resolve all of the usings")
+        anl
+
+let private gbody body ltable anl =
     anl
 
 let private members anl =
     invalidOp "bad"
 
-let private entryPoint =
+let private entryPoint (epoint: EntryPoint option) anl =
     let argtype() = 
         PrimitiveType.String
         |> Primitive
         |> ArrayType
-    Analyzer.check
-        (fun (anl: Analysis<EntryPoint>) ->
-            match (anl.Data.Parameters) with
-            | [ args ] when args.Type = (argtype() |> TypeName) ->
+    match epoint with
+    | Some epoint ->
+        match epoint.Parameters with
+        | [ args ] when args.Type = (argtype() |> TypeName) ->
+            let ltable =
                 LocalsTable.empty
                 |> LocalsTable.enterScope
                 |> LocalsTable.addExpParam
                     args
                     (fun _ -> argtype())
-                |> Option.map
-                    (fun ltable -> Result.Ok (anl.Data, ltable))
-                |> Option.defaultValue
-                    (InternalAnalyzerError "Unable to add the parameter to the locals table" |> Result.Error)
-            | _ ->
-                BadEntryPointSignature anl.Data |> Result.Error)
-        (fun anl ->
-            invalidOp "")
-        (Analyzer.setData ())
+            match ltable with
+            | Some ltable ->
+                let gen =
+                    invalidOp "TODO: create the entry point"
+                { anl with Analysis.EntryPoint = Some gen }
+            | None ->
+                Analyzer.error
+                    (InternalAnalyzerError "Unable to add the parameter to the locals table")
+                    anl
+        | _ ->
+            Analyzer.error
+                (BadEntryPointSignature epoint)
+                anl
+    | None -> anl
 
 let output (cunits, epoint) table =
-    let result =
+    let rtypes =
         Analyzer.init table
-        |> Analyzer.setData cunits
-        |> globals
+        |> globals cunits
         |> ntypes
-        // |> resolveTheUsingsOfTheCuOrSomething
+        |> tresolution
+    let result =
+        rtypes
         // |> members
-        |> Analyzer.setData epoint
-        |> entryPoint
+        |> entryPoint epoint
     match result.Errors with
     | ImmList.Empty ->
         { GlobalTypes =
             Seq.map
-                (fun (tdef, cu) -> cu.Namespace, tdef)
+                (fun (tdef, cu, _) -> cu.Namespace, tdef)
                 result.GlobalTypes
           EntryPoint = result.EntryPoint }
         |> Result.Ok

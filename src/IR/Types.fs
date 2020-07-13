@@ -132,8 +132,7 @@ type EntryPointReturn =
 
 type GenEntryPoint =
     { Parameters: GenParamTuple
-      Body: GenBody<unit>
-      Return: EntryPointReturn
+      Body: GenBody<EntryPointReturn>
       Syntax: Ast.EntryPoint }
 
 type GenOutput =

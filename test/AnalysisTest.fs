@@ -43,6 +43,32 @@ let testStrs name sources f =
 let tests =
     [
         testStrs
+            "global usings are validated"
+            [
+                """
+                namespace my.fancy.space;
+                class MyClass { }
+                """
+                """
+                class Global {
+                  class Nested { }
+                }
+                """
+                """
+                // This is the one that should be checked.
+                namespace other.space;
+
+                use my.fancy.space;
+                use my.fancy.space.MyClass;
+                use Global;
+                use Nested;
+
+                class IgnoreMe { }
+                """
+            ]
+            (fun _ -> ())
+
+        testStrs
             "valid types are returned as result"
             [
                 """
@@ -98,6 +124,6 @@ let tests =
                 let epoint = Option.get output.EntryPoint
                 Assert.equal
                     EntryPointReturn.ImplicitZero
-                    epoint.Return)
+                    epoint.Body.ReturnType)
     ]
     |> testList "analysis tests"
