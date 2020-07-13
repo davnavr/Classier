@@ -11,6 +11,7 @@ type AnalyzerError =
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>
     | DuplicateModuleMember of GenModule * TypeOrMember<TypeDef, StaticMember>
     | FeatureNotImplemented of feature: string
+    | InternalAnalyzerError of msg: string
 
 module AnalyzerError =
     let print =
@@ -33,4 +34,6 @@ module AnalyzerError =
                 epoint.Origin
         | FeatureNotImplemented feature ->
             sprintf "%s is not yet implemented" feature
+        | InternalAnalyzerError msg ->
+            sprintf "Internal analyzer error: %s" msg
         | err -> sprintf "%A" err

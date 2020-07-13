@@ -1,6 +1,7 @@
 ﻿module Classier.NET.Compiler.LocalsTable
 
 open System.Collections.Immutable
+open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.Identifier
 
@@ -26,6 +27,7 @@ let exitScope (LocalsTable table) =
     | [] -> None
     | _ -> LocalsTable table.Tail |> Some
 
+// TODO: How will type resolution work here?
 let addLocal lname ltype (LocalsTable table) =
     table
     |> List.tryHead
@@ -40,3 +42,12 @@ let addLocal lname ltype (LocalsTable table) =
                     (newSet :: table.Tail)
                     |> LocalsTable))
     |> Option.flatten
+
+let addExpParam (eparam: ExpParam) rtype table =
+    match eparam.Name with
+    | Some pname ->
+        addLocal
+            pname
+            (rtype eparam.Type)
+            table
+    | None -> Some table

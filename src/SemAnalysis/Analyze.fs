@@ -21,6 +21,7 @@ module private Analyzer =
           Errors = ImmutableList.Empty
           GlobalTable = table
           GlobalTypes = ImmutableList.Empty }
+
     let setData data anl =
         // Copy expression is not used in order to allow different types for 'Data
         { Data = data
@@ -28,12 +29,18 @@ module private Analyzer =
           Errors = anl.Errors
           GlobalTable = anl.GlobalTable
           GlobalTypes = anl.GlobalTypes }
+
     let error err anl =
         { anl with Errors = anl.Errors.Add err }
-    let check checker anl =
+    let check checker success failure anl: Analysis<_> =
         match checker anl with
-        | Some err -> error err anl
-        | None -> anl
+        | Result.Ok data ->
+            setData data anl
+            |> success
+        | Result.Error err ->
+            anl
+            |> error err
+            |> failure
 
 let private globals anl =
     let ctypes (cunit: CompilationUnit) =
@@ -189,42 +196,48 @@ let private ntypes anl =
                     mdle)
         anl
 
-let private gbody (body: PStatement list) ltable anl =
-    List.fold
-        (fun (state, locals) (pos, st) ->
-            match st with
-            | _ ->
-                let err =
-                    sprintf "analyzer for statement %A" st
-                    |> FeatureNotImplemented
-                Analyzer.error err state, locals)
-        (anl, ltable)
-        body
-    |> fst
+let private gbody anl =
+    let result =
+        List.fold
+            (fun state (pos, st) ->
+                match state with
+                | Result.Ok (ltable, body) ->
+                    match st with
+                    | _ ->
+                        sprintf "analyzer for statement %A" st
+                        |> FeatureNotImplemented
+                        |> Result.Error
+                | Result.Error _ -> state)
+            (Result.Ok (snd anl.Data, GenBody.empty))
+            (fst anl.Data)
+    anl
 
 let private members anl =
     invalidOp "bad"
 
-let private entryPoint epoint =
-    match epoint with
-    | Some (epoint: EntryPoint) ->
-        Analyzer.check
-            (fun _ ->
-                let expected = 
-                    PrimitiveType.String
-                    |> Primitive
-                    |> ArrayType
-                    |> TypeName
-                match (epoint.Parameters) with
-                | [ args ] when args.Type = expected -> None
-                | _ -> BadEntryPointSignature epoint |> Some)
-        >> (fun anl ->
-                let body =
-                    LocalsTable.empty
-                    // |> LocalsTable.addLocal
-                    // |> gbody
-                invalidOp "TODO: Validate the body of the entrypoint")
-    | None -> id
+let private entryPoint =
+    let argtype() = 
+        PrimitiveType.String
+        |> Primitive
+        |> ArrayType
+    Analyzer.check
+        (fun (anl: Analysis<EntryPoint>) ->
+            match (anl.Data.Parameters) with
+            | [ args ] when args.Type = (argtype() |> TypeName) ->
+                LocalsTable.empty
+                |> LocalsTable.enterScope
+                |> LocalsTable.addExpParam
+                    args
+                    (fun _ -> argtype())
+                |> Option.map
+                    (fun ltable -> Result.Ok (anl.Data, ltable))
+                |> Option.defaultValue
+                    (InternalAnalyzerError "Unable to add the parameter to the locals table" |> Result.Error)
+            | _ ->
+                BadEntryPointSignature anl.Data |> Result.Error)
+        (fun anl ->
+            invalidOp "")
+        (Analyzer.setData ())
 
 let output (cunits, epoint) table =
     let result =
@@ -232,8 +245,10 @@ let output (cunits, epoint) table =
         |> Analyzer.setData cunits
         |> globals
         |> ntypes
+        // |> resolveTheUsingsOfTheCuOrSomething
         // |> members
-        |> entryPoint epoint
+        |> Analyzer.setData epoint
+        |> entryPoint
     match result.Errors with
     | ImmList.Empty ->
         { GlobalTypes =

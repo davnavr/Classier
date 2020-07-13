@@ -26,6 +26,7 @@
     <Compile Include="Parser.fs" />
     <Compile Include="Extern.fs" />
     <Compile Include="IR\Types.fs" />
+    <Compile Include="IR\GenBody.fs" />
     <Compile Include="IR\GenParam.fs" />
     <Compile Include="IR\GenExpression.fs" />
     <Compile Include="IR\GenName.fs" />
