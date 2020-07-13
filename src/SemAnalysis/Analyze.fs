@@ -5,6 +5,7 @@ open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
+open Classier.NET.Compiler.TypeSystem
 
 type private Analysis =
     { EntryPoint: GenEntryPoint option
@@ -12,6 +13,17 @@ type private Analysis =
       GlobalTable: GlobalsTable
       GlobalTypes: ImmutableList<GenType * CompilationUnit> }
 
+module private Analyzer =
+    let error anl err =
+        { anl with Errors = anl.Errors.Add err }
+    let check checker anl =
+        match checker anl with
+        | Some err -> error anl err
+        | None -> anl
+    let next (f: Analysis -> Analysis) anl =
+        f anl
+
+// TODO: Maybe pass in an empty 'Analysis' and create and use new functions in the Analyzer module to chain together the work?
 let private globals gtable cunits =
     let ctypes cunit =
         Seq.map
@@ -168,20 +180,53 @@ let private ntypes anl =
                     mdle)
         anl
 
-let private gbody body =
-    
-    invalidOp "bad"
+let private gbody (body: PStatement list) ltable anl = // TODO: Maybe make Analysis generic so it can pass data around to different analyzer functions?
+    List.fold
+        (fun (state, locals) (pos, st) ->
+            match st with
+            | _ ->
+                let err =
+                    st
+                    |> sprintf "analyzer for statement %A"
+                    |> FeatureNotImplemented
+                    |> Analyzer.error state
+                err, locals)
+        (anl, ltable)
+        body
+    |> fst
 
 let private members anl =
     invalidOp "bad"
 
-let private entryPoint epoint anl =
+let private entryPoint epoint =
     match epoint with
-    | Some epoint ->
-        invalidOp "no impl for entrypoint"
-    | None -> anl
+    | Some (epoint: EntryPoint) ->
+        Analyzer.check
+            (fun _ ->
+                let err = BadEntryPointSignature epoint |> Some
+                match (epoint.Parameters) with // TODO: Come up with way to make this chain of matches shorter.
+                | [ args ] ->
+                    let (TypeName ptype) = args.Type
+                    match ptype with
+                    | ArrayType oftype ->
+                        match oftype with
+                        | Primitive prim ->
+                            match prim with
+                            | PrimitiveType.String -> None
+                            | _ -> err
+                        | _ -> err
+                    | _ -> err
+                | _ -> err)
+        >> Analyzer.next
+            (fun anl ->
+                let body =
+                    LocalsTable.empty
+                    // |> LocalsTable.addLocal
+                    // |> gbody 
+                invalidOp "TODO: Validate the body of the entrypoint")
+    | None -> id
 
-let output (cunits, epoint: EntryPoint option) table =
+let output (cunits, epoint) table =
     let result =
         globals table cunits
         |> ntypes

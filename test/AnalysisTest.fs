@@ -92,7 +92,7 @@ let tests =
         testStrs
             "entry point exists"
             [
-                "main (args: String[]) { }"
+                "main (args: string[]) { }"
             ]
             (fun output ->
                 let epoint = Option.get output.EntryPoint

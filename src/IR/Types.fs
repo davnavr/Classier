@@ -48,7 +48,8 @@ type GenStatement =
     | IgnoredExpr of GenExpression
 
 type GenBody =
-    | GenBody of ImmutableList<GenStatement * Ast.Statement>
+    { Statements: ImmutableList<GenStatement * Ast.Statement>
+      ReturnType: ResolvedType }
 
 type GenPrimaryCtor =
     { Body: GenBody
