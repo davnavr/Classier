@@ -257,8 +257,9 @@ let identifier =
           Generics = gparams }
 let identifierFull: Parser<FullIdentifier<_>, _> =
     sepBy1 identifier (separator period |> attempt)
-    |>> FullIdentifier
     <?> "fully qualified name"
+    |>> fun (names) ->
+        FullIdentifier(names.Head, names.Tail)
 
 let extends = keyword "extends" >>. identifierFull
 let implementsOpt =
@@ -1455,7 +1456,8 @@ let compilationUnit: Parser<CompilationUnit, State> =
         skipString "use"
         >>. space1
         |> attempt
-        >>. identifierFull
+        >>. position
+        .>>. identifierFull
         .>> space
         .>> semicolon
         <?> "use statement"
@@ -1512,7 +1514,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
     space
     >>. tuple4
         (namespaceDecl .>> space)
-        (useStatements .>> space) // TODO: Consider moving use statements before namespace decl.
+        (useStatements .>> space)
         (definitions .>> eof)
         position
     |>> fun (ns, uses, types, pos) ->

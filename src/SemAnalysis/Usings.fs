@@ -18,9 +18,11 @@ type internal Usings =
 module internal Usings =
     let empty = Usings ImmutableSortedDictionary.Empty
 
-    let private add name gtable (Usings usings) =
-        invalidOp "add the thing and see if it is valid"
-        Result.Error name
+    let private add (pos, uname) gtable (Usings usings) =
+        match Identifier.fullAsList uname with
+        | [ name ] ->
+            
+            invalidOp "add the thing and see if it is valid"
 
     let ofCompilationUnit gtable (cu: CompilationUnit) =
         Seq.fold
@@ -29,6 +31,6 @@ module internal Usings =
                 | Result.Ok added ->
                     added, err
                 | Result.Error e ->
-                    usings, ImmList.add e err)
+                    usings, ImmList.addRange e err)
             (empty, ImmutableList.Empty)
             cu.Usings

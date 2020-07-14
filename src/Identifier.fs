@@ -26,11 +26,15 @@ type Identifier<'Generic> =
 
 [<StructuralComparison; StructuralEquality>]
 type FullIdentifier<'Generic> =
-    | FullIdentifier of Identifier<'Generic> list
+    | FullIdentifier of Identifier<'Generic> * Identifier<'Generic> list
 
     override this.ToString() =
-        let (FullIdentifier ids) = this
-        String.Join('.', ids)
+        let (FullIdentifier(head, ids)) = this
+        match ids with
+        | [] -> string head
+        | _ ->
+            String.Join('.', ids)
+            |> sprintf "%O.%s" head
 
 let private nameRegex = "^[A-Za-z][A-Za-z_0-9]*$" |> Regex
 
@@ -51,10 +55,12 @@ let ofStr str =
 let ofStrSeq strs =
     Seq.tryHead strs
     |> Option.map
-        (fun _ ->
-            Seq.map ofStr strs
-            |> Seq.toList
-            |> FullIdentifier)
+        (fun head ->
+            let rest =
+                strs
+                |> Seq.map ofStr
+                |> Seq.toList
+            FullIdentifier(ofStr head, rest))
 
 let mapGenerics gmapper id =
     { Name = id.Name
@@ -62,3 +68,6 @@ let mapGenerics gmapper id =
           List.map gmapper id.Generics }
 
 let noGenerics<'Generic> = mapGenerics (fun (_: 'Generic) -> ())
+
+let fullAsList (FullIdentifier (head, tail)) =
+    head :: tail

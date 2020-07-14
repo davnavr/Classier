@@ -7,7 +7,7 @@ open Classier.NET.Compiler.IR
 
 type AnalyzerError =
     | BadEntryPointSignature of EntryPoint
-    | BadUseStatement of FullIdentifier<TypeName>
+    | BadUseStatement of FParsec.Position * FullIdentifier<TypeName>
     | DuplicateGlobalType of TypeDef * GlobalTypeSymbol
     | DuplicateClassMember of GenClass * TypeOrMember<Class, InstanceMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>

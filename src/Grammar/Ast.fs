@@ -251,6 +251,6 @@ type TypeDef =
 
 type CompilationUnit =
     { Namespace: Namespace
-      Usings: FullIdentifier<TypeName> list
+      Usings: (FParsec.Position * FullIdentifier<TypeName>) list
       Source: string
       Types: (GlobalAccess * TypeDef) list }
