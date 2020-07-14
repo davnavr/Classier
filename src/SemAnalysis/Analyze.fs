@@ -11,14 +11,16 @@ type private Analysis =
     { EntryPoint: GenEntryPoint option
       Errors: ImmutableList<AnalyzerError>
       GlobalTable: GlobalsTable
-      GlobalTypes: ImmutableList<GenType * CompilationUnit * Usings> }
+      GlobalTypes: ImmutableList<GenType * CompilationUnit>
+      Usings: ImmutableSortedDictionary<CompilationUnit, Usings> }
 
 module private Analyzer =
     let init table =
         { EntryPoint = None
           Errors = ImmutableList.Empty
           GlobalTable = table
-          GlobalTypes = ImmutableList.Empty }
+          GlobalTypes = ImmutableList.Empty
+          Usings = ImmutableSortedDictionary.Empty }
 
     let error err anl =
         { anl with Errors = anl.Errors.Add err }
@@ -56,7 +58,7 @@ let private globals cunits anl =
             | Result.Ok ntable ->
                 { state with
                     GlobalTable = ntable
-                    GlobalTypes = state.GlobalTypes.Add (gtype, cunit, Usings.empty) }
+                    GlobalTypes = state.GlobalTypes.Add (gtype, cunit) }
             | Result.Error dup ->
                 Analyzer.error
                     (DuplicateGlobalType (tdef, dup))
@@ -149,7 +151,7 @@ let private ntypes anl =
     anl.GlobalTypes
     |> Seq.indexed
     |> Seq.fold
-        (fun state (i, (gtype, cu, us)) ->
+        (fun state (i, (gtype, cu)) ->
             let addNested create t tdef =
                 let (gen, err) = create tdef
                 { state with
@@ -157,7 +159,7 @@ let private ntypes anl =
                     GlobalTypes =
                         ImmList.setItem
                             i
-                            (t gen, cu, us)
+                            (t gen, cu)
                             state.GlobalTypes }
             match gtype with
             | GenClass clss ->
@@ -181,7 +183,7 @@ let private tresolution anl =
     anl.GlobalTypes
     |> Seq.indexed
     |> Seq.fold
-        (fun state _ ->
+        (fun state (i, _) ->
             invalidOp "TODO: Resolve all of the usings")
         anl
 
@@ -235,7 +237,7 @@ let output (cunits, epoint) table =
     | ImmList.Empty ->
         { GlobalTypes =
             Seq.map
-                (fun (tdef, cu, _) -> cu.Namespace, tdef)
+                (fun (tdef, ns) -> ns.Namespace, tdef)
                 result.GlobalTypes
           EntryPoint = result.EntryPoint }
         |> Result.Ok
