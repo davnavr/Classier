@@ -80,14 +80,22 @@ type GenInterfaceMember =
     | InterfaceMthd
     | InterfaceProp
 
-type GenInterface =
+type GenInterface<'Parent> =
     { InterfaceName: GenName
       Members: InterfaceMembers
+      Parent: 'Parent
       SuperInterfaces: InterfaceSet
       Syntax: Ast.Interface }
 
-type InterfaceMembers =
-    MemberSet<GenInterface, GenInterfaceMember>
+[<RequireQualifiedAccess>]
+type GenInterface =
+    | Nested of GenNestedInterface
+    | Global of GenGlobalInterface
+
+type GenNestedInterface = GenInterface<GenInterface>
+type GenGlobalInterface = GenInterface<Namespace>
+
+type InterfaceMembers = MemberSet<GenNestedInterface, GenInterfaceMember>
 type InterfaceSet = ImmutableSortedSet<ResolvedInterface>
 
 type GenClassMember =
@@ -95,36 +103,59 @@ type GenClassMember =
     | ClassMthd of GenMethod
     | ClassProp
 
-type GenClass =
+type GenClass<'Parent> =
     { ClassName: GenName
       Interfaces: InterfaceSet
       Members: ClassMembers
+      Parent: 'Parent
       PrimaryCtor: GenPrimaryCtor
       SuperClass: DefinedOrExtern<GenClass, EClass> option
       Syntax: Ast.Class }
 
-type ClassMembers = MemberSet<GenClass, GenClassMember>
+[<RequireQualifiedAccess>]
+type GenClass =
+    | Nested of GenNestedClass
+    | Global of GenGlobalClass
+
+type GenNestedClass = GenClass<GenClass>
+type GenGlobalClass = GenClass<Namespace>
+
+type ClassMembers = MemberSet<GenNestedClass, GenClassMember>
 
 type GenModuleMember =
     | ModuleFunc of GenFunction
     | ModuleOper
 
-type GenModule =
+type GenModule<'Parent> =
     { Members: ModuleMembers
       ModuleName: IdentifierStr
+      Parent: 'Parent
       Syntax: Ast.Module }
 
-type ModuleMembers = MemberSet<GenType, GenModuleMember>
+[<RequireQualifiedAccess>]
+type GenModule =
+    | Nested of GenNestedModule
+    | Global of GenGlobalModule
 
-type MemberSet = // TODO: Is this type necessary?
-    | ClassMembers of ClassMembers
-    | InterfaceMembers of InterfaceMembers
-    | ModuleMembers of ModuleMembers
+type GenNestedModule = GenModule<GenModule>
+type GenGlobalModule = GenModule<Namespace>
+
+type ModuleMembers = MemberSet<GenNestedType, GenModuleMember>
 
 type GenType =
     | GenClass of GenClass
     | GenInterface of GenInterface
     | GenModule of GenModule
+
+type GenNestedType =
+    | GenNestedClass of GenNestedClass
+    | GenNestedInterface of GenNestedInterface
+    | GenNestedModule of GenNestedModule
+
+type GenGlobalType =
+    | GenGlobalClass of GenGlobalClass
+    | GenGlobalInterface of GenGlobalInterface
+    | GenGlobalModule of GenGlobalModule
 
 type EntryPointReturn =
     | ExitCode
@@ -136,5 +167,5 @@ type GenEntryPoint =
       Syntax: Ast.EntryPoint }
 
 type GenOutput =
-    { GlobalTypes: seq<Namespace * GenType>
+    { GlobalTypes: seq<GenGlobalType>
       EntryPoint: GenEntryPoint option }

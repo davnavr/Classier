@@ -4,7 +4,7 @@ module Classier.NET.Compiler.Grammar.Member
 open Classier.NET.Compiler.AccessControl
 
 let inline private methodParams map def =
-    ((^a) : (member Method : Signature<_, _>) (def)).Parameters
+    (^a : (member Method : Signature<_, _>) def).Parameters
     |> List.map (List.map map)
     |> Some
 

@@ -39,7 +39,7 @@ let private memberSet tname mname mparams =
 
 let emptyClass =
     memberSet
-        (fun cdef -> cdef.ClassName)
+        (fun (cdef: GenNestedClass) -> cdef.ClassName)
         (function
         | _ -> None)
         (fun mdef ->
@@ -49,7 +49,7 @@ let emptyClass =
 
 let emptyInterface =
     memberSet
-        (fun idef -> idef.InterfaceName)
+        (fun (idef: GenNestedInterface) -> idef.InterfaceName)
         (function
         | _ -> None)
         (fun mdef ->
@@ -59,40 +59,10 @@ let emptyInterface =
 
 let emptyModule =
     memberSet
-        GenType.name
+        GenType.nname
         (function
         | _ -> None)
         (fun mdef ->
             match mdef with
             | ModuleFunc _
             | _ -> List.empty)
-
-let rec ofClass (gclass: GenClass) = // TODO: Should this take a GenClass or a Grammar.Ast.Class?
-    let nextmem acc (macc, mdef) =
-        let gmember = // TODO: Maybe have functions elsewhere that handle creation of placeholder members?
-            match mdef with
-            | TypeOrMember.Type nested ->
-                nested
-                |> GenType.gclass emptyClass
-                |> ofClass
-                |> ignore
-                //|> TypeOrMember.Type
-                invalidOp "bad"
-            | TypeOrMember.Member mdef ->
-                invalidOp "bad"
-        Result.bind
-            (fun (set: ImmutableSortedSet<_>) -> // TODO: Error can also occur if mdef is a nested class with invalid members, since ofClass needs to be called recursively.
-                let add =
-                    SortedSet.tryAdd (macc, gmember) set
-                match add with
-                | Some nset -> Result.Ok nset
-                | None -> Result.Error gmember)
-            acc
-    Seq.fold
-        (fun acc (macc, mdef) ->
-            result {
-                let! set = acc
-                return set
-            })
-        (Result.Ok emptyClass)
-        gclass.Syntax.Members

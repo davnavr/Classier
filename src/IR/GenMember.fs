@@ -4,6 +4,9 @@ open System.Collections.Immutable
 open Classier.NET.Compiler.TypeSystem
 open Classier.NET.Compiler.Grammar.Ast
 
+let inline internal syntax mber =
+    (^a : (member Syntax : _) mber)
+
 let classm =
     function
     | Abstract mabs ->
