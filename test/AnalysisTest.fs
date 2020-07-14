@@ -10,15 +10,17 @@ open Fuchu
 let testStrs name sources f =
     test name {
         let (result, state) =
-            Seq.fold
-                (fun (acc, state) source ->
+            sources
+            |> Seq.indexed
+            |> Seq.fold
+                (fun (acc, state) (i, source) ->
                     match acc with
                     | Result.Ok list ->
                         let result =
                             runParserOnString
                                 Parser.compilationUnit
                                 Parser.defaultState
-                                name
+                                (sprintf "%s%i" name i)
                                 source
                         match result with
                         | Success(cu, nstate, _) ->
@@ -31,7 +33,6 @@ let testStrs name sources f =
                             Result.Error msg, state
                     | Result.Error _ -> acc, state)
                 (Result.Ok ImmutableList.Empty, Parser.defaultState)
-                sources
         Analyze.output
             (Assert.isOk result, state.EntryPoint)
             GlobalsTable.empty

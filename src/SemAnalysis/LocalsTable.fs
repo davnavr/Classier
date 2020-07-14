@@ -14,7 +14,7 @@ type LocalsTable =
     | LocalsTable of ImmutableSortedSet<Local> list
 
 let private emptyScope =
-    SortedSet.withComparison
+    SortedSet.withComparer
         (fun one two ->
             compare one.Name two.Name)
         ImmutableSortedSet.Empty

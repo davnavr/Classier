@@ -65,7 +65,7 @@ module GlobalsTable =
                               | _ -> 0
                       | _ -> name
                   | _ -> ns
-        SortedSet.withComparison
+        SortedSet.withComparer
             compare
             ImmutableSortedSet.Empty
 

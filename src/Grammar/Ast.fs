@@ -8,17 +8,14 @@ open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
 type TypeParam =
-    | TypeParam of GenericParam<FullIdentifier<TypeArg>, FullIdentifier<TypeArg>>
+    | TypeParam of GenericParam<FullIdentifier<TypeName>, FullIdentifier<TypeName>>
 
     override this.ToString() =
         let (TypeParam id) = this
         id.ToString()
 
-// TODO: Rename this to TypeArgOrParam or remove it.
-type TypeArg = Generic<TypeName, FullIdentifier<TypeParam>, FullIdentifier<TypeParam>>
-
 type TypeName =
-    | TypeName of Type<FullIdentifier<TypeArg>>
+    | TypeName of Type<FullIdentifier<TypeName>>
 
 type Name<'Identifier> =
     { Identifier: 'Identifier
@@ -94,10 +91,10 @@ type Expression =
            Target: Expression |}
     | PrefixOp of string * Expression
     | InfixOp of Expression * string * Expression
-    | IdentifierRef of Identifier<TypeArg>
+    | IdentifierRef of Identifier<TypeName>
     | IfExpr of If
     | MatchExpr of Match
-    | MemberAccess of Expression * Identifier<TypeArg>
+    | MemberAccess of Expression * Identifier<TypeName>
     | Nested of Expression
     | NullLit
     | NumLit of NumericLit
@@ -229,11 +226,11 @@ type Class =
     { ClassName: GenericName
       Body: PStatement list
       Inheritance: ClassInheritance
-      Interfaces: FullIdentifier<TypeArg> list
+      Interfaces: FullIdentifier<TypeName> list
       Members: MemberList<Class, InstanceMember>
       PrimaryCtor: PrimaryCtor
       SelfIdentifier: IdentifierStr option
-      SuperClass: FullIdentifier<TypeArg> option }
+      SuperClass: FullIdentifier<TypeName> option }
 
     override this.ToString() =
         sprintf "%Oclass %O" this.Inheritance this.ClassName
@@ -241,7 +238,7 @@ type Class =
 type Interface =
     { InterfaceName: GenericName
       Members: MemberList<Interface, AbstractMember>
-      SuperInterfaces: FullIdentifier<TypeArg> list }
+      SuperInterfaces: FullIdentifier<TypeName> list }
 
 type Module =
     { ModuleName: SimpleName
@@ -254,6 +251,6 @@ type TypeDef =
 
 type CompilationUnit =
     { Namespace: Namespace
-      Usings: FullIdentifier<TypeArg> list
+      Usings: FullIdentifier<TypeName> list
       Source: string
       Types: (GlobalAccess * TypeDef) list }

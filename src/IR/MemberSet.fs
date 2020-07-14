@@ -33,7 +33,7 @@ let private memberSet tname mname mparams =
                 | TypeOrMember.Type _ -> -1
             compare (ctype tdef) (mname mdef) * factor
         | _ -> overload
-    SortedSet.withComparison
+    SortedSet.withComparer
         mcompare
         ImmutableSortedSet.Empty
 

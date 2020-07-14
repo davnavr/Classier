@@ -16,11 +16,18 @@ type private Analysis =
 
 module private Analyzer =
     let init table =
+        let usings =
+            ImmSortedDict.withKeyComparer
+                (fun cu1 cu2 ->
+                    compare
+                        cu1.Source
+                        cu2.Source)
+                ImmutableSortedDictionary.Empty
         { EntryPoint = None
           Errors = ImmutableList.Empty
           GlobalTable = table
           GlobalTypes = ImmutableList.Empty
-          Usings = ImmutableSortedDictionary.Empty }
+          Usings = usings }
 
     let error err anl =
         { anl with Errors = anl.Errors.Add err }
@@ -179,13 +186,22 @@ let private ntypes anl =
                     mdle)
         anl
 
-let private tresolution anl =
-    anl.GlobalTypes
-    |> Seq.indexed
-    |> Seq.fold
-        (fun state (i, _) ->
-            invalidOp "TODO: Resolve all of the usings")
+let private tresolution cunits anl =
+    Seq.fold
+        (fun state cu ->
+            let (uses, err) =
+                Usings.ofCompilationUnit
+                    anl.GlobalTable
+                    cu
+            { state with
+                Usings =
+                    state.Usings.SetItem(cu, uses)
+                Errors =
+                    err
+                    |> Seq.map BadUseStatement
+                    |> state.Errors.AddRange })
         anl
+        cunits
 
 let private gbody body ltable anl =
     anl
@@ -228,7 +244,7 @@ let output (cunits, epoint) table =
         Analyzer.init table
         |> globals cunits
         |> ntypes
-        |> tresolution
+        |> tresolution cunits
     let result =
         rtypes
         // |> members

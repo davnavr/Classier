@@ -254,8 +254,8 @@ let identifier =
     <?> "identifier"
     |>> fun (name, gparams) ->
         { Name = name
-          Generics = List.map GenericArg gparams }
-let identifierFull: Parser<FullIdentifier<TypeArg>, _> =
+          Generics = gparams }
+let identifierFull: Parser<FullIdentifier<_>, _> =
     sepBy1 identifier (separator period |> attempt)
     |>> FullIdentifier
     <?> "fully qualified name"

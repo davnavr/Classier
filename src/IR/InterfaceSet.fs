@@ -24,6 +24,6 @@ let empty: InterfaceSet =
                 |> (*) (cname def ext)
             | (Defined d1, Defined d2) -> cname d1 d2
         | ns -> ns
-    SortedSet.withComparison
+    SortedSet.withComparer
         icompare
         ImmutableSortedSet.Empty

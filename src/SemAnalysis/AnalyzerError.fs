@@ -1,11 +1,13 @@
 ﻿namespace Classier.NET.Compiler.SemAnalysis
 
 open Classier.NET.Compiler
+open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 
 type AnalyzerError =
     | BadEntryPointSignature of EntryPoint
+    | BadUseStatement of FullIdentifier<TypeName>
     | DuplicateGlobalType of TypeDef * GlobalTypeSymbol
     | DuplicateClassMember of GenClass * TypeOrMember<Class, InstanceMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>

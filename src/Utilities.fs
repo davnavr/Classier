@@ -25,11 +25,18 @@ module Bool =
         then Some()
         else None
 
+[<RequireQualifiedAccess>]
+module Comparer =
+    open System.Collections.Generic
+
+    let create f =
+        { new IComparer<_> with
+              member _.Compare(one, two) =
+                  f one two }
+
 /// Provides helper functions for interacting with sorted sets.
 [<RequireQualifiedAccess>]
 module SortedSet =
-    open System.Collections.Generic
-
     let (|Contains|_|) item (set: ImmutableSortedSet<_>) =
         set.Contains(item) |> Bool.toOpt
 
@@ -45,11 +52,8 @@ module SortedSet =
 
     let remove item (set: ImmutableSortedSet<_>) = set.Remove item
 
-    let withComparison comparer (set: ImmutableSortedSet<_>) =
-        { new IComparer<_> with
-              member _.Compare(one, two) =
-                  comparer one two }
-        |> set.WithComparer
+    let withComparer comparer (set: ImmutableSortedSet<_>) =
+        Comparer.create comparer |> set.WithComparer
 
     let replace item (set: ImmutableSortedSet<_>) =
         match set.TryGetValue item with
@@ -80,6 +84,11 @@ module ImmList =
 module ImmSortedDict =
     let setItem key value (dict: ImmutableSortedDictionary<_, _>) =
         dict.SetItem(key, value)
+
+    let withKeyComparer kcomparer (dict: ImmutableSortedDictionary<_, _>) =
+        kcomparer
+        |> Comparer.create
+        |> dict.WithComparers
 
 [<RequireQualifiedAccess>]
 module Regex =
