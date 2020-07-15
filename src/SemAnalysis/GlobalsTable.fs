@@ -5,7 +5,6 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.IR
 
-// TODO: Make everything in this file part of the module?
 type GlobalTypeSymbol =
     { Namespace: Namespace
       Type: DefinedOrExtern<AccessControl.GlobalAccess * GenType, EType> }
