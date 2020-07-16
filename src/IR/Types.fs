@@ -92,6 +92,11 @@ type GenInterface =
     | Nested of GenNestedInterface
     | Global of GenGlobalInterface
 
+    member this.InterfaceName =
+        match this with
+        | Nested n -> n.InterfaceName
+        | Global g -> g.InterfaceName
+
 type GenNestedInterface = GenInterface<GenInterface>
 type GenGlobalInterface = GenInterface<Namespace>
 

@@ -40,24 +40,7 @@ let block indent p =
 let pclass (acc, gclass: GenClass) =
     fun prnt ->
         seq {
-            let minherit =
-                match gclass.Syntax.Inheritance with
-                | Ast.CanInherit -> String.Empty
-                | Ast.MustInherit -> "abstract "
-                | Ast.Sealed -> "sealed "
-
-            sprintf
-                "%O %sclass %O%O "
-                acc
-                minherit
-                gclass.ClassName
-                () // TODO: Print generic arguments.
-
-            match (gclass.Interfaces, gclass.SuperClass) with
-            | (SortedSet.Empty, _)
-            | (_, Some _) ->
-                invalidOp "no impl"
-            | _ -> String.Empty
+            invalidOp "no impl"
         }
         |> Seq.iter prnt
 
