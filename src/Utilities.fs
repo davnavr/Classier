@@ -43,26 +43,22 @@ module SortedSet =
     let (|Empty|_|) (set: ImmutableSortedSet<_>) =
         Bool.toOpt set.IsEmpty
 
-    let add item (set: ImmutableSortedSet<_>) = set.Add item
+    let inline add item (set: ImmutableSortedSet<_>) =
+        set.Add item
+    let inline remove item (set: ImmutableSortedSet<_>) =
+        set.Remove item
+    let inline withComparer comparer (set: ImmutableSortedSet<_>) =
+        Comparer.create comparer |> set.WithComparer
 
     let tryAdd item (set: ImmutableSortedSet<_>) =
         match set with
         | Contains item -> None
         | _ -> set |> add item |> Some
 
-    let remove item (set: ImmutableSortedSet<_>) = set.Remove item
-
-    let withComparer comparer (set: ImmutableSortedSet<_>) =
-        Comparer.create comparer |> set.WithComparer
-
-    let replace item (set: ImmutableSortedSet<_>) =
-        match set.TryGetValue item with
-        | (true, _) ->
-            set
-            |> remove item
-            |> add item
-        | (false, _) ->
-            set
+    let tryGetValue equal found missing (set: ImmutableSortedSet<_>) =
+        match set.TryGetValue equal with
+        | (true, original) -> found original
+        | (false, _) -> missing()
 
 [<RequireQualifiedAccess>]
 module ImmList =
@@ -89,6 +85,11 @@ module ImmSortedDict =
         kcomparer
         |> Comparer.create
         |> dict.WithComparers
+
+    let tryGetValue key found missing (dict: ImmutableSortedDictionary<_, _>) =
+        match dict.TryGetValue key with
+        | (true, value) -> found value
+        | (false, _) -> missing()
 
 [<RequireQualifiedAccess>]
 module Regex =

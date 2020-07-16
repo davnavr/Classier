@@ -1,6 +1,8 @@
-﻿module rec Classier.NET.Compiler.Extern
+﻿[<AutoOpen>]
+module rec Classier.NET.Compiler.Extern.Types
 
 open System.Collections.Immutable
+open Classier.NET.Compiler
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Identifier
@@ -81,12 +83,14 @@ type EInterface<'Parent> =
 [<RequireQualifiedAccess>]
 type EInterface =
     | Nested of EInterface<EType>
-    | Global of EInterface<Namespace>
+    | Global of EGlobalInterface
 
     member this.InterfaceName =
         match this with
         | Nested n -> n.InterfaceName
         | Global g -> g.InterfaceName
+
+type EGlobalInterface = EInterface<Namespace>
 
 type EClass<'Parent> =
     { ClassName: EGenericName
@@ -98,12 +102,14 @@ type EClass<'Parent> =
 [<RequireQualifiedAccess>]
 type EClass =
     | Nested of EClass<EType>
-    | Global of EClass<Namespace>
+    | Global of EGlobalClass
 
     member this.ClassName =
         match this with
         | Nested n -> n.ClassName
         | Global g -> g.ClassName
+
+type EGlobalClass = EClass<Namespace>
 
 type EModule<'Parent> =
     { ModuleName: EGenericName
@@ -112,20 +118,21 @@ type EModule<'Parent> =
 [<RequireQualifiedAccess>]
 type EModule =
     | Nested of EModule<EType>
-    | Global of EModule<Namespace>
+    | Global of EGlobalModule
 
     member this.ModuleName =
         match this with
         | Nested n -> n.ModuleName
         | Global g -> g.ModuleName
 
+type EGlobalModule = EModule<Namespace>
+
+type EGlobalType =
+    | EGlobalClass of EGlobalClass
+    | EGlobalInterface of EGlobalInterface
+    | EGlobalModule of EGlobalModule
+
 type EType =
     | EClass of EClass
     | EInterface of EInterface
     | EModule of EModule
-
-let typeName =
-    function
-    | EClass clss -> clss.ClassName
-    | EInterface i -> i.InterfaceName
-    | EModule m -> m.ModuleName

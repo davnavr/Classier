@@ -2,16 +2,18 @@
 module Classier.NET.Compiler.SemAnalysis.Analyze
 
 open System.Collections.Immutable
+
 open Classier.NET.Compiler
+open Classier.NET.Compiler.TypeSystem
+
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
-open Classier.NET.Compiler.TypeSystem
 
 type private Analysis =
     { EntryPoint: GenEntryPoint option
       Errors: ImmutableList<AnalyzerError>
       GlobalTable: GlobalsTable
-      GlobalTypes: ImmutableList<GenType * CompilationUnit>
+      GlobalTypes: ImmutableList<GenGlobalType * CompilationUnit>
       Usings: ImmutableSortedDictionary<CompilationUnit, Usings> }
 
 module private Analyzer =
@@ -35,31 +37,40 @@ module private Analyzer =
 let private globals cunits anl =
     let ctypes (cunit: CompilationUnit) =
         Seq.map
-            (fun (acc, tdef) ->
-                (cunit, acc, tdef))
+            (fun (_, tdef) -> cunit, tdef)
             cunit.Types
     cunits
     |> Seq.collect ctypes
     |> Seq.fold
-        (fun state (cunit, acc, tdef) ->
+        (fun state (cunit, tdef) ->
+            let tcreate fsyntax mset gtype def =
+                def
+                |> fsyntax cunit.Namespace mset
+                |> gtype
             let gtype =
                 match tdef with
                 | Class cdef ->
-                    cdef
-                    |> GenType.gclass MemberSet.emptyClass
-                    |> GenClass
+                    tcreate
+                        GenType.clss
+                        MemberSet.emptyClass
+                        GenGlobalClass
+                        cdef
                 | Interface intf ->
-                    intf
-                    |> GenType.ginterface MemberSet.emptyInterface
-                    |> GenInterface
+                    tcreate
+                        GenType.intf
+                        MemberSet.emptyInterface
+                        GenGlobalInterface
+                        intf
                 | Module mdle ->
-                    mdle
-                    |> GenType.gmodule MemberSet.emptyModule
-                    |> GenModule
+                    tcreate
+                        GenType.mdle
+                        MemberSet.emptyModule
+                        GenGlobalModule
+                        mdle
             let result =
                 GlobalsTable.addSymbol
-                    { Namespace = cunit.Namespace
-                      Type = Defined (acc, gtype) }
+                    (Defined gtype)
+                    cunit.Namespace
                     state.GlobalTable
             match result with
             | Result.Ok ntable ->
@@ -73,118 +84,7 @@ let private globals cunits anl =
         anl
 
 let private ntypes anl =
-    let tclass = GenType.gclass MemberSet.emptyClass
-    let tinterface = GenType.ginterface MemberSet.emptyInterface
-
-    let nested (syntaxm: _ -> MemberList<_, _>) gtype =
-        gtype
-        |> syntaxm
-        |> Seq.choose
-            (function
-            | (acc: AccessControl.Access, TypeOrMember.Type nested) ->
-                Some(acc, nested)
-            | (_, TypeOrMember.Member _) -> None)
-    let rec ntype syntaxm ctype typem update duperr gtype =
-        let inner = ntype syntaxm ctype typem update duperr
-        gtype
-        |> nested syntaxm
-        |> Seq.fold
-            (fun (parent, err) (acc, nested) ->
-                let (gnested, nerr) =
-                    ctype nested |> inner
-                let add =
-                    SortedSet.tryAdd
-                        (acc, TypeOrMember.Type gnested)
-                        (typem parent)
-                match add with
-                | Some added ->
-                    let errors = ImmList.addRange nerr err
-                    update added parent, errors
-                | None ->
-                    let dup = duperr(parent, TypeOrMember.Type nested)
-                    parent, ImmList.add dup err)
-            (gtype, ImmutableList.Empty)
-
-    let nclass =
-        ntype
-            (fun (clss: GenClass) -> clss.Syntax.Members)
-            tclass
-            (fun clss -> clss.Members)
-            (fun added parent -> { parent with Members = added })
-            DuplicateClassMember
-    let ninterface =
-        ntype
-            (fun (intf: GenInterface) -> intf.Syntax.Members)
-            tinterface
-            (fun intf -> intf.Members)
-            (fun added parent -> { parent with Members = added })
-            DuplicateInterfaceMember
-    let rec nmodule (mdle: GenModule) =
-        nested
-            (fun _ -> mdle.Syntax.Members)
-            mdle
-        |> Seq.fold
-            (fun (parent, err) (acc, nested) ->
-                let (gnested, nerr) =
-                    let atype (tmap: _ -> GenType) (ntype, err) =
-                        tmap ntype, err
-                    match nested with
-                    | Class clss ->
-                        tclass clss
-                        |> nclass
-                        |> atype GenClass
-                    | Interface intf ->
-                        tinterface intf
-                        |> ninterface
-                        |> atype GenInterface
-                    | Module nmdle ->
-                        GenType.gmodule
-                            MemberSet.emptyModule
-                            nmdle
-                        |> nmodule
-                        |> atype GenModule
-                let add =
-                    SortedSet.tryAdd
-                        (acc, TypeOrMember.Type gnested)
-                        parent.Members
-                match add with
-                | Some added ->
-                    { parent with Members = added }, err.AddRange nerr
-                | None ->
-                    let dup = DuplicateModuleMember(parent, TypeOrMember.Type nested)
-                    parent, err.Add dup)
-            (mdle, ImmutableList.Empty)
-
-    anl.GlobalTypes
-    |> Seq.indexed
-    |> Seq.fold
-        (fun state (i, (gtype, cu)) ->
-            let addNested create t tdef =
-                let (gen, err) = create tdef
-                { state with
-                    Errors = state.Errors.AddRange err
-                    GlobalTypes =
-                        ImmList.setItem
-                            i
-                            (t gen, cu)
-                            state.GlobalTypes }
-            match gtype with
-            | GenClass clss ->
-                addNested
-                    nclass
-                    GenClass
-                    clss
-            | GenInterface intf ->
-                addNested
-                    ninterface
-                    GenInterface
-                    intf
-            | GenModule mdle ->
-                addNested
-                    nmodule
-                    GenModule
-                    mdle)
-        anl
+    anl
 
 let private tresolution cunits anl =
     Seq.fold
@@ -252,9 +152,7 @@ let output (cunits, epoint) table =
     match result.Errors with
     | ImmList.Empty ->
         { GlobalTypes =
-            Seq.map
-                (fun (tdef, ns) -> ns.Namespace, tdef)
-                result.GlobalTypes
+            Seq.map fst result.GlobalTypes
           EntryPoint = result.EntryPoint }
         |> Result.Ok
     | err -> Result.Error err

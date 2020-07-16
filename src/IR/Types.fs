@@ -117,6 +117,11 @@ type GenClass =
     | Nested of GenNestedClass
     | Global of GenGlobalClass
 
+    member this.ClassName =
+        match this with
+        | Nested n -> n.ClassName
+        | Global g -> g.ClassName
+
 type GenNestedClass = GenClass<GenClass>
 type GenGlobalClass = GenClass<Namespace>
 

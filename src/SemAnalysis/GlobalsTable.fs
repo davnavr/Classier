@@ -1,104 +1,75 @@
 ﻿namespace Classier.NET.Compiler.SemAnalysis
 
 open System.Collections.Immutable
+
 open Classier.NET.Compiler
+open Classier.NET.Compiler.Identifier
+
 open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.IR
 
-type GlobalTypeSymbol =
-    { Namespace: Namespace
-      Type: DefinedOrExtern<AccessControl.GlobalAccess * GenType, EType> }
-
-/// Stores the namespaces and types declared in compilation units.
-type GlobalsTable =
-    private
-    | GlobalsTable of ImmutableSortedDictionary<Namespace, ImmutableSortedSet<GlobalTypeSymbol>>
-
+[<RequireQualifiedAccess>]
 module GlobalsTable =
+    type private GlobalType = DefinedOrExtern<GenGlobalType, EGlobalType>
+
+    type Table =
+        private
+        | GlobalsTable of ImmutableSortedDictionary<Namespace, ImmutableSortedSet<GlobalType>>
+
     let private emptySymbols =
-        let compare symbol1 symbol2 =
-                  let ns =
-                      compare
-                          symbol1.Namespace
-                          symbol2.Namespace
-                  match ns with
-                  | 0 ->
-                      let (type1, type2) = (symbol1.Type, symbol2.Type)
-                      let tname tdef =
-                          match tdef with
-                          | Defined (_, def) ->
-                              GenType.name def
-                              |> Identifier.noGenerics
-                          | Extern ext ->
-                              Extern.typeName ext
-                              |> Identifier.noGenerics
-                      let name =
-                          compare
-                              (tname type1)
-                              (tname type2)
-                      match name with
-                      | 0 ->
-                          match (type1, type2) with
-                          | (Defined (_, def), Extern ext)
-                          | (Extern ext, Defined (_, def)) ->
-                              let value =
-                                  match type1 with
-                                  | Defined _ -> 1
-                                  | _ -> -1
-                              match (def, ext) with
-                              | (GenModule _, EModule _) -> 0
-                              | (GenModule _, _) -> value
-                              | (_, EModule _) -> value * -1
-                              | _ -> 0
-                          | (Defined (_, def1), Defined (_, def2)) ->
-                              match (def1, def2) with
-                              | (GenModule _, GenModule _) -> 0
-                              | (_, GenModule _) -> -1
-                              | (GenModule _, _) -> 1
-                              | _ -> 0
-                          | (Extern ext1, Extern ext2) ->
-                              match (ext1, ext2) with
-                              | (EModule _, EModule _) -> 0
-                              | (_, EModule _) -> -1
-                              | (EModule _, _) -> 1
-                              | _ -> 0
-                      | _ -> name
-                  | _ -> ns
         SortedSet.withComparer
-            compare
+            (fun type1 type2 ->
+                let tname =
+                    function
+                    | Defined def ->
+                        GenType.gname def |> Identifier.noGenerics
+                    | Extern ext ->
+                        EType.gname ext |> Identifier.noGenerics
+                let cname =
+                    compare
+                        (tname type1)
+                        (tname type2)
+                match cname with
+                | 0 ->
+                    match (type1, type2) with
+                    | (Defined def1, Defined def2) ->
+                        match (def1, def2) with
+                        | (GenGlobalModule _, GenGlobalModule _) -> 0
+                        | (_, GenGlobalModule _) -> -1
+                        | (GenGlobalModule _, _) -> 1
+                        | _ -> 0
+                    | (Extern ext1, Extern ext2) ->
+                        match (ext1, ext2) with
+                        | (EGlobalModule _, EGlobalModule _) -> 0
+                        | (_, EGlobalModule _) -> -1
+                        | (EGlobalModule _, _) -> 1
+                        | _ -> 0
+                | _ -> cname)
             ImmutableSortedSet.Empty
 
     let empty = GlobalsTable ImmutableSortedDictionary.Empty
 
-    let getNamespaces (GlobalsTable table) = table.Keys
-
-    let getSymbols ns (GlobalsTable table) =
-        match table.TryGetValue ns with
-        | (true, symbols) -> symbols
-        | (false, _) -> emptySymbols
-
-    let addSymbol tsymbol globals =
-        let (GlobalsTable table) = globals
-        let set =
-            getSymbols
-                tsymbol.Namespace
-                globals
-        match set.TryGetValue tsymbol with
-        | (true, existing) ->
-            Result.Error existing
-        | (false, _) ->
+    let types ns (GlobalsTable table) =
+        ImmSortedDict.tryGetValue
+            ns
+            id
+            (fun () -> emptySymbols)
             table
-            |> ImmSortedDict.setItem
-                tsymbol.Namespace
-                (SortedSet.add tsymbol set)
-            |> GlobalsTable
-            |> Result.Ok
 
-    let replaceSymbol replacement globals =
+    let addSymbol tdef ns globals =
         let (GlobalsTable table) = globals
-        let types =
-            globals
-            |> getSymbols replacement.Namespace
-            |> SortedSet.replace replacement
-        table.SetItem(replacement.Namespace, types)
-        |> GlobalsTable
+        let nstypes =
+            types ns globals
+        SortedSet.tryGetValue
+            tdef
+            Result.Error
+            (fun() ->
+                ImmSortedDict.setItem
+                    ns
+                    (SortedSet.add tdef nstypes)
+                    table
+                |> GlobalsTable
+                |> Result.Ok)
+            nstypes
+
+type GlobalsTable = GlobalsTable.Table
