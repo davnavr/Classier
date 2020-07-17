@@ -69,26 +69,90 @@ module GlobalsTable =
                     cgtypes t1 t2)
         |> Table
 
-    /// Retrieves the global types in the specified namespace.
-    let nstypes (Namespace ns) =
-        let rec inner nsnames (Table table) =
+    let private foldns folder fail state (Namespace ns) t =
+        let rec inner nsnames acc (Table table) =
             match nsnames with
+            | [] -> acc
             | name :: rest ->
                 let equiv = NamespaceSymbol(name, empty)
                 match table.TryGetValue equiv with
+                | (false, _)
+                | (true, TypeSymbol _)-> fail acc
                 | (true, NamespaceSymbol (_, ntable)) ->
-                    inner rest ntable
-                | _ ->
-                    Seq.empty
-            | _ ->
-                Seq.choose
-                    (function
-                    | NamespaceSymbol _ -> None
-                    | TypeSymbol tdef -> Some tdef)
-                    table
-        inner ns
+                    inner rest (folder ntable name acc) ntable
+        inner ns (state t) t
 
-    let addSymbol tdef ns globals =
-        invalidOp "no"
+    let private updatens symbols addsymbol ns ttable =
+        let empty _ = List.empty
+        let tables =
+            foldns
+                (fun ntable name nlist ->
+                    (name, ntable) :: nlist)
+                empty
+                empty
+                ns
+                ttable
+        match tables with
+        | [] -> Result.Ok ttable
+        | (hns, htable) :: tns ->
+            let addns (Table table) symbol =
+                let nssymbol = NamespaceSymbol symbol
+                table
+                |> SortedSet.remove nssymbol
+                |> SortedSet.add nssymbol
+                |> Table
+            result {
+                let! ntable =
+                    Seq.fold
+                        (fun state nssymbol ->
+                            match state with
+                            | Result.Ok (Table build) ->
+                                addsymbol
+                                    nssymbol
+                                    build
+                            | Result.Error _ -> state)
+                        (Result.Ok htable)
+                        symbols
+                return
+                    List.fold
+                        (fun prev (nname, ntable) ->
+                            nname, addns ntable prev)
+                        (hns, ntable)
+                        tns
+                    |> addns ttable
+            }
+
+    let private nssymbols ns table =
+        let (Table symbols) =
+            foldns
+                (fun t _ _ -> t)
+                (fun _ -> empty)
+                id
+                ns
+                table
+        symbols
+
+    /// Retrieves the global types in the specified namespace.
+    let nstypes ns table =
+        Seq.choose
+            (function
+            | NamespaceSymbol _ -> None
+            | TypeSymbol tdef -> Some tdef)
+            (nssymbols ns table)
+
+    let addType tdef ns ttable =
+        updatens
+            [ TypeSymbol tdef ]
+            (fun symbol table ->
+                match table.TryGetValue symbol with
+                | (true, TypeSymbol dup) -> Result.Error dup
+                | _ ->
+                    SortedSet.add
+                        symbol
+                        table
+                    |> Table
+                    |> Result.Ok)
+            ns
+            ttable
 
 type GlobalsTable = GlobalsTable.Table

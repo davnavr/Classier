@@ -68,7 +68,7 @@ let private globals cunits anl =
                         GenGlobalModule
                         mdle
             let result =
-                GlobalsTable.addSymbol
+                GlobalsTable.addType
                     (Defined gtype)
                     cunit.Namespace
                     state.GlobalTable
