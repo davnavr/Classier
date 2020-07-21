@@ -150,17 +150,17 @@ type GenModule =
 type GenNestedModule = GenModule<GenModule>
 type GenGlobalModule = GenModule<Namespace>
 
-type ModuleMembers = MemberSet<GenNestedType, GenModuleMember>
+type ModuleMembers = MemberSet<GenNestedType<GenModule>, GenModuleMember>
 
 type GenType =
     | GenClass of GenClass
     | GenInterface of GenInterface
     | GenModule of GenModule
 
-type GenNestedType =
-    | GenNestedClass of GenNestedClass
-    | GenNestedInterface of GenNestedInterface
-    | GenNestedModule of GenNestedModule
+type GenNestedType<'Parent> =
+    | GenNestedClass of GenClass<'Parent>
+    | GenNestedInterface of GenInterface<'Parent>
+    | GenNestedModule of GenModule<'Parent>
 
 type GenGlobalType =
     | GenGlobalClass of GenGlobalClass

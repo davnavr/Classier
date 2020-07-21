@@ -57,12 +57,11 @@ let emptyInterface =
             | InterfaceMthd _
             | _ -> List.empty)
 
-let emptyModule =
+let emptyModule: ImmutableSortedSet<_ * TypeOrMember<GenNestedType<GenModule>, _>> =
     memberSet
         GenType.nname
         (function
         | _ -> None)
-        (fun mdef ->
-            match mdef with
-            | ModuleFunc _
-            | _ -> List.empty)
+        (function
+        | ModuleFunc _
+        | _ -> List.empty)

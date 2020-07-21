@@ -1,6 +1,8 @@
 ﻿[<RequireQualifiedAccess>]
 module Classier.NET.Compiler.SemAnalysis.Analyze
 
+#nowarn "40"
+
 open System.Collections.Immutable
 
 open Classier.NET.Compiler
@@ -84,7 +86,103 @@ let private globals cunits anl =
         anl
 
 let private ntypes anl =
-    anl
+    let ntype smembers gen tmembers update duperr gtype =
+        gtype
+        |> smembers
+        |> Seq.choose
+            (function
+            | (acc: AccessControl.Access, TypeOrMember.Type nested) ->
+                Some(acc, nested)
+            | (_, TypeOrMember.Member) -> None)
+        |> Seq.fold
+            (fun (parent, err) (acc, nested) ->
+                let (gnested, nerr) =
+                    gen nested parent
+                let add =
+                    SortedSet.tryAdd
+                        (acc, TypeOrMember.Type gnested)
+                        (tmembers parent)
+                match add with
+                | Result.Ok added ->
+                    update added parent, ImmList.addRange nerr err
+                | Result.Error _ ->
+                    parent, ImmList.add (duperr parent nested) err)
+            (gtype, ImmutableList.Empty)
+    let dupclass ptype parent dup =
+        DuplicateClassMember(ptype parent, TypeOrMember.Type dup)
+    let dupintf pintf parent dup =
+        DuplicateInterfaceMember(pintf parent, TypeOrMember.Type dup)
+    let rec nclass =
+        ntype
+            (fun (clss: GenNestedClass) -> clss.Syntax.Members)
+            (fun nested parent ->
+                GenType.clss (GenClass.Nested parent) MemberSet.emptyClass nested |> nclass)
+            (fun clss -> clss.Members)
+            (fun nmembers parent -> { parent with Members = nmembers })
+            (dupclass GenClass.Nested)
+    let rec ninterface =
+        ntype
+            (fun (intf: GenNestedInterface) -> intf.Syntax.Members)
+            (fun nested parent ->
+                GenType.intf (GenInterface.Nested parent) MemberSet.emptyInterface nested |> ninterface)
+            (fun intf -> intf.Members)
+            (fun nmembers parent -> { parent with Members = nmembers })
+            (dupintf GenInterface.Nested)
+    anl.GlobalTypes
+    |> Seq.indexed
+    |> Seq.fold
+        (fun state (i, (gtype, cu)) ->
+            let nested t tdef create =
+                let (gen, err) = create tdef
+                { state with
+                    Errors = state.Errors.AddRange err
+                    GlobalTypes =
+                        ImmList.setItem
+                            i
+                            (t gen, cu)
+                            state.GlobalTypes }
+            match gtype with
+            | GenGlobalClass gclass ->
+                ntype
+                    (fun (clss: GenGlobalClass) -> clss.Syntax.Members)
+                    (fun nested parent ->
+                        GenType.clss (GenClass.Global parent) MemberSet.emptyClass nested |> nclass)
+                    (fun clss -> clss.Members)
+                    (fun nmembers parent -> { parent with Members = nmembers })
+                    (dupclass GenClass.Global)
+                |> nested
+                    GenGlobalClass
+                    gclass
+            | GenGlobalInterface gintf ->
+                ntype
+                    (fun (intf: GenGlobalInterface) -> intf.Syntax.Members)
+                    (fun nested parent ->
+                        GenType.intf (GenInterface.Global parent) MemberSet.emptyInterface nested |> ninterface)
+                    (fun intf -> intf.Members)
+                    (fun nmembers parent -> { parent with Members = nmembers })
+                    (dupintf GenInterface.Global)
+                |> nested
+                    GenGlobalInterface
+                    gintf
+            | GenGlobalModule gmdle ->
+                ntype
+                    (fun (mdle: GenGlobalModule) -> mdle.Syntax.Members)
+                    (fun nested parent ->
+                        match nested with // TODO: Add the nested types inside of the nested classes, interfaces, and modules of a module.
+                        | Class nested ->
+                            GenType.clss (GenModule.Global parent) MemberSet.emptyClass nested |> GenNestedClass, Seq.empty
+                        | Interface nested ->
+                            GenType.intf (GenModule.Global parent) MemberSet.emptyInterface nested |> GenNestedInterface, Seq.empty
+                        | Module nested ->
+                            GenType.mdle (GenModule.Global parent) MemberSet.emptyModule nested |> GenNestedModule, Seq.empty)
+                    (fun mdle -> mdle.Members)
+                    (fun nmembers parent -> { parent with Members = nmembers })
+                    (fun parent dup ->
+                        DuplicateModuleMember(GenModule.Global parent, TypeOrMember.Type dup))
+                |> nested
+                    GenGlobalModule
+                    gmdle)
+        anl
 
 let private tresolution cunits anl =
     Seq.fold
@@ -144,11 +242,11 @@ let output (cunits, epoint) table =
         Analyzer.init table
         |> globals cunits
         |> ntypes
-        |> tresolution cunits
+        //|> tresolution cunits
     let result =
         rtypes
         // |> members
-        |> entryPoint epoint
+        //|> entryPoint epoint
     match result.Errors with
     | ImmList.Empty ->
         { GlobalTypes =

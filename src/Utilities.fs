@@ -50,15 +50,20 @@ module SortedSet =
     let inline withComparer comparer (set: ImmutableSortedSet<_>) =
         Comparer.create comparer |> set.WithComparer
 
-    let tryAdd item (set: ImmutableSortedSet<_>) =
-        match set with
-        | Contains item -> None
-        | _ -> set |> add item |> Some
-
     let tryGetValue equal found missing (set: ImmutableSortedSet<_>) =
         match set.TryGetValue equal with
         | (true, original) -> found original
         | (false, _) -> missing()
+
+    let tryAdd item set =
+        tryGetValue
+            item
+            Result.Error
+            (fun() ->
+                set
+                |> add item
+                |> Result.Ok)
+            set
 
 [<RequireQualifiedAccess>]
 module ImmList =

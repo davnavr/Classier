@@ -29,19 +29,7 @@ let exitScope (LocalsTable table) =
 
 // TODO: How will type resolution work here?
 let addLocal lname ltype (LocalsTable table) =
-    table
-    |> List.tryHead
-    |> Option.map
-        (fun locals ->
-            locals
-            |> SortedSet.tryAdd
-                { Name = lname
-                  Type = ltype }
-            |> Option.map
-                (fun newSet ->
-                    (newSet :: table.Tail)
-                    |> LocalsTable))
-    |> Option.flatten
+    invalidOp "bad"
 
 let addExpParam (eparam: ExpParam) rtype table =
     match eparam.Name with
