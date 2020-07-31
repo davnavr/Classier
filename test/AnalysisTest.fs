@@ -156,9 +156,16 @@ let tests =
                             |> Option.get
                             |> Identifier.ofStr
                           Parameters =
-                            
-                            ImmutableArray.Empty // TODO: Add string param
-                          ReturnType = TypeSystem.Primitive TypeSystem.PrimitiveType.Unit |> Grammar.Ast.TypeName }
+                            { EParam.Name =
+                                "value"
+                                |> Identifier.create
+                                |> Option.get
+                              Type =
+                                TypeSystem.Primitive TypeSystem.PrimitiveType.Unit }
+                            |> ImmArray.singleton
+                            |> ImmArray.singleton
+                          ReturnType =
+                            TypeSystem.Primitive TypeSystem.PrimitiveType.Unit }
                         |> EFunction
                         |> TypeOrMember.Member
                         |> SortedSet.singleton }

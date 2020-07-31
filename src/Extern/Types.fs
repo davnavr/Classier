@@ -10,7 +10,11 @@ open Classier.NET.Compiler.Identifier
 
 type EGenericName = Identifier<GenericParam<EInterface, EClass>>
 
-// TODO: Create a new type instead of using Grammar.Ast.TypeName
+type EResolvedType = TypeSystem.Type<EType>
+
+type EParam =
+    { Name: IdentifierStr
+      Type: EResolvedType }
 
 type EAccess =
     | EPublic
@@ -19,8 +23,8 @@ type EAccess =
 type EMethod<'Modifier> =
     { MethodName: EGenericName
       Modifiers: 'Modifier
-      Parameters: ImmutableArray<ImmutableArray<ExpParam>>
-      ReturnType: TypeName }
+      Parameters: ImmutableArray<ImmutableArray<EParam>>
+      ReturnType: EResolvedType }
 
 type EAccessors =
     | EGet
@@ -30,7 +34,7 @@ type EAccessors =
 type EProperty =
     { Accessors: EAccessors
       PropName: IdentifierStr
-      ValueType: TypeName }
+      ValueType: EResolvedType }
 
 type FieldReadonly =
     | IsMutable
@@ -39,25 +43,25 @@ type FieldReadonly =
 type EField =
     { FieldName: IdentifierStr
       Readonly: FieldReadonly
-      ValueType: TypeName }
+      ValueType: EResolvedType }
 
 type EFunction =
     { FunctionName: EGenericName
-      Parameters: ImmutableArray<ImmutableArray<ExpParam>>
-      ReturnType: TypeName }
+      Parameters: ImmutableArray<ImmutableArray<EParam>>
+      ReturnType: EResolvedType }
 
 type EOperator =
     { Kind: OperatorKind
-      Operands: ImmutableArray<ExpParam>
+      Operands: ImmutableArray<EParam>
       Symbol: OperatorStr
-      ReturnType: TypeName }
+      ReturnType: EResolvedType }
 
 type EAbstractMember =
     | EAMethod of EMethod<unit>
     | EAProperty of EProperty
 
 type EConcreteMember =
-    | EConstructor of ImmutableArray<ExpParam>
+    | EConstructor of ImmutableArray<EParam>
     | EMethod of EMethod<MethodModifiers>
     | EProperty of EProperty
     | EField of EField
