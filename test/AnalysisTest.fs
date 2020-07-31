@@ -2,12 +2,15 @@
 module Classier.NET.Compiler.AnalysisTest
 
 open System.Collections.Immutable
-open Classier.NET.Compiler.IR
-open Classier.NET.Compiler.SemAnalysis
 open FParsec
+
 open Fuchu
 
-let testStrs name sources f =
+open Classier.NET.Compiler.Extern
+open Classier.NET.Compiler.IR
+open Classier.NET.Compiler.SemAnalysis
+
+let testStrs name gtable sources f =
     test name {
         let (result, state) =
             sources
@@ -35,7 +38,7 @@ let testStrs name sources f =
                 (Result.Ok ImmutableList.Empty, Parser.defaultState)
         Analyze.output
             (Assert.isOk result, state.EntryPoint)
-            GlobalsTable.empty
+            (gtable GlobalsTable.empty)
         |> Assert.isOk
         |> f
         |> ignore
@@ -45,6 +48,7 @@ let tests =
     [
         testStrs
             "global usings are validated"
+            id
             [
                 """
                 namespace my.fancy.space;
@@ -71,6 +75,7 @@ let tests =
 
         testStrs
             "valid types are returned as result"
+            id
             [
                 """
                 class Classy {
@@ -96,6 +101,7 @@ let tests =
 
         testStrs
             "empty nested interface is included"
+            id
             [
                 """
                 module Parent {
@@ -118,6 +124,7 @@ let tests =
 
         testStrs
             "entry point exists"
+            id
             [
                 "main (args: string[]) { }"
             ]
@@ -126,5 +133,50 @@ let tests =
                 Assert.equal
                     EntryPointReturn.ImplicitZero
                     epoint.Body.ReturnType)
+
+        testStrs
+            "hello world is a valid program"
+            (fun gtable ->
+                let system =
+                    "System"
+                    |> Identifier.create
+                    |> Option.get
+                    |> List.singleton
+                    |> Namespace
+                let console =
+                    { EModule.ModuleName =
+                        "Console"
+                        |> Identifier.create
+                        |> Option.get
+                        |> Identifier.ofStr
+                      Members =
+                        { FunctionName =
+                            "WriteLine"
+                            |> Identifier.create
+                            |> Option.get
+                            |> Identifier.ofStr
+                          Parameters =
+                            
+                            ImmutableArray.Empty // TODO: Add string param
+                          ReturnType = TypeSystem.Primitive TypeSystem.PrimitiveType.Unit |> Grammar.Ast.TypeName }
+                        |> EFunction
+                        |> TypeOrMember.Member
+                        |> SortedSet.singleton }
+                    |> EGlobalModule
+                    |> Extern
+                GlobalsTable.addType
+                    console
+                    system
+                    gtable
+                |> Result.get)
+            [
+                """
+                main (args: string[]) {
+                    System.Console.WriteLine("Hello World!");
+                }
+                """
+            ]
+            (fun output ->
+                invalidOp "bad test")
     ]
     |> testList "analysis tests"

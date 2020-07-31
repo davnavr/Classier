@@ -2,12 +2,15 @@
 module rec Classier.NET.Compiler.Extern.Types
 
 open System.Collections.Immutable
+
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Identifier
 
 type EGenericName = Identifier<GenericParam<EInterface, EClass>>
+
+// TODO: Create a new type instead of using Grammar.Ast.TypeName
 
 type EAccess =
     | EPublic
@@ -72,11 +75,9 @@ type EMember =
     | EInstanceMember of EInstanceMember
     | EStaticMember of EStaticMember
 
-type EMemberSet<'Member> = ImmutableSortedSet<EAccess * TypeOrMember<EType, 'Member>>
-
 type EInterface<'Parent> =
     { InterfaceName: EGenericName
-      Members: EMemberSet<EAbstractMember>
+      Members: ImmutableSortedSet<TypeOrMember<EType, EAbstractMember>>
       Parent: 'Parent
       SuperInterfaces: ImmutableSortedSet<EInterface> }
 
@@ -95,7 +96,7 @@ type EGlobalInterface = EInterface<Namespace>
 type EClass<'Parent> =
     { ClassName: EGenericName
       Interfaces: ImmutableSortedSet<EInterface>
-      Members: EMemberSet<EMember>
+      Members: ImmutableSortedSet<EAccess * TypeOrMember<EType, EMember>>
       Parent: 'Parent
       SuperClass: EClass option }
 
@@ -113,7 +114,7 @@ type EGlobalClass = EClass<Namespace>
 
 type EModule<'Parent> =
     { ModuleName: EGenericName
-      Members: EMemberSet<EStaticMember> }
+      Members: ImmutableSortedSet<TypeOrMember<EType, EStaticMember>> }
 
 [<RequireQualifiedAccess>]
 type EModule =

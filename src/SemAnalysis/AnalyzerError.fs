@@ -16,6 +16,7 @@ type AnalyzerError =
     | DuplicateModuleMember of GenModule * TypeOrMember<TypeDef, StaticMember>
     | FeatureNotImplemented of feature: string
     | InternalAnalyzerError of msg: string
+    | LocalsTableError of LocalsTable.Error
 
 module AnalyzerError =
     let print =

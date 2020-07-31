@@ -47,6 +47,7 @@ module SortedSet =
         set.Add item
     let inline remove item (set: ImmutableSortedSet<_>) =
         set.Remove item
+    let inline singleton item = ImmutableSortedSet.Create(item = item)
     let inline withComparer comparer (set: ImmutableSortedSet<_>) =
         Comparer.create comparer |> set.WithComparer
 
@@ -66,6 +67,11 @@ module SortedSet =
             set
 
 [<RequireQualifiedAccess>]
+module ImmArray =
+    let inline ofArray source = ImmutableArray.Create(items = source)
+    let inline singleton item = ImmutableArray.Create(item = item)
+
+[<RequireQualifiedAccess>]
 module ImmList =
     let (|Contains|_|) item (list: ImmutableList<_>) =
         list.Contains item |> Bool.toOpt
@@ -76,8 +82,9 @@ module ImmList =
     let map mapping (list: ImmutableList<_>) =
         new System.Func<_, _>(mapping) |> list.ConvertAll
 
-    let add item (list: ImmutableList<_>) = list.Add item
-    let addRange items (list: ImmutableList<_>) = list.AddRange items
+    let inline add item (list: ImmutableList<_>) = list.Add item
+    let inline addRange items (list: ImmutableList<_>) = list.AddRange items
+    let inline singleton item = ImmutableList.Create(item = item)
 
     let setItem index item (list: ImmutableList<_>) = list.SetItem(index, item)
 
@@ -110,6 +117,14 @@ module Regex =
 
     let (|Matches|_|) (reg: Regex) str =
         reg.IsMatch str |> Bool.toOpt
+
+[<RequireQualifiedAccess>]
+module Result =
+    let get r =
+        match r with
+        | Result.Ok value -> value
+        | Result.Error err ->
+            err.ToString() |> invalidArg "r"
 
 [<AutoOpen>]
 module ResultBuilder =

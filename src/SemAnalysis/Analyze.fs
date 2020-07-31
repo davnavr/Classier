@@ -36,6 +36,7 @@ module private Analyzer =
     let error err anl =
         { anl with Errors = anl.Errors.Add err }
 
+/// Adds all global types in the source code and ensures no duplicate names.
 let private globals cunits anl =
     let ctypes (cunit: CompilationUnit) =
         Seq.map
@@ -201,9 +202,20 @@ let private tresolution cunits anl =
                     |> state.Errors.AddRange })
         anl
         cunits
+    // TODO: Is there anything else that needs types to be resolved? If not, rename function.
 
-let private gbody body ltable anl =
-    anl
+let private gbody body ltable usings ret =
+    let (_, _, result) =
+        List.fold
+            (fun (table, err, gen) (pos, st) ->
+                match st with
+                | Ast.IgnoredExpr expr ->
+                    failwith "nope"
+                | _ -> failwithf "Unsupported statement '%A'" st)
+            (ltable, ImmutableList.Empty, GenBody.empty ret)
+            body
+    // TODO: Don't ignore errors when generating body.
+    result
 
 let private members anl =
     invalidOp "bad"
@@ -224,13 +236,19 @@ let private entryPoint (epoint: EntryPoint option) anl =
                     args
                     (fun _ -> argtype())
             match ltable with
-            | Some ltable ->
+            | Result.Ok ltable ->
                 let gen =
-                    invalidOp "TODO: create the entry point"
+                    { Parameters =
+                        GenParam.ofExpParam
+                            args
+                            (fun _ -> argtype())
+                        |> ImmList.singleton
+                      Body = gbody epoint.Body ltable () ImplicitZero
+                      Syntax = epoint }
                 { anl with Analysis.EntryPoint = Some gen }
-            | None ->
+            | Result.Error err ->
                 Analyzer.error
-                    (InternalAnalyzerError "Unable to add the parameter to the locals table")
+                    (LocalsTableError err)
                     anl
         | _ ->
             Analyzer.error
@@ -247,7 +265,7 @@ let output (cunits, epoint) table =
     let result =
         rtypes
         // |> members
-        //|> entryPoint epoint
+        |> entryPoint epoint
     match result.Errors with
     | ImmList.Empty ->
         { GlobalTypes =
