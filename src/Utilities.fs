@@ -83,10 +83,11 @@ module ImmList =
 
 [<RequireQualifiedAccess>]
 module ImmSortedDict =
-    let setItem key value (dict: ImmutableSortedDictionary<_, _>) =
+    let inline add key value (dict: ImmutableSortedDictionary<_, _>) =
+        dict.Add(key, value)
+    let inline setItem key value (dict: ImmutableSortedDictionary<_, _>) =
         dict.SetItem(key, value)
-
-    let withKeyComparer kcomparer (dict: ImmutableSortedDictionary<_, _>) =
+    let inline withKeyComparer kcomparer (dict: ImmutableSortedDictionary<_, _>) =
         kcomparer
         |> Comparer.create
         |> dict.WithComparers
@@ -95,6 +96,13 @@ module ImmSortedDict =
         match dict.TryGetValue key with
         | (true, value) -> found value
         | (false, _) -> missing()
+
+    let tryAdd key value (dict: ImmutableSortedDictionary<_, _>) =
+        tryGetValue
+            key
+            Result.Error
+            (fun() -> dict.Add(key, value) |> Result.Ok)
+            dict
 
 [<RequireQualifiedAccess>]
 module Regex =

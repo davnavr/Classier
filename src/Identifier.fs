@@ -71,3 +71,12 @@ let noGenerics<'Generic> = mapGenerics (fun (_: 'Generic) -> ())
 
 let fullAsList (FullIdentifier (head, tail)) =
     head :: tail
+
+let (|NamespaceName|_|) name =
+    let nlist = fullAsList name
+    let strs() = List.map (fun id -> id.Name) nlist
+    List.forall
+        (fun id -> List.isEmpty id.Generics)
+        nlist
+    |> Bool.toOpt
+    |> Option.map strs

@@ -17,24 +17,48 @@ module Usings =
     
     type Usings =
         private
-        | Usings of ImmutableSortedDictionary<FullIdentifier<ResolvedType>, ImmutableSortedSet<Use>>
+        | Usings of ImmutableSortedDictionary<FullIdentifier<TypeName>, ImmutableSortedSet<Use>>
 
     let empty = Usings ImmutableSortedDictionary.Empty
 
     let private add (pos, uname) gtable (Usings usings) =
-        match Identifier.fullAsList uname with
-        | [ name ] ->
-            invalidOp "add the thing and see if it is valid"
+        match uname with
+        | NamespaceName strs ->
+            result {
+                let! uset =
+                    ImmSortedDict.tryGetValue
+                        uname
+                        (fun uset ->
+                            SortedSet.tryAdd
+                                (Namespace strs |> UseNamespace)
+                                uset
+                            |> Result.mapError (fun _ -> pos, uname))
+                        (fun() ->
+                            SortedSet.add
+                                (Namespace strs |> UseNamespace)
+                                ImmutableSortedSet.Empty
+                            |> Result.Ok)
+                        usings
+                let result =
+                    ImmSortedDict.setItem
+                        uname
+                        uset
+                        usings
+                    |> Usings
+                return result
+            }
+        | _ -> invalidOp "Using statements are only currently supported for namespaces"
 
     let ofCompilationUnit gtable (cu: CompilationUnit) =
-        Seq.fold
+        cu.Usings
+        |> List.toSeq
+        |> Seq.fold
             (fun (usings, err) name ->
                 match add name gtable usings with
                 | Result.Ok added ->
                     added, err
                 | Result.Error e ->
-                    usings, ImmList.addRange e err)
+                    usings, ImmList.add e err)
             (empty, ImmutableList.Empty)
-            cu.Usings
 
 type Usings = Usings.Usings

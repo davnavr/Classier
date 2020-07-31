@@ -185,6 +185,7 @@ let private ntypes anl =
         anl
 
 let private tresolution cunits anl =
+    // NOTE: This checks that the usings are valid.
     Seq.fold
         (fun state cu ->
             let (uses, err) =
@@ -242,7 +243,7 @@ let output (cunits, epoint) table =
         Analyzer.init table
         |> globals cunits
         |> ntypes
-        //|> tresolution cunits
+        |> tresolution cunits
     let result =
         rtypes
         // |> members

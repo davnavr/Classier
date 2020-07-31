@@ -67,7 +67,7 @@ let tests =
                 class IgnoreMe { }
                 """
             ]
-            (fun _ -> ())
+            (fun _ -> ()) // TODO: Find something to check in this test.
 
         testStrs
             "valid types are returned as result"
