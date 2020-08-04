@@ -1,6 +1,4 @@
 
-use System.Console;
-
-main (args: Array<String>) {
+main (args: string[]) {
   System.Console.WriteLine("Hello world!");
 }

@@ -136,46 +136,7 @@ let tests =
 
         testStrs
             "hello world is a valid program"
-            (fun gtable ->
-                let system =
-                    "System"
-                    |> Identifier.create
-                    |> Option.get
-                    |> List.singleton
-                    |> Namespace
-                let console =
-                    { EModule.ModuleName =
-                        "Console"
-                        |> Identifier.create
-                        |> Option.get
-                        |> Identifier.ofStr
-                      Members =
-                        { FunctionName =
-                            "WriteLine"
-                            |> Identifier.create
-                            |> Option.get
-                            |> Identifier.ofStr
-                          Parameters =
-                            { EParam.Name =
-                                "value"
-                                |> Identifier.create
-                                |> Option.get
-                              Type =
-                                TypeSystem.Primitive TypeSystem.PrimitiveType.Unit }
-                            |> ImmArray.singleton
-                            |> ImmArray.singleton
-                          ReturnType =
-                            TypeSystem.Primitive TypeSystem.PrimitiveType.Unit }
-                        |> EFunction
-                        |> TypeOrMember.Member
-                        |> SortedSet.singleton }
-                    |> EGlobalModule
-                    |> Extern
-                GlobalsTable.addType
-                    console
-                    system
-                    gtable
-                |> Result.get)
+            Program.TempStandardLib.table
             [
                 """
                 main (args: string[]) {

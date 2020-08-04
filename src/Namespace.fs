@@ -13,3 +13,10 @@ type Namespace =
         | _ ->
             Seq.map string ns
             |> String.concat "."
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Namespace =
+    let (|Global|_|) (Namespace ns) =
+        match ns with
+        | [] -> Some()
+        | _ -> None

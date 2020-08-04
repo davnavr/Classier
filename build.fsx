@@ -75,7 +75,7 @@ Target.create "Publish" (fun _ ->
     Trace.trace "Publishing..."
 )
 
-"Clean" ==> "Build Bootstrap" ==> "Test Bootstrap" ==> "Build Samples" ==> "Publish"
-"Build Bootstrap" ==> "Lint Bootstrap" ==> "Publish"
+"Clean" ==> "Build Bootstrap" ==> "Build Samples" ==> "Publish"
+"Build Bootstrap" ==> "Test Bootstrap" ==> "Publish"
 
 Target.runOrDefault "Publish"
