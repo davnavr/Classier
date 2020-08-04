@@ -40,8 +40,7 @@
     <Compile Include="SemAnalysis\LocalsTable.fs" />
     <Compile Include="SemAnalysis\AnalyzerError.fs" />
     <Compile Include="SemAnalysis\Analyze.fs" />
-    <Compile Include="ToSource\Print.fs" />
-    <Compile Include="ToSource\Output.fs" />
+    <Compile Include="Print.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
