@@ -77,19 +77,19 @@ module GlobalsTable =
                 let equiv = NamespaceSymbol(name, empty)
                 match table.TryGetValue equiv with
                 | (false, _)
-                | (true, TypeSymbol _)-> fail acc
+                | (true, TypeSymbol _) -> fail name acc
                 | (true, NamespaceSymbol (_, ntable)) ->
                     inner rest (folder ntable name acc) ntable
         inner ns (state t) t
 
     let private updatens symbols addsymbol ns ttable =
-        let empty _ = List.empty
         let tables =
             foldns
                 (fun ntable name nlist ->
                     (name, ntable) :: nlist)
-                empty
-                empty
+                (fun name nlist ->
+                    (name, empty) :: nlist)
+                (fun _ -> List.empty)
                 ns
                 ttable
         match tables with
@@ -126,7 +126,7 @@ module GlobalsTable =
         let (Table symbols) =
             foldns
                 (fun t _ _ -> t)
-                (fun _ -> empty)
+                (fun _ _ -> empty)
                 id
                 ns
                 table
@@ -154,5 +154,12 @@ module GlobalsTable =
                     |> Result.Ok)
             ns
             ttable
+
+    let hasGlobalNs ns (Table table) =
+        let symbol =
+            NamespaceSymbol(ns, empty)
+        match table with
+        | SortedSet.Contains symbol -> true
+        | _ -> false
 
 type GlobalsTable = GlobalsTable.Table

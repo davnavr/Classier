@@ -2,11 +2,13 @@
 module rec Classier.NET.Compiler.IR.Types
 
 open System.Collections.Immutable
+
 open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.Generic
+
+open Classier.NET.Compiler.Extern
 
 module Ast = Classier.NET.Compiler.Grammar.Ast
 
@@ -21,10 +23,9 @@ type GenParam =
 type GenParamTuple = ImmutableList<GenParam>
 type GenParamList = ImmutableList<GenParamTuple>
 
-type ResolvedInterface =
-    Namespace * DefinedOrExtern<GenInterface, EInterface>
-type ResolvedClass =
-    DefinedOrExtern<GenClass, EClass> // TODO: Add namespace for here too?
+// TODO: Is namespace information needed for these types?
+type ResolvedInterface = Namespace * DefinedOrExtern<GenInterface, EInterface>
+type ResolvedClass = DefinedOrExtern<GenClass, EClass>
 
 type GenName = Identifier<GenericParam<ResolvedInterface, ResolvedClass>>
 
@@ -39,9 +40,13 @@ type CallExpression<'Target> =
 
 type ComplexExpression =
     | CtorCall of CallExpression<ResolvedClass>
+    | FuncCall of CallExpression<DefinedOrExtern<GenFunction, EFunction>>
 type GenExpression =
     | BoolLit of bool
     | ComplexExpr of ComplexExpression
+    | GlobalTypeRef of DefinedOrExtern<GenGlobalType, EGlobalType>
+    | NamespaceRef of Namespace
+    | StrLit of string
 
 type GenStatement =
     | Empty

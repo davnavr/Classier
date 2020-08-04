@@ -184,6 +184,7 @@ let tests =
                 """
             ]
             (fun output ->
-                invalidOp "bad test")
+                let epoint = Option.get output.EntryPoint
+                Assert.notEmpty epoint.Body.Statements)
     ]
     |> testList "analysis tests"

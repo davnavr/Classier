@@ -47,3 +47,8 @@ let head s =
     | Some h -> h
     | None ->
         fail "The head of the sequence could not be retrieved since the sequence is empty"
+
+let notEmpty col =
+    if Seq.isEmpty col
+    then fail "The collection was unexpectedly empty"
+    else col

@@ -8,6 +8,7 @@ open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.TypeSystem
 
+open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 
@@ -204,13 +205,55 @@ let private tresolution cunits anl =
         cunits
     // TODO: Is there anything else that needs types to be resolved? If not, rename function.
 
-let private gbody body ltable usings ret =
+let rec private gexpr expr ltable gtable =
+    match expr with
+    | Ast.BoolLit value -> BoolLit value
+    | Ast.FuncCall fcall -> // TODO: Make just enough code to make a call to Console.WriteLine work.
+        { Arguments =
+            Seq.map
+                (fun arg -> gexpr arg ltable gtable)
+                fcall.Arguments
+            |> ImmList.ofSeq
+          Target = gexpr fcall.Target ltable gtable }
+        invalidOp "How to tell what the target is?"
+    | Ast.IdentifierRef name ->
+        match name.Generics with
+        | [] when GlobalsTable.hasGlobalNs name.Name gtable ->
+            Namespace [ name.Name ] |> NamespaceRef
+        | _ -> failwithf "Code to handle identifier '%O' is not yet implemented" name
+    | Ast.MemberAccess(target, mber) ->
+        let texpr = gexpr target ltable gtable
+        match texpr with
+        | NamespaceRef ns ->
+            let gtype =
+                gtable
+                |> GlobalsTable.nstypes ns
+                |> Seq.tryFind (fun other ->
+                    let oname =
+                        match other with
+                        | Defined gtype -> (GenType.gname gtype).Name
+                        | Extern etype -> (EType.gname etype).Name
+                    // TODO: Handle any generic parameters or arguments here.
+                    oname = mber.Name)
+            match gtype with
+            | Some gtype -> GlobalTypeRef gtype
+            | None -> failwithf "The global type '%O' does not exist" mber.Name
+        // | GlobalModuleRef
+        | _ -> failwithf "Unsupported member access for expression: '%A'" target
+    | Ast.StrLit str -> StrLit str
+    | _ -> failwithf "Unsupported expression: '%A'" expr
+
+let private gbody body ltable usings ret gtable =
     let (_, _, result) =
         List.fold
             (fun (table, err, gen) (pos, st) ->
                 match st with
                 | Ast.IgnoredExpr expr ->
-                    failwith "nope"
+                    let nbody =
+                        gexpr expr table gtable
+                        |> IgnoredExpr
+                        |> GenBody.addTo gen st
+                    (table, err, nbody)
                 | _ -> failwithf "Unsupported statement '%A'" st)
             (ltable, ImmutableList.Empty, GenBody.empty ret)
             body
@@ -243,7 +286,7 @@ let private entryPoint (epoint: EntryPoint option) anl =
                             args
                             (fun _ -> argtype())
                         |> ImmList.singleton
-                      Body = gbody epoint.Body ltable () ImplicitZero
+                      Body = gbody epoint.Body ltable () ImplicitZero anl.GlobalTable
                       Syntax = epoint }
                 { anl with Analysis.EntryPoint = Some gen }
             | Result.Error err ->

@@ -84,6 +84,7 @@ module ImmList =
 
     let inline add item (list: ImmutableList<_>) = list.Add item
     let inline addRange items (list: ImmutableList<_>) = list.AddRange items
+    let inline ofSeq (value: seq<_>) = ImmutableList.CreateRange value
     let inline singleton item = ImmutableList.Create(item = item)
 
     let setItem index item (list: ImmutableList<_>) = list.SetItem(index, item)

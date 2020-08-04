@@ -69,6 +69,9 @@ let mapGenerics gmapper id =
 
 let noGenerics<'Generic> = mapGenerics (fun (_: 'Generic) -> ())
 
+// TODO: Come up with a better name, or have different modules for functions that work with either a identifier or a full identifier.
+let toFull id = FullIdentifier(id, List.empty)
+
 let fullAsList (FullIdentifier (head, tail)) =
     head :: tail
 
