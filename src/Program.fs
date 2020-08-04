@@ -2,6 +2,7 @@
 
 open System
 open System.IO
+open Classier.NET.Compiler.ToSource
 
 /// The entry point of the compiler.
 [<EntryPoint>]
@@ -17,7 +18,8 @@ let main args = // TODO: Handle arguments correctly. Need to have an argument th
         use fileout = new StreamWriter(File.OpenWrite (Array.last args))
         let output =
             Output.write
-                { EntryPoint = epoint }
+                { Definitions = System.Collections.Immutable.ImmutableList.Empty
+                  EntryPoint = epoint }
                 fileout.WriteLine
         output()
     | Result.Error err -> Console.Error.Write err

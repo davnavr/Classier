@@ -3,7 +3,6 @@
 open System
 open System.Collections.Generic
 open System.Collections.Immutable
-open Classier.NET.Compiler.Identifier
 
 [<StructuralEquality>]
 [<StructuralComparison>]
@@ -46,17 +45,19 @@ type PrimitiveType =
 
 [<StructuralEquality>]
 [<StructuralComparison>]
-type TypeName<'Generic> =
+type Type<'Named> =
+    | ArrayType of Type<'Named>
     | FuncType of
-        {| ParamType: TypeName<'Generic>
-           ReturnType: TypeName<'Generic> |}
-    | Identifier of FullIdentifier<'Generic>
+        {| ParamType: Type<'Named>
+           ReturnType: Type<'Named> |}
+    | Named of 'Named
     | Primitive of PrimitiveType
-    | Tuple of TypeName<'Generic> list
+    | Tuple of Type<'Named> list // TODO: Make it so that it requires at least one item?
 
     override this.ToString() =
         match this with
-        | FuncType f -> sprintf "%s => %s" (string f.ParamType) (string f.ReturnType)
-        | Identifier names -> String.Join('.', names)
-        | Primitive p -> p.ToString()
+        | ArrayType itype -> sprintf "%O[]" itype
+        | FuncType f -> sprintf "%O => %O" f.ParamType f.ReturnType
+        | Named ntype -> ntype.ToString()
+        | Primitive p -> string p
         | Tuple types -> sprintf "(%s)" (String.Join(", ", types))

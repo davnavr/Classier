@@ -1,18 +1,15 @@
-﻿module Classier.NET.Compiler.Namespace
+﻿namespace Classier.NET.Compiler
 
-open System
-open Classier.NET.Compiler.Grammar
+open Classier.NET.Compiler.Identifier
 
+[<StructuralComparison; StructuralEquality>]
 type Namespace =
-    | Namespace of FullIdentifier
-    | GlobalNamespace
+    | Namespace of IdentifierStr list
 
     override this.ToString() =
-        match this with
-        | Namespace ns -> string ns
-        | GlobalNamespace -> String.Empty
-
-let fullId ns =
-    match ns with
-    | Some fullId -> Namespace fullId
-    | None -> GlobalNamespace
+        let (Namespace ns) = this
+        match ns with
+        | [] -> "<global namespace>"
+        | _ ->
+            Seq.map string ns
+            |> String.concat "."

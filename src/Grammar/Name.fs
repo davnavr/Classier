@@ -1,24 +1,14 @@
-﻿namespace Classier.NET.Compiler.Grammar
+﻿module Classier.NET.Compiler.Grammar.Name
 
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Identifier
 
-type Name<'Identifier> =
-    { Identifier: 'Identifier
-      Position: FParsec.Position }
+let simple pos (str: IdentifierStr) =
+    { Identifier = str
+      Position = pos }
 
-    override this.ToString() = this.Identifier.ToString()
+let ofStr pos str =
+    { Identifier = Identifier.ofStr str
+      Position = pos }
 
-type SimpleName = Name<IdentifierStr>
-type GenericName = Name<Identifier>
-
-module Name =
-    let simple pos (str: IdentifierStr) =
-        { Identifier = str
-          Position = pos }
-
-    let ofStr pos str =
-        { Identifier = Identifier.ofStr str
-          Position = pos }
-
-    let asGeneric name = ofStr name.Position name.Identifier
+let asGeneric name = ofStr name.Position name.Identifier

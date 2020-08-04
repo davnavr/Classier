@@ -1,12 +1,17 @@
-﻿namespace Classier.NET.Compiler
+﻿namespace Classier.NET.Compiler.ToSource
 
+open System.Collections.Immutable
+open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.Grammar
 
 type Output =
-    { EntryPoint: EntryPoint option }
+    { Definitions: ImmutableList<GenType>
+      EntryPoint: EntryPoint option }
 
+[<RequireQualifiedAccess>]
 module Output =
-    let write output prnt =
+    [<System.Obsolete>]
+    let write output prnt = // TODO: prnt should instead be a function that doesn't print to a new line.
         let block lines =
             seq {
                 "{"
@@ -60,9 +65,7 @@ module Output =
                     "static class ____Program"
                     yield! block
                         [
-                            sprintf
-                                "private static void Main(string[] %s)"
-                                (epoint.Arguments.Name |> Option.map string |> Option.defaultValue "____args")
+                            "private static void Main(string[] ___args)"
                             yield! body epoint.Body
                         ]
                 | None -> "// No entry point"

@@ -9,31 +9,39 @@
   
   <!-- Source files -->
   <ItemGroup>
-    <Compile Include="SortedSet.fs" />
+    <Compile Include="Utilities.fs" />
+    <Compile Include="AccessControl.fs" />
     <Compile Include="Identifier.fs" />
+    <Compile Include="Namespace.fs" />
     <Compile Include="TypeSystem.fs" />
     <Compile Include="Generic.fs" />
-    <Compile Include="Grammar\Aliases.fs" />
-    <Compile Include="Grammar\Name.fs" />
     <Compile Include="Grammar\Numeric.fs" />
+    <Compile Include="Grammar\Ast.fs" />
+    <Compile Include="Grammar\Name.fs" />
     <Compile Include="Grammar\Param.fs" />
-    <Compile Include="Grammar\Statement.fs" />
     <Compile Include="Grammar\Expression.fs" />
     <Compile Include="Grammar\Operator.fs" />
     <Compile Include="Grammar\Member.fs" />
-    <Compile Include="Grammar\Types.fs" />
-    <Compile Include="Grammar\MemberDef.fs" />
     <Compile Include="Grammar\TypeDef.fs" />
-    <Compile Include="Grammar\CompilationUnit.fs" />
     <Compile Include="Parser.fs" />
-    <Compile Include="Namespace.fs" />
-    <Compile Include="Extern.fs" />
-    <Compile Include="GlobalType.fs" />
-    <Compile Include="GlobalsTable.fs" />
-    <Compile Include="LocalsTable.fs" />
-    <Compile Include="Analyzer.fs" />
-    <Compile Include="CompilerError.fs" />
-    <Compile Include="Output.fs" />
+    <Compile Include="Extern\Types.fs" />
+    <Compile Include="Extern\EType.fs" />
+    <Compile Include="IR\Types.fs" />
+    <Compile Include="IR\GenBody.fs" />
+    <Compile Include="IR\GenParam.fs" />
+    <Compile Include="IR\GenExpression.fs" />
+    <Compile Include="IR\GenName.fs" />
+    <Compile Include="IR\GenMember.fs" />
+    <Compile Include="IR\InterfaceSet.fs" />
+    <Compile Include="IR\GenType.fs" />
+    <Compile Include="IR\MemberSet.fs" />
+    <Compile Include="SemAnalysis\GlobalsTable.fs" />
+    <Compile Include="SemAnalysis\Usings.fs" />
+    <Compile Include="SemAnalysis\LocalsTable.fs" />
+    <Compile Include="SemAnalysis\AnalyzerError.fs" />
+    <Compile Include="SemAnalysis\Analyze.fs" />
+    <Compile Include="ToSource\Print.fs" />
+    <Compile Include="ToSource\Output.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

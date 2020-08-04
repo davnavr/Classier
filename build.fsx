@@ -57,11 +57,17 @@ Target.create "Lint Bootstrap" (fun _ ->
 )
 
 Target.create "Test Bootstrap" (fun _ ->
-    runProj "./test/Classier.NET.Compiler.Tests.fsproj" List.empty
+    runProj "./test/Classier.NET.Compiler.Tests.fsproj" []
 )
 
 Target.create "Build Samples" (fun _ ->
-    runProj "./src/Classier.NET.Compiler.fsproj" [ "\"./samples/SimpleHelloWorld/SimpleHello.txt\""; "--output"; "./samples/SimpleHelloWorld/Hello.output.cs" ]
+    runProj
+        "./src/Classier.NET.Compiler.fsproj"
+        [
+            "\"./samples/SimpleHelloWorld/SimpleHello.txt\""
+            "--output"
+            "./samples/SimpleHelloWorld/Hello.output.cs"
+        ]
     DotNetCli.build id "./samples/SimpleHelloWorld/SimpleHelloWorld.csproj"
 )
 

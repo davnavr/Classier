@@ -3,6 +3,7 @@
 open System
 open System.Collections.Immutable
 open FParsec
+open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.Grammar.Operator
@@ -90,16 +91,11 @@ let keyword word =
     .>> space1
     |> attempt
 
-let accessModifier lowestAccess =
+let accessModifier lowest def modfs =
     let modifiers =
-        [
-            "public", Access.Public
-            "internal", Access.Internal
-            "protected", Access.Protected
-            "private", Access.Private
-        ]
+        modfs
         |> Seq.map (fun (str, vis) ->
-            if vis <= lowestAccess then
+            if vis <= lowest then
                 keyword str >>% vis
             else
                 vis
@@ -112,8 +108,22 @@ let accessModifier lowestAccess =
                 "access modifier"
             |> attempt
 
-            preturn Access.Public
+            preturn def
         ]
+let memberAccess lowest =
+    [
+        "public", Public
+        "internal", Internal
+        "protected", Protected
+        "private", Private
+    ]
+    |> accessModifier lowest Public
+let globalAccess =
+    [
+        "public", GlobalPublic
+        "internal", GlobalInternal
+    ]
+    |> accessModifier GlobalInternal GlobalPublic
 
 let typeName, private typeNameRef = createParserForwardedToRef<TypeName, _>()
 let typeNameOpt =
@@ -244,11 +254,12 @@ let identifier =
     <?> "identifier"
     |>> fun (name, gparams) ->
         { Name = name
-          Generics = List.map GenericArg gparams }
-let identifierFull =
+          Generics = gparams }
+let identifierFull: Parser<FullIdentifier<_>, _> =
     sepBy1 identifier (separator period |> attempt)
-    |>> FullIdentifier
     <?> "fully qualified name"
+    |>> fun (names) ->
+        FullIdentifier(names.Head, names.Tail)
 
 let extends = keyword "extends" >>. identifierFull
 let implementsOpt =
@@ -282,7 +293,7 @@ let paramTupleList typeAnn =
     |> many1
     <?> "parameter list"
 
-let expressionRef = OperatorPrecedenceParser<_,_,_>()
+let private expressionRef = OperatorPrecedenceParser<_,_,_>()
 let expression = expressionRef.ExpressionParser <?> "expression"
 let equalsExpr =
     skipChar '='
@@ -311,18 +322,23 @@ let tupleExpr =
     >>. sepBy expression (separator comma)
     .>> rparen
     <?> "tuple"
-let parenExpr = tupleExpr |>> TupleLit
+let parenExpr =
+    tupleExpr
+    |>> function
+    | [] -> UnitLit
+    | [ nested ] -> nested
+    | head::tail -> TupleLit(head, tail)
 
 do
-    let simpleType =
-        choiceL
+    let simpleType: Parser<TypeName, _> =
+        choice
             [
                 PrimitiveType.names
                 |> Seq.map (fun pair -> skipString (pair.Value) >>% pair.Key)
                 |> choice
                 |>> Primitive
 
-                identifierFull |>> Identifier
+                identifierFull |>> Named
 
                 between
                     lparen
@@ -331,21 +347,50 @@ do
                 <?> "tuple"
                 |>> function
                 | [] -> Primitive PrimitiveType.Unit
-                | items -> Tuple items
+                | items ->
+                    items
+                    |> List.map (fun (TypeName tname) -> tname)
+                    |> Tuple
             ]
-            "type name"
+        |>> TypeName
+    let modifiedType (f: TypeName -> _ -> _) p prev =
+        prev
+        .>>. opt p
+        |>> fun (btype, mtype) ->
+            match mtype with
+            | Some modf -> f btype modf
+            | None -> btype
+    let arrayType =
+        space
+        >>. skipChar '['
+        |> attempt
+        >>. space
+        >>. skipChar ']'
+        |> many1
+        |> modifiedType
+            (fun itype nest ->
+                Seq.fold
+                    (fun (TypeName prev) () ->
+                        ArrayType prev |> TypeName)
+                    itype
+                    nest)
+    let functionType =
+        space
+        >>. lambdaOperator
+        >>. space
+        >>. (typeName <?> "return type")
+        |> attempt
+        |> modifiedType
+            (fun (TypeName ptype) (TypeName rettype) ->
+                FuncType
+                    {| ParamType = ptype
+                       ReturnType = rettype |}
+                |> TypeName)
     typeNameRef :=
         simpleType
-        .>>. opt
-            (space
-            >>. lambdaOperator
-            >>. space
-            >>. typeName
-            |> attempt)
-        |>> fun (paramsType, retType) ->
-            match retType with
-            | Some _ -> FuncType {| ParamType = paramsType; ReturnType = retType.Value |}
-            | None -> paramsType
+        |> arrayType
+        |> functionType
+        <?> "type name"
 
 let private pattern =
     [
@@ -455,7 +500,7 @@ do
             ]
             "statement"
 
-let genericParams =
+let genericParams = // TODO: Rename this?
     let genericParam =
         choice
             [
@@ -482,25 +527,26 @@ let genericParams =
               RequiredInterfaces = iimpl
               RequiredSuperClass = super
               Variance = variance }
+            |> TypeParam
     ltsign
     |> attempt
     >>. sepBy1 genericParam (separator comma)
     .>> gtsign
     |> optList
     <?> "generic parameters"
-let genericIdentifier: Parser<Identifier, _> =
-    identifierStr
-    |> attempt
-    .>> space
-    .>>. genericParams
-    .>> space
-    |>> fun (name, gparams) ->
-        { Name = name
-          Generics = List.map GenericParam gparams }
-let genericName =
+let genericName: Parser<GenericName, _> =
+    let identifier =
+        identifierStr
+        |> attempt
+        .>> space
+        .>>. genericParams
+        .>> space
+        |>> fun (name, gparams) ->
+            { Name = name
+              Generics = gparams }
     tuple2
         position
-        genericIdentifier
+        identifier
     .>> space
     |>> fun (pos, id) -> { Identifier = id; Position = pos }
 let simpleName: Parser<SimpleName, _> =
@@ -738,7 +784,7 @@ let memberDef members types =
         ]
         |> choice
 let memberBlock label acc members types =
-    accessModifier acc
+    memberAccess acc
     .>>. memberDef
         members
         types
@@ -754,7 +800,7 @@ let memberBody label (members: seq<_>) types =
             |> attempt
             |>> Choice1Of2
 
-            accessModifier Access.Private
+            memberAccess Access.Private
             .>>. memberDef members types
             |>> Choice2Of2
         ]
@@ -784,11 +830,11 @@ do
     let members =
         [
             methodDef
-                (AMethod >> Member)
+                (AMethod >> TypeOrMember.Member)
                 None
 
             propDef
-                (AProperty >> Member)
+                (AProperty >> TypeOrMember.Member)
                 None
         ]
         |> Seq.map
@@ -802,9 +848,9 @@ do
             "interface body"
             Access.Internal
             members
-            [ interfaceDef Type ]
+            [ interfaceDef TypeOrMember.Type ]
 
-let private classBody, private classBodyRef = createParserForwardedToRef<_ * ImmutableList<_ * ClassMember>, _>()
+let private classBody, private classBodyRef = createParserForwardedToRef<_ * _, _>()
 let classDef cdef modfs =
     let dataMembers =
         keyword "data"
@@ -827,7 +873,8 @@ let classDef cdef modfs =
                                ]
                              ReturnType =
                                PrimitiveType.Boolean
-                               |> TypeName.Primitive
+                               |> Type.Primitive
+                               |> TypeName
                                |> Some }
                           MethodName = "equals" |> IdentifierStr |> Name.ofStr pos
                           Modifiers = MethodModifiers.Default
@@ -856,7 +903,7 @@ let classDef cdef modfs =
                                     |> Some)
                         |> Seq.choose id
                 }
-                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> ClassMember.Member)
+                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> TypeOrMember.Member)
         |> opt
     let classModf =
         validateModifiers
@@ -871,7 +918,7 @@ let classDef cdef modfs =
                 | _ -> Result.Error None)
             Sealed
     let classCtor =
-        accessModifier Access.Private
+        memberAccess Access.Private
         .>> space
         |> opt
         |>> Option.defaultValue Access.Public
@@ -922,8 +969,10 @@ let classDef cdef modfs =
           Interfaces = ilist
           Members =
             match rmembers with
-            | Some toadd -> cmembers.InsertRange(0, toadd ctorparams)
+            | Some toadd ->
+                cmembers.InsertRange(0, toadd ctorparams)
             | None -> cmembers
+            |> List.ofSeq
           PrimaryCtor = (ctoracc, ctorparams, baseargs)
           SelfIdentifier = selfid
           SuperClass = basec }
@@ -951,7 +1000,7 @@ do
               SelfIdentifier = selfid }
             |> Constructor
             |> Concrete
-            |> Member
+            |> TypeOrMember.Member
     classBodyRef :=
         memberBody
             "class body"
@@ -959,14 +1008,14 @@ do
                 ctorDef
 
                 methodDef
-                    (AMethod >> Abstract >> Member)
-                    (Method >> Concrete >> Member |> Some)
+                    (AMethod >> Abstract >> TypeOrMember.Member)
+                    (Method >> Concrete >> TypeOrMember.Member |> Some)
 
                 propDef
-                    (AProperty >> Abstract >> Member)
-                    (Property >> Concrete >> Member |> Some)
+                    (AProperty >> Abstract >> TypeOrMember.Member)
+                    (Property >> Concrete >> TypeOrMember.Member |> Some)
             ]
-            [ classDef Type ]
+            [ classDef TypeOrMember.Type ]
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
 let moduleDef mdef modfs =
@@ -997,7 +1046,7 @@ do
                   ReturnType = retType }
               FunctionName = name }
             |> Function
-            |> Member
+            |> TypeOrMember.Member
     let opName =
         Operator.operatorChars
         |> anyOf
@@ -1035,7 +1084,7 @@ do
                       ReturnType = retType
                       Symbol = name }
                     |> Operator
-                    |> Member
+                    |> TypeOrMember.Member
     moduleBodyRef :=
         memberBlock
             "module body"
@@ -1045,9 +1094,9 @@ do
                 operatorDef
             ]
             [
-                classDef (Class >> Type)
-                interfaceDef (Interface >> Type)
-                moduleDef (Module >> Type)
+                classDef (Class >> TypeOrMember.Type)
+                interfaceDef (Interface >> TypeOrMember.Type)
+                moduleDef (Module >> TypeOrMember.Type)
             ]
 
 let private optionalEnd =
@@ -1302,13 +1351,7 @@ do
                       ReturnType = None }
                     |> AnonFunc
 
-                tupleExpr
-                <?> "tuple"
-                |>> (fun ex ->
-                    match ex with
-                    | [] -> UnitLit
-                    | [ nested ] -> nested
-                    | _ -> TupleLit ex)
+                parenExpr <?> "tuple"
 
                 ifExpr
 
@@ -1353,7 +1396,7 @@ do
                 |>> (fun (ctype, args) ->
                     CtorCall
                         {| Arguments = args
-                           Type = Identifier ctype |})
+                           Type = Named ctype |> TypeName |})
 
                 [
                     pstring "true"
@@ -1404,17 +1447,17 @@ let compilationUnit: Parser<CompilationUnit, State> =
         skipString "namespace"
         >>. space1
         |> attempt
-        >>. sepBy1 identifier (separator period)
-        |>> FullIdentifier
+        >>. sepBy1 identifierStr (separator period)
         .>> space
         .>> semicolon
-        |> opt
+        |> optList
         <?> "namespace declaration"
     let useStatements =
         skipString "use"
         >>. space1
         |> attempt
-        >>. identifierFull
+        >>. position
+        .>>. identifierFull
         .>> space
         .>> semicolon
         <?> "use statement"
@@ -1432,7 +1475,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
                 |> Seq.map (fun def -> def modfs)
                 |> choice
         let entrypoint =
-            let eparam =
+            let eparam = // TODO: Be less strict with parameters, allow none or more than one.
                 between
                     (lparen .>> space)
                     (rparen >>. space)
@@ -1442,26 +1485,23 @@ let compilationUnit: Parser<CompilationUnit, State> =
             >>= fun state ->
                 match state.EntryPoint with
                 | Some existing ->
-                    string existing.Origin
-                    |> sprintf "An entry point already exists at %s"
+                    existing.Origin
+                    |> sprintf "An entry point already exists at %O"
                     |> fail
                 | None ->
-                    position
-                    .>> keyword "main"
-                    |> attempt
-                    .>>. eparam
-                    .>> space
-                    .>>. functionBody
-                    >>= fun ((pos, eargs), body) ->
+                    tuple3
+                        (position .>> keyword "main" |> attempt)
+                        (paramTuple typeAnnExp .>> space)
+                        functionBody
+                    >>= fun (pos, eargs, body) ->
                         let entrypoint =
-                            { Arguments = eargs
+                            { Parameters = eargs
                               Body = body
                               Origin = pos }
                             |> Some
                         setUserState { state with EntryPoint = entrypoint }
         [
-            Access.Internal
-            |> accessModifier
+            globalAccess
             .>>. typeDef
             |>> Some
 
@@ -1472,15 +1512,13 @@ let compilationUnit: Parser<CompilationUnit, State> =
         |> many
         |>> List.choose id
     space
-    >>. tuple5
+    >>. tuple4
         (namespaceDecl .>> space)
         (useStatements .>> space)
         (definitions .>> eof)
         position
-        getUserState
-    |>> fun (ns, uses, types, pos, state) ->
-        { EntryPoint = state.EntryPoint
-          Namespace = ns
+    |>> fun (ns, uses, types, pos) ->
+        { Namespace = Namespace ns
           Usings = uses
           Source = pos.StreamName
           Types = types }
@@ -1496,12 +1534,12 @@ let parseFiles enc paths =
         Seq.fold
             (fun acc path ->
                 match acc with
-                | Result.Ok (list: ImmutableList<_>, epoint, state) ->
+                | Result.Ok (list: ImmutableList<_>, state) ->
                     match parseFile state path with
                     | Success (cu, nstate, _) ->
-                        Result.Ok (list.Add cu, cu.EntryPoint, nstate)
+                        Result.Ok (list.Add cu, nstate)
                     | Failure (_, err, _) -> Result.Error err
                 | Result.Error _ -> acc)
-            (Result.Ok (ImmutableList.Empty, None, defaultState))
+            (Result.Ok (ImmutableList.Empty, defaultState))
             paths
-        |> Result.map (fun (cunits, epoint, _) -> cunits, epoint)
+        |> Result.map (fun (cunits, estate) -> cunits, estate.EntryPoint)
