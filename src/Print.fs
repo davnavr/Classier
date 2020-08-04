@@ -52,11 +52,47 @@ let pposition (pos: FParsec.Position) =
         pos.StreamName
     |> line
 
+let rec pexpr (expr: GenExpression) = // TODO: FInd a better way to make this recursive
+    match expr with
+    | ComplexExpr cexpr ->
+        match cexpr with
+        | TempEFunctionCall call ->
+            let (ns, mdle, func) = call.Target
+            let qns =
+                match ns with
+                | Namespace.Global -> ""
+                | _ -> sprintf "%O." ns
+            print {
+                strf
+                    "global:%s%O.%O"
+                    qns
+                    mdle.ModuleName.Name // NOTE: Generics are not printed for name of module or function
+                    func.FunctionName.Name
+                |> line
+
+                call.Arguments
+                |> Seq.map pexpr
+                |> many
+                |> paren
+            }
+        | _ -> strl "#error Bad complex expression"
+    | StrLit s ->
+        print {
+            str "\""
+            str s // TODO: How to handle special characters and escape sequences? Are they replaced by the parser?
+            str "\""
+        }
+    | _ -> strl "#error Bad expression"
+
 let pbody (body: GenBody<_>) indent =
     print {
         for (st, (pos, syntax)) in body.Statements do
             pposition pos
             match st with
+            | Empty -> strl ";"
+            | IgnoredExpr expr ->
+                pexpr expr // TODO: Does computation expression cause this to be skipped or will it work correctly?
+                strl ";" |> line
             | _ -> strl "#error Bad statement"
     }
     |> block indent
