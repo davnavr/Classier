@@ -40,11 +40,12 @@ type CallExpression<'Target> =
 
 type ComplexExpression =
     | CtorCall of CallExpression<ResolvedClass>
-    | FuncCall of CallExpression<DefinedOrExtern<GenFunction, EFunction>>
+    | TempEFunctionCall of CallExpression<Namespace * EGlobalModule * EFunction>
 type GenExpression =
     | BoolLit of bool
     | ComplexExpr of ComplexExpression
-    | GlobalTypeRef of DefinedOrExtern<GenGlobalType, EGlobalType>
+    | GlobalTypeRef of Namespace * DefinedOrExtern<GenGlobalType, EGlobalType> // TODO: Should every type and member (EGlobalClass, GenNestedInterface, GenCtor, etc.), have its own Ref case here?
+    | TempEFunctionRef of Namespace * EGlobalModule * EFunction
     | NamespaceRef of Namespace
     | StrLit of string
 

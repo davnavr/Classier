@@ -84,11 +84,11 @@ module GlobalsTable =
 
     let private updatens symbols addsymbol ns ttable =
         let tables =
+            let ncons ntable name nlist =
+                (name, ntable) :: nlist
             foldns
-                (fun ntable name nlist ->
-                    (name, ntable) :: nlist)
-                (fun name nlist ->
-                    (name, empty) :: nlist)
+                ncons
+                (ncons empty)
                 (fun _ -> List.empty)
                 ns
                 ttable
