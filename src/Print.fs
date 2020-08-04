@@ -29,7 +29,7 @@ type PrintBuilder() =
 let print = PrintBuilder()
 
 let str s = Print (fun prnt -> prnt s)
-let strf format = printf format |> str
+let strf fmt = Core.Printf.ksprintf str fmt
 
 let line p = many [ p; str "\n" ]
 
@@ -43,6 +43,23 @@ let block indent p =
         indented indent p
         strl "}"
     }
+let paren p = many [ str "("; p; str ")" ]
+
+let pposition (pos: FParsec.Position) =
+    strf
+        "#line %i \"%s\""
+        pos.Line
+        pos.StreamName
+    |> line
+
+let pbody (body: GenBody<_>) indent =
+    print {
+        for (st, (pos, syntax)) in body.Statements do
+            pposition pos
+            match st with
+            | _ -> strl "#error Bad statement"
+    }
+    |> block indent
 
 let pepoint output indent =
     match output.EntryPoint with
@@ -50,10 +67,10 @@ let pepoint output indent =
         print {
             strl "internal static class _EntryPoint"
 
-            seq {
-                str "private static void Main()"
+            print {
+                strl "private static void Main()"
+                pbody epoint.Body indent
             }
-            |> many
             |> block indent
         }
     | None -> strl "// No entry point"

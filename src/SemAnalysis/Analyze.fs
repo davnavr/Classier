@@ -279,7 +279,7 @@ let private gbody body ltable usings ret gtable =
                     let nbody =
                         gexpr expr table gtable
                         |> IgnoredExpr
-                        |> GenBody.addTo gen st
+                        |> GenBody.addTo gen (pos, st)
                     (table, err, nbody)
                 | _ -> failwithf "Unsupported statement '%A'" st)
             (ltable, ImmutableList.Empty, GenBody.empty ret)
