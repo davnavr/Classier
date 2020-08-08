@@ -850,19 +850,23 @@ do
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_ * _, _>()
 let classDef cdef modfs =
+    let classDef =
+        keyword "data"
+        >>% DataClass
+        <|>% NormalClass
+        .>> keyword "class"
     let classModf =
         validateModifiers
             modfs
-            (fun (inheritKind, classKind) modf ->
+            (fun (inheritKind) modf ->
                 match (inheritKind, modf) with
                 | (MustInherit, "inheritable")
                 | (CanInherit, "abstract") ->
                     badModfier "An abstract class already implies that it is 'inheritable'"
-                | (_, "inheritable") -> Result.Ok(CanInherit, classKind)
-                | (_, "abstract") -> Result.Ok(MustInherit, classKind)
-                | (_, "data") -> Result.Ok(inheritKind, DataClass)
+                | (_, "inheritable") -> Result.Ok CanInherit
+                | (_, "abstract") -> Result.Ok MustInherit
                 | _ -> Result.Error None)
-            (Sealed, NormalClass)
+            (Sealed)
     let classCtor =
         memberAccess Access.Private
         .>> space
@@ -881,8 +885,8 @@ let classDef cdef modfs =
             match cbase with
             | Some (basec, baseargs) -> Some basec, baseargs
             | None -> None, List.empty
-    keyword "class"
-    >>. tuple7
+    tuple8
+        classDef
         classModf
         genericName
         classCtor
@@ -890,11 +894,11 @@ let classDef cdef modfs =
         classBase
         (implementsOpt .>> space)
         classBody
-    |>> fun ((minherit, mkind), name, (ctoracc, ctorparams), selfid, (basec, baseargs), ilist, (body, cmembers)) ->
-        { ClassKind = mkind
+    |>> fun (kind, inht, name, (ctoracc, ctorparams), selfid, (basec, baseargs), ilist, (body, cmembers)) ->
+        { ClassKind = kind
           ClassName = name
           Body = List.ofSeq body
-          Inheritance = minherit
+          Inheritance = inht
           Interfaces = ilist
           Members = List.ofSeq cmembers
           PrimaryCtor = (ctoracc, ctorparams, baseargs)
@@ -926,20 +930,27 @@ do
             |> Concrete
             |> TypeOrMember.Member
     classBodyRef :=
-        memberBody
-            "class body"
-            [
-                ctorDef
+        [
+            semicolon
+            |> attempt
+            >>% (ImmutableList.Empty, ImmutableList.Empty)
 
-                methodDef
-                    (AMethod >> Abstract >> TypeOrMember.Member)
-                    (Method >> Concrete >> TypeOrMember.Member |> Some)
+            memberBody
+                "class body"
+                [
+                    ctorDef
 
-                propDef
-                    (AProperty >> Abstract >> TypeOrMember.Member)
-                    (Property >> Concrete >> TypeOrMember.Member |> Some)
-            ]
-            [ classDef TypeOrMember.Type ]
+                    methodDef
+                        (AMethod >> Abstract >> TypeOrMember.Member)
+                        (Method >> Concrete >> TypeOrMember.Member |> Some)
+
+                    propDef
+                        (AProperty >> Abstract >> TypeOrMember.Member)
+                        (Property >> Concrete >> TypeOrMember.Member |> Some)
+                ]
+                [ classDef TypeOrMember.Type ]
+        ]
+        |> choice
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
 let moduleDef mdef modfs =
