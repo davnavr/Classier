@@ -625,7 +625,7 @@ let methodDef amthd cmthd modfs =
             tuple5
                 selfId
                 genericName
-                (paramTupleList typeAnnOpt .>> space)
+                (paramTupleList typeAnnExp .>> space)
                 (typeAnnOpt .>> space)
                 functionBody
             |>> fun (selfId, name, mparams, retType, body) ->
@@ -649,7 +649,6 @@ let methodDef amthd cmthd modfs =
                      { Body = ()
                        Parameters = mparams
                        ReturnType = retType }
-                     : Signature<unit, TypeName>
                   MethodName = name }
                 |> amthd
     <?> "method definition"
@@ -778,8 +777,7 @@ let memberDef members types =
 
             types
             |> Seq.map (fun def ->
-                def modfs
-                .>> space)
+                def modfs .>> space)
             |> choice
         ]
         |> choice
@@ -852,77 +850,25 @@ do
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_ * _, _>()
 let classDef cdef modfs =
-    let dataMembers =
-        keyword "data"
-        >>. position
-        |>> fun pos ->
-            fun values ->
-                let selfid = "this__"
-                seq {
-                    Method
-                        { Method =
-                           { Body = List.empty // TODO: Create a body for the equals method here.
-                             Parameters =
-                               [
-                                   [
-                                       "obj"
-                                       |> IdentifierStr 
-                                       |> Some
-                                       |> Param.create None
-                                   ]
-                               ]
-                             ReturnType =
-                               PrimitiveType.Boolean
-                               |> Type.Primitive
-                               |> TypeName
-                               |> Some }
-                          MethodName = "equals" |> IdentifierStr |> Name.ofStr pos
-                          Modifiers = MethodModifiers.Default
-                          SelfIdentifier = IdentifierStr selfid |> Some }
-
-                    yield!
-                        values
-                        |> Seq.map
-                            (fun (param: InfParam) ->
-                                match param.Name with
-                                | None -> None
-                                | Some pname ->
-                                    { Accessors =
-                                        pname
-                                        |> Identifier.ofStr
-                                        |> IdentifierRef
-                                        |> Return
-                                        |> Expression.withPos pos
-                                        |> List.singleton
-                                        |> Get
-                                      PropName = Name.simple pos pname
-                                      SelfIdentifier = None
-                                      Value = None
-                                      ValueType = param.Type }
-                                    |> Property
-                                    |> Some)
-                        |> Seq.choose id
-                }
-                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> TypeOrMember.Member)
-        |> opt
     let classModf =
         validateModifiers
             modfs
-            (fun inheritKind modf ->
+            (fun (inheritKind, classKind) modf ->
                 match (inheritKind, modf) with
                 | (MustInherit, "inheritable")
                 | (CanInherit, "abstract") ->
                     badModfier "An abstract class already implies that it is 'inheritable'"
-                | (_, "inheritable") -> Result.Ok CanInherit
-                | (_, "abstract") -> Result.Ok MustInherit
+                | (_, "inheritable") -> Result.Ok(CanInherit, classKind)
+                | (_, "abstract") -> Result.Ok(MustInherit, classKind)
+                | (_, "data") -> Result.Ok(inheritKind, DataClass)
                 | _ -> Result.Error None)
-            Sealed
+            (Sealed, NormalClass)
     let classCtor =
         memberAccess Access.Private
         .>> space
         |> opt
         |>> Option.defaultValue Access.Public
-        .>>. (paramTuple typeAnnOpt |> optList)
+        .>>. (paramTuple typeAnnExp |> optList)
         .>> space
         <?> "primary constructor"
     let classBase =
@@ -935,44 +881,22 @@ let classDef cdef modfs =
             match cbase with
             | Some (basec, baseargs) -> Some basec, baseargs
             | None -> None, List.empty
-    let def header label body =
-        tuple8
-            header
-            classModf
-            genericName
-            classCtor
-            selfIdAs
-            classBase
-            (implementsOpt .>> space)
-            body
-        <?> label
-    [
-        [
-            semicolon >>% (ImmutableList.Empty, ImmutableList.Empty)
-            classBody
-        ]
-        |> choice
-        |> def
-            (dataMembers .>> keyword "class")
-            "record definition"
-
-        def
-            (keyword "class" >>% None)
-            "class definition"
-            classBody
-    ]
-    |> choice
-    |>> fun (rmembers, cmodf, name, (ctoracc, ctorparams), selfid, (basec, baseargs), ilist, (body, cmembers)) ->
-        { ClassName = name
+    keyword "class"
+    >>. tuple7
+        classModf
+        genericName
+        classCtor
+        selfIdAs
+        classBase
+        (implementsOpt .>> space)
+        classBody
+    |>> fun ((minherit, mkind), name, (ctoracc, ctorparams), selfid, (basec, baseargs), ilist, (body, cmembers)) ->
+        { ClassKind = mkind
+          ClassName = name
           Body = List.ofSeq body
-          Inheritance = cmodf
+          Inheritance = minherit
           Interfaces = ilist
-          Members =
-            match rmembers with
-            | Some toadd ->
-                cmembers.InsertRange(0, toadd ctorparams)
-            | None -> cmembers
-            |> List.ofSeq
+          Members = List.ofSeq cmembers
           PrimaryCtor = (ctoracc, ctorparams, baseargs)
           SelfIdentifier = selfid
           SuperClass = basec }
@@ -990,7 +914,7 @@ do
         |> attempt
         >>. noModifiers modfs
         >>. tuple3
-            (paramTuple typeAnnOpt .>> space)
+            (paramTuple typeAnnExp .>> space)
             selfIdAs
             ctorCall
         <?> "constructor definition"
@@ -1034,7 +958,7 @@ do
         noModifiers modfs
         >>. tuple4
             genericName
-            (paramTupleList typeAnnOpt .>> space)
+            (paramTupleList typeAnnExp .>> space)
             (typeAnnOpt .>> space)
             functionBody
         |> attempt
@@ -1073,14 +997,14 @@ do
             | Some opkind ->
                 tuple4
                     (opName .>> space)
-                    (paramTuple typeAnnOpt .>> space)
+                    (paramTuple typeAnnExp .>> space)
                     (typeAnnOpt .>> space)
                     functionBody
                 <?> "operator definition"
-                |>> fun (name, oper, retType, body) ->
+                |>> fun (name, opnds, retType, body) ->
                     { Body = body
                       Kind = opkind
-                      Operands = oper
+                      Operands = opnds
                       ReturnType = retType
                       Symbol = name }
                     |> Operator

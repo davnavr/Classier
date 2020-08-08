@@ -17,7 +17,7 @@ type ResolvedType =
 
 type GenParam =
     { Name: IdentifierStr option
-      Syntax: Ast.InfParam
+      Syntax: Ast.ExpParam
       Type: ResolvedType }
 
 type GenParamTuple = ImmutableList<GenParam>
