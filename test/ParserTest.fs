@@ -1,10 +1,12 @@
 ﻿[<RequireQualifiedAccess>]
 module Classier.NET.Compiler.ParserTest
 
-open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.TypeSystem
-open FParsec
 open Fuchu
+open FParsec
+
+open Classier.NET.Compiler.TypeSystem
+
+open Classier.NET.Compiler.Grammar
 
 let parseStr parser name f =
     runParserOnString
@@ -62,8 +64,7 @@ let tests =
                     public class Class3<T> protected {
                     }
 
-                    public abstract class Class4<T, U implements IThing> {
-                    }
+                    public abstract class Class4<T, U implements IThing>;
                     """
                     |> parse
                     |> ParserAssert.isSuccess
@@ -243,5 +244,23 @@ let tests =
                         |> ignore
                     }))
         |> testList "simple type name is valid"
+
+        testStr
+            Parser.compilationUnit
+            "more than one entry point is not allowed"
+            (fun parse ->
+                """
+                main() {
+                    "One" |> System.Console.WriteLine;
+                }
+
+                main() {
+                    "Tw\u00D0"
+                }
+                """
+                |> parse
+                |> ParserAssert.isFailure
+                |> string
+                |> Assert.strContains "entry point already exists")
     ]
     |> testList "parser tests"

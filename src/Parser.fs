@@ -2,13 +2,15 @@
 
 open System
 open System.Collections.Immutable
+
 open FParsec
+
 open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
-open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.Grammar.Operator
 open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
+
+open Classier.NET.Compiler.Grammar
 
 type StatementEnd =
     | RequireEnd
@@ -455,8 +457,7 @@ do
                         | _ -> None
                     rest
                     |> Option.defaultValue value
-                    |>> fun value ->
-                        decl (p, value)
+                    |>> fun dvalue -> decl (p, dvalue)
 
                 skipString "while"
                 >>. space
@@ -1410,12 +1411,6 @@ let compilationUnit: Parser<CompilationUnit, State> =
                 |> Seq.map (fun def -> def modfs)
                 |> choice
         let entrypoint =
-            let eparam = // TODO: Be less strict with parameters, allow none or more than one.
-                between
-                    (lparen .>> space)
-                    (rparen >>. space)
-                    (param typeAnnExp)
-                .>> space
             getUserState
             >>= fun state ->
                 match state.EntryPoint with
