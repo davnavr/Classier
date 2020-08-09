@@ -1,7 +1,5 @@
 ﻿module Classier.NET.Compiler.Generic
 
-open Classier.NET.Compiler.Identifier
-
 type GenericVariance =
     | NoVariance
     | Covariant

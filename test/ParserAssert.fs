@@ -2,9 +2,15 @@
 
 open FParsec
 
-let isSuccess result =
-    match result with
+let isSuccess =
+    function
     | Success (result, state, _) ->
         result, state
     | Failure (msg, _, _) ->
         Assert.fail msg
+
+let isFailure =
+    function
+    | Failure (_, err, _) -> err
+    | Success (_, _, pos) ->
+        Assert.failf "Unexpected success while parsing %s" pos.StreamName

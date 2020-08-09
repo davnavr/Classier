@@ -11,28 +11,16 @@ module TempStandardLib =
 
     let table gtable =
         let system =
-            "System"
-            |> Identifier.create
-            |> Option.get
-            |> List.singleton
-            |> Namespace
+            Namespace [ IdentifierStr.create "System" ]
         let console =
             { EModule.ModuleName =
-                "Console"
-                |> Identifier.create
-                |> Option.get
-                |> Identifier.ofStr
+                Identifier.create "Console"
               Members =
                 { FunctionName =
-                    "WriteLine"
-                    |> Identifier.create
-                    |> Option.get
-                    |> Identifier.ofStr
+                    Identifier.create "WriteLine"
                   Parameters =
                     { EParam.Name =
-                        "value"
-                        |> Identifier.create
-                        |> Option.get
+                        IdentifierStr.create "value"
                       Type =
                         TypeSystem.Primitive TypeSystem.PrimitiveType.Unit }
                     |> ImmArray.singleton

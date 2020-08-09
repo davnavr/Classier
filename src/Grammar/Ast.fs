@@ -4,7 +4,6 @@ module rec Classier.NET.Compiler.Grammar.Ast
 open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
-open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
 type TypeParam =
@@ -40,16 +39,14 @@ type Pattern =
     | TuplePattern of InfParam list
     | VarPattern of IdentifierStr * TypeName option
 
-type Local = Pattern * Expression
-
 type PStatement = FParsec.Position * Statement
 type Statement =
     | Empty
     /// An expression whose result is evaluated then discarded.
     | IgnoredExpr of Expression
-    | LetDecl of Local
+    | LetDecl of Pattern * Expression
     | Return of Expression
-    | VarDecl of Local
+    | VarDecl of Pattern * Expression option
     | While of Expression * PStatement list
 
 type EntryPoint =
@@ -57,11 +54,12 @@ type EntryPoint =
       Body: PStatement list
       Origin: FParsec.Position }
 
-type Signature<'Body, 'Type> =
+type Signature<'Body, 'ReturnType> =
     { Body: 'Body
-      Parameters: Param<'Type> list list
-      ReturnType: 'Type }
-type InfSignature = Signature<PStatement list, TypeName option>
+      Parameters: ExpParam list list
+      ReturnType: 'ReturnType }
+type Signature<'ReturnType> =
+    Signature<PStatement list, 'ReturnType>
 
 type If =
     { Condition: Expression
@@ -81,7 +79,7 @@ type Try =
       Finally: PStatement list }
 
 type Expression =
-    | AnonFunc of Signature<PStatement list, TypeName option>
+    | AnonFunc of Signature<TypeName option>
     | BoolLit of bool
     | CtorCall of
         {| Arguments: Expression list
@@ -121,7 +119,7 @@ type OperatorStr =
 type Operator =
     { Body: PStatement list
       Kind: OperatorKind
-      Operands: InfParam list
+      Operands: ExpParam list
       ReturnType: TypeName option
       Symbol: OperatorStr }
 
@@ -131,10 +129,10 @@ type MutatorModf =
 
 type Ctor =
     { Call: Expression
-      Parameters: InfParam list
+      Parameters: ExpParam list
       SelfIdentifier: IdentifierStr option }
 
-type PrimaryCtor = Access * InfParam list * Expression list
+type PrimaryCtor = Access * ExpParam list * Expression list
 
 [<RequireQualifiedAccess>]
 type MethodImpl =
@@ -152,7 +150,7 @@ type MethodModifiers =
           Purity = IsMutator }
 
 type Method =
-    { Method: InfSignature
+    { Method: Signature<TypeName option>
       MethodName: GenericName
       Modifiers: MethodModifiers
       SelfIdentifier: IdentifierStr option }
@@ -185,7 +183,7 @@ type AProperty =
       ValueType: TypeName }
 
 type StaticFunction =
-    { Function: InfSignature
+    { Function: Signature<TypeName option>
       FunctionName: GenericName }
 
 type AbstractMember =
@@ -209,6 +207,11 @@ type MemberName =
     | IdentifierName of GenericName
     | OperatorName of OperatorStr
 
+type ClassKind =
+    /// A class that has properties already defined.
+    | DataClass
+    | NormalClass
+
 type ClassInheritance =
     | MustInherit
     | CanInherit
@@ -223,7 +226,8 @@ type ClassInheritance =
 type MemberList<'Type, 'Member> = (Access * TypeOrMember<'Type, 'Member>) list
 
 type Class =
-    { ClassName: GenericName
+    { ClassKind: ClassKind
+      ClassName: GenericName
       Body: PStatement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier<TypeName> list

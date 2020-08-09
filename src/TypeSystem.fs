@@ -52,7 +52,7 @@ type Type<'Named> =
            ReturnType: Type<'Named> |}
     | Named of 'Named
     | Primitive of PrimitiveType
-    | Tuple of Type<'Named> list // TODO: Make it so that it requires at least one item?
+    | Tuple of Type<'Named> * Type<'Named> list
 
     override this.ToString() =
         match this with
@@ -60,4 +60,4 @@ type Type<'Named> =
         | FuncType f -> sprintf "%O => %O" f.ParamType f.ReturnType
         | Named ntype -> ntype.ToString()
         | Primitive p -> string p
-        | Tuple types -> sprintf "(%s)" (String.Join(", ", types))
+        | Tuple (head, tail) -> sprintf "(%s)" (String.Join(", ", head :: tail))

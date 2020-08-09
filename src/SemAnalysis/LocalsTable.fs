@@ -3,7 +3,6 @@
 open System.Collections.Immutable
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
-open Classier.NET.Compiler.Identifier
 
 type Local =
     { Name: IdentifierStr

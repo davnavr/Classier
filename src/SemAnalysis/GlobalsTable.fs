@@ -3,7 +3,6 @@
 open System.Collections.Immutable
 
 open Classier.NET.Compiler
-open Classier.NET.Compiler.Identifier
 
 open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.IR
@@ -23,9 +22,9 @@ module GlobalsTable =
             let tname =
                 function
                 | Defined def ->
-                    GenType.gname def |> Identifier.noGenerics
+                    GenType.gname def |> Identifier.umap
                 | Extern ext ->
-                    EType.gname ext |> Identifier.noGenerics
+                    EType.gname ext |> Identifier.umap
             let cname =
                 compare
                     (tname type1)

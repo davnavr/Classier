@@ -6,11 +6,20 @@ open System.Collections
 let inline fail msg = msg |> Fuchu.AssertException |> raise
 let inline failf format = Printf.ksprintf fail format
 
+let isOk result =
+    match result with
+    | Result.Ok ok -> ok
+    | Result.Error err ->
+        failf "The value was an error: %O" err
 let isSome opt =
     match opt with
     | Some value -> value
     | None ->
         fail "The value was unexpectedly None"
+let isTrue msg =
+    function
+    | true -> ()
+    | false -> fail msg
 
 let equal (exp: 'T when 'T: equality) act =
     let format (item: obj) =
@@ -36,19 +45,20 @@ let equal (exp: 'T when 'T: equality) act =
             (format exp)
             (format act)
 
-let isOk result =
-    match result with
-    | Result.Ok ok -> ok
-    | Result.Error err ->
-        failf "The value was an error: %O" err
-
 let head s =
     match Seq.tryHead s with
     | Some h -> h
     | None ->
         fail "The head of the sequence could not be retrieved since the sequence is empty"
-
 let notEmpty col =
     if Seq.isEmpty col
     then fail "The collection was unexpectedly empty"
     else col
+
+let strContains sub str =
+    let msg =
+        sprintf
+            "The substring '%s' in string '%s' could not be found"
+            sub
+            str
+    isTrue msg (str.Contains sub)

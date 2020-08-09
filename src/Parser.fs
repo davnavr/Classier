@@ -2,13 +2,14 @@
 
 open System
 open System.Collections.Immutable
+
 open FParsec
+
 open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
-open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.Grammar.Operator
-open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
+
+open Classier.NET.Compiler.Grammar
 
 type StatementEnd =
     | RequireEnd
@@ -246,7 +247,7 @@ let genericArgs =
 let identifierStr =
     asciiLetter
     .>>. manyChars (asciiLetter <|> pchar '_' <|> digit)
-    |>> (String.Concat >> IdentifierStr)
+    |>> (String.Concat >> IdentifierStr.create)
 let identifier =
     identifierStr
     .>> space
@@ -347,10 +348,9 @@ do
                 <?> "tuple"
                 |>> function
                 | [] -> Primitive PrimitiveType.Unit
-                | items ->
-                    items
-                    |> List.map (fun (TypeName tname) -> tname)
-                    |> Tuple
+                | head :: tail ->
+                    let mapper (TypeName tname) = tname
+                    Tuple(mapper head, List.map mapper tail)
             ]
         |>> TypeName
     let modifiedType (f: TypeName -> _ -> _) p prev =
@@ -408,55 +408,58 @@ let private pattern =
     |> choice
 
 do
+    let vvalue =
+        equalsExpr
+        |> attempt
+        .>> space
+        .>> semicolon
+        <?> "variable value"
     statementRef :=
         position
         .>>. choiceL
             [
                 semicolon >>% Empty <?> "empty statement"
 
-                choice
-                    [
-                        keyword "let" >>% LetDecl
-                        keyword "var" >>% VarDecl
-                    ]
-                |> attempt
-                .>>. pattern
+                keyword "let"
+                >>. pattern
                 .>> space
                 <?> "local variable or function"
-                >>= fun (decl, p) ->
-                    let value =
-                        equalsExpr
-                        |> attempt
-                        .>> space
-                        .>> semicolon
-                        <?> "variable value"
-                    let rest =
-                        match p with
-                        | VarPattern (_, vtype) ->
-                            match vtype with
-                            | None ->
-                                [
-                                    value
+                >>= fun p ->
+                    match p with
+                    | VarPattern (_, vtype) when Option.isNone vtype ->
+                        [
+                            vvalue
 
-                                    paramTupleList typeAnnOpt
-                                    .>> space
-                                    .>>. typeAnnOpt
-                                    .>> space
-                                    .>>. (statementBlock <?> "local function body")
-                                    |>> fun ((parameters, retType), body) ->
-                                        { Body = body
-                                          Parameters = parameters
-                                          ReturnType = retType }
-                                        |> AnonFunc
-                                ]
-                                |> choice
-                                |> Some
-                            | Some _ -> None
-                        | _ -> None
-                    rest
-                    |> Option.defaultValue value
-                    |>> fun value ->
-                        decl (p, value)
+                            tuple3
+                                (paramTupleList typeAnnExp .>> space)
+                                (typeAnnOpt .>> space)
+                                (statementBlock <?> "local function body")
+                            .>> optional semicolon
+                            |>> fun (parameters, retType, body) ->
+                                { Body = body
+                                  Parameters = parameters
+                                  ReturnType = retType }
+                                |> AnonFunc
+                        ]
+                        |> choice
+                    | _ -> vvalue
+                    |>> fun value -> LetDecl(p, value)
+
+                keyword "var"
+                >>. pattern
+                .>> space
+                >>= fun p ->
+                    let mvalue = vvalue |>> Some
+                    match p with
+                    | VarPattern (_, vtype) when Option.isSome vtype ->
+                        [
+                            mvalue
+                            semicolon >>% None
+                        ]
+                        |> choice
+                    | _ -> mvalue
+                    |>> fun value -> VarDecl(p, value)
+                <?> "mutable variable"
 
                 skipString "while"
                 >>. space
@@ -581,7 +584,7 @@ let functionBody =
         ]
         "function body"
 
-let methodDef amthd cmthd modfs =
+let private methodDef amthd cmthd modfs =
     validateModifiers
         modfs
         (fun (prev, isAbstract) modf ->
@@ -593,13 +596,17 @@ let methodDef amthd cmthd modfs =
                 | MethodImpl.Virtual ->
                     badModfier "An 'abstract' method implies that it can be overriden, making the 'virtual' modifier redundant"
                 | _ -> Result.Ok (prev, true)
-            | "mutator" -> Result.Ok ({ prev with Purity = IsMutator }, isAbstract)
+            | "mutator" ->
+                if isAbstract then
+                    badModfier "An 'abstract' method cannot be a 'mutator' since it does not have a body"
+                else
+                    Result.Ok ({ prev with Purity = IsMutator }, false)
             | "override" ->
                 match prev.ImplKind with
                 | MethodImpl.Virtual ->
                     badModfier "A 'virtual' method makes the 'override' modifier redundant, since it already can be overriden"
                 | _ ->
-                    Result.Ok ({ prev with ImplKind = MethodImpl.Override }, false)
+                    Result.Ok ({ prev with ImplKind = MethodImpl.Override }, isAbstract)
             | "sealed" ->
                 match prev.ImplKind with
                 | MethodImpl.Default ->
@@ -625,7 +632,7 @@ let methodDef amthd cmthd modfs =
             tuple5
                 selfId
                 genericName
-                (paramTupleList typeAnnOpt .>> space)
+                (paramTupleList typeAnnExp .>> space)
                 (typeAnnOpt .>> space)
                 functionBody
             |>> fun (selfId, name, mparams, retType, body) ->
@@ -649,12 +656,11 @@ let methodDef amthd cmthd modfs =
                      { Body = ()
                        Parameters = mparams
                        ReturnType = retType }
-                     : Signature<unit, TypeName>
                   MethodName = name }
                 |> amthd
     <?> "method definition"
     |> attempt
-let propDef aprop cprop modfs =
+let private propDef aprop cprop modfs =
     validateModifiers
         modfs
         (fun (isabst, ispure) modf ->
@@ -778,8 +784,7 @@ let memberDef members types =
 
             types
             |> Seq.map (fun def ->
-                def modfs
-                .>> space)
+                def modfs .>> space)
             |> choice
         ]
         |> choice
@@ -852,63 +857,15 @@ do
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_ * _, _>()
 let classDef cdef modfs =
-    let dataMembers =
+    let classDef =
         keyword "data"
-        >>. position
-        |>> fun pos ->
-            fun values ->
-                let selfid = "this__"
-                seq {
-                    Method
-                        { Method =
-                           { Body = List.empty // TODO: Create a body for the equals method here.
-                             Parameters =
-                               [
-                                   [
-                                       "obj"
-                                       |> IdentifierStr 
-                                       |> Some
-                                       |> Param.create None
-                                   ]
-                               ]
-                             ReturnType =
-                               PrimitiveType.Boolean
-                               |> Type.Primitive
-                               |> TypeName
-                               |> Some }
-                          MethodName = "equals" |> IdentifierStr |> Name.ofStr pos
-                          Modifiers = MethodModifiers.Default
-                          SelfIdentifier = IdentifierStr selfid |> Some }
-
-                    yield!
-                        values
-                        |> Seq.map
-                            (fun (param: InfParam) ->
-                                match param.Name with
-                                | None -> None
-                                | Some pname ->
-                                    { Accessors =
-                                        pname
-                                        |> Identifier.ofStr
-                                        |> IdentifierRef
-                                        |> Return
-                                        |> Expression.withPos pos
-                                        |> List.singleton
-                                        |> Get
-                                      PropName = Name.simple pos pname
-                                      SelfIdentifier = None
-                                      Value = None
-                                      ValueType = param.Type }
-                                    |> Property
-                                    |> Some)
-                        |> Seq.choose id
-                }
-                |> Seq.map (fun mdef -> Access.Public, Concrete mdef |> TypeOrMember.Member)
-        |> opt
+        >>% DataClass
+        <|>% NormalClass
+        .>> keyword "class"
     let classModf =
         validateModifiers
             modfs
-            (fun inheritKind modf ->
+            (fun (inheritKind) modf ->
                 match (inheritKind, modf) with
                 | (MustInherit, "inheritable")
                 | (CanInherit, "abstract") ->
@@ -916,13 +873,13 @@ let classDef cdef modfs =
                 | (_, "inheritable") -> Result.Ok CanInherit
                 | (_, "abstract") -> Result.Ok MustInherit
                 | _ -> Result.Error None)
-            Sealed
+            (Sealed)
     let classCtor =
         memberAccess Access.Private
         .>> space
         |> opt
         |>> Option.defaultValue Access.Public
-        .>>. (paramTuple typeAnnOpt |> optList)
+        .>>. (paramTuple typeAnnExp |> optList)
         .>> space
         <?> "primary constructor"
     let classBase =
@@ -935,44 +892,22 @@ let classDef cdef modfs =
             match cbase with
             | Some (basec, baseargs) -> Some basec, baseargs
             | None -> None, List.empty
-    let def header label body =
-        tuple8
-            header
-            classModf
-            genericName
-            classCtor
-            selfIdAs
-            classBase
-            (implementsOpt .>> space)
-            body
-        <?> label
-    [
-        [
-            semicolon >>% (ImmutableList.Empty, ImmutableList.Empty)
-            classBody
-        ]
-        |> choice
-        |> def
-            (dataMembers .>> keyword "class")
-            "record definition"
-
-        def
-            (keyword "class" >>% None)
-            "class definition"
-            classBody
-    ]
-    |> choice
-    |>> fun (rmembers, cmodf, name, (ctoracc, ctorparams), selfid, (basec, baseargs), ilist, (body, cmembers)) ->
-        { ClassName = name
+    tuple8
+        classDef
+        classModf
+        genericName
+        classCtor
+        selfIdAs
+        classBase
+        (implementsOpt .>> space)
+        classBody
+    |>> fun (kind, inht, name, (ctoracc, ctorparams), selfid, (basec, baseargs), ilist, (body, cmembers)) ->
+        { ClassKind = kind
+          ClassName = name
           Body = List.ofSeq body
-          Inheritance = cmodf
+          Inheritance = inht
           Interfaces = ilist
-          Members =
-            match rmembers with
-            | Some toadd ->
-                cmembers.InsertRange(0, toadd ctorparams)
-            | None -> cmembers
-            |> List.ofSeq
+          Members = List.ofSeq cmembers
           PrimaryCtor = (ctoracc, ctorparams, baseargs)
           SelfIdentifier = selfid
           SuperClass = basec }
@@ -990,7 +925,7 @@ do
         |> attempt
         >>. noModifiers modfs
         >>. tuple3
-            (paramTuple typeAnnOpt .>> space)
+            (paramTuple typeAnnExp .>> space)
             selfIdAs
             ctorCall
         <?> "constructor definition"
@@ -1002,20 +937,27 @@ do
             |> Concrete
             |> TypeOrMember.Member
     classBodyRef :=
-        memberBody
-            "class body"
-            [
-                ctorDef
+        [
+            semicolon
+            |> attempt
+            >>% (ImmutableList.Empty, ImmutableList.Empty)
 
-                methodDef
-                    (AMethod >> Abstract >> TypeOrMember.Member)
-                    (Method >> Concrete >> TypeOrMember.Member |> Some)
+            memberBody
+                "class body"
+                [
+                    ctorDef
 
-                propDef
-                    (AProperty >> Abstract >> TypeOrMember.Member)
-                    (Property >> Concrete >> TypeOrMember.Member |> Some)
-            ]
-            [ classDef TypeOrMember.Type ]
+                    methodDef
+                        (AMethod >> Abstract >> TypeOrMember.Member)
+                        (Method >> Concrete >> TypeOrMember.Member |> Some)
+
+                    propDef
+                        (AProperty >> Abstract >> TypeOrMember.Member)
+                        (Property >> Concrete >> TypeOrMember.Member |> Some)
+                ]
+                [ classDef TypeOrMember.Type ]
+        ]
+        |> choice
 
 let private moduleBody, private moduleBodyRef = createParserForwardedToRef<_, _>()
 let moduleDef mdef modfs =
@@ -1034,7 +976,7 @@ do
         noModifiers modfs
         >>. tuple4
             genericName
-            (paramTupleList typeAnnOpt .>> space)
+            (paramTupleList typeAnnExp .>> space)
             (typeAnnOpt .>> space)
             functionBody
         |> attempt
@@ -1073,14 +1015,14 @@ do
             | Some opkind ->
                 tuple4
                     (opName .>> space)
-                    (paramTuple typeAnnOpt .>> space)
+                    (paramTuple typeAnnExp .>> space)
                     (typeAnnOpt .>> space)
                     functionBody
                 <?> "operator definition"
-                |>> fun (name, oper, retType, body) ->
+                |>> fun (name, opnds, retType, body) ->
                     { Body = body
                       Kind = opkind
-                      Operands = oper
+                      Operands = opnds
                       ReturnType = retType
                       Symbol = name }
                     |> Operator
@@ -1340,7 +1282,7 @@ do
             [
                 strLit
 
-                paramTuple typeAnnOpt
+                paramTuple typeAnnExp
                 .>> space
                 .>>. lambdaBlock
                 |> attempt
@@ -1447,8 +1389,9 @@ let compilationUnit: Parser<CompilationUnit, State> =
         skipString "namespace"
         >>. space1
         |> attempt
-        >>. sepBy1 identifierStr (separator period)
-        .>> space
+        >>. sepBy1
+            (identifierStr .>> space)
+            (attempt period .>> space)
         .>> semicolon
         |> optList
         <?> "namespace declaration"
@@ -1475,12 +1418,6 @@ let compilationUnit: Parser<CompilationUnit, State> =
                 |> Seq.map (fun def -> def modfs)
                 |> choice
         let entrypoint =
-            let eparam = // TODO: Be less strict with parameters, allow none or more than one.
-                between
-                    (lparen .>> space)
-                    (rparen >>. space)
-                    (param typeAnnExp)
-                .>> space
             getUserState
             >>= fun state ->
                 match state.EntryPoint with

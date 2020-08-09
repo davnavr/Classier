@@ -1,7 +1,5 @@
 ﻿namespace Classier.NET.Compiler
 
-open Classier.NET.Compiler.Identifier
-
 [<StructuralComparison; StructuralEquality>]
 type Namespace =
     | Namespace of IdentifierStr list

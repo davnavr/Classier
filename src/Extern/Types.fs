@@ -6,7 +6,6 @@ open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.Generic
 open Classier.NET.Compiler.Grammar
-open Classier.NET.Compiler.Identifier
 
 type EGenericName = Identifier<GenericParam<EInterface, EClass>>
 

@@ -5,7 +5,6 @@ open System.Collections.Immutable
 
 open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
-open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.Generic
 
 open Classier.NET.Compiler.Extern
@@ -17,7 +16,7 @@ type ResolvedType =
 
 type GenParam =
     { Name: IdentifierStr option
-      Syntax: Ast.InfParam
+      Syntax: Ast.ExpParam
       Type: ResolvedType }
 
 type GenParamTuple = ImmutableList<GenParam>
