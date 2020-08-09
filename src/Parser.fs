@@ -348,10 +348,9 @@ do
                 <?> "tuple"
                 |>> function
                 | [] -> Primitive PrimitiveType.Unit
-                | items ->
-                    items
-                    |> List.map (fun (TypeName tname) -> tname)
-                    |> Tuple
+                | head :: tail ->
+                    let mapper (TypeName tname) = tname
+                    Tuple(mapper head, List.map mapper tail)
             ]
         |>> TypeName
     let modifiedType (f: TypeName -> _ -> _) p prev =

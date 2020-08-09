@@ -227,7 +227,7 @@ let tests =
 
                     tidentifier [ "System"; "Object" ]
 
-                    Tuple [ Primitive PrimitiveType.Int; Primitive PrimitiveType.Float ]
+                    Tuple(Primitive PrimitiveType.Int, [ Primitive PrimitiveType.Float ])
                 ]
                 |> Seq.map (fun exp ->
                     let ename = string exp
