@@ -410,54 +410,43 @@ let private pattern =
     |> choice
 
 do
+    let vvalue =
+        equalsExpr
+        |> attempt
+        .>> space
+        .>> semicolon
+        <?> "variable value"
     statementRef :=
         position
         .>>. choiceL
             [
                 semicolon >>% Empty <?> "empty statement"
 
-                choice
-                    [
-                        keyword "let" >>% LetDecl
-                        keyword "var" >>% VarDecl
-                    ]
-                |> attempt
-                .>>. pattern
+                keyword "let"
+                >>. pattern
                 .>> space
                 <?> "local variable or function"
-                >>= fun (decl, p) ->
-                    let value =
-                        equalsExpr
-                        |> attempt
-                        .>> space
-                        .>> semicolon
-                        <?> "variable value"
-                    let rest =
-                        match p with
-                        | VarPattern (_, vtype) ->
-                            match vtype with
-                            | None ->
-                                [
-                                    value
+                >>= fun p ->
+                    match p with
+                    | VarPattern (_, vtype) when Option.isNone vtype ->
+                        [
+                            vvalue
 
-                                    paramTupleList typeAnnOpt
-                                    .>> space
-                                    .>>. typeAnnOpt
-                                    .>> space
-                                    .>>. (statementBlock <?> "local function body")
-                                    |>> fun ((parameters, retType), body) ->
-                                        { Body = body
-                                          Parameters = parameters
-                                          ReturnType = retType }
-                                        |> AnonFunc
-                                ]
-                                |> choice
-                                |> Some
-                            | Some _ -> None
-                        | _ -> None
-                    rest
-                    |> Option.defaultValue value
-                    |>> fun dvalue -> decl (p, dvalue)
+                            tuple3
+                                (paramTupleList typeAnnExp .>> space)
+                                (typeAnnOpt .>> space)
+                                (statementBlock <?> "local function body")
+                            |>> fun (parameters, retType, body) ->
+                                { Body = body
+                                  Parameters = parameters
+                                  ReturnType = retType }
+                                |> AnonFunc
+                        ]
+                        |> choice
+                    | _ -> vvalue
+                    |>> fun value -> LetDecl(p, value)
+
+                // TODO: Add 'var'
 
                 skipString "while"
                 >>. space
@@ -1276,7 +1265,7 @@ do
             [
                 strLit
 
-                paramTuple typeAnnOpt
+                paramTuple typeAnnExp
                 .>> space
                 .>>. lambdaBlock
                 |> attempt

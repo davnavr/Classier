@@ -57,14 +57,12 @@ type EntryPoint =
       Body: PStatement list
       Origin: FParsec.Position }
 
-type Signature<'Body, 'ParamType, 'ReturnType> =
+type Signature<'Body, 'ReturnType> =
     { Body: 'Body
-      Parameters: Param<'ParamType> list list
+      Parameters: ExpParam list list
       ReturnType: 'ReturnType }
-type Signature<'ParamType, 'ReturnType> =
-    Signature<PStatement list, 'ParamType, 'ReturnType>
-type Signature<'ParamType> =
-    Signature<'ParamType, 'ParamType option>
+type Signature<'ReturnType> =
+    Signature<PStatement list, 'ReturnType>
 
 type If =
     { Condition: Expression
@@ -84,7 +82,7 @@ type Try =
       Finally: PStatement list }
 
 type Expression =
-    | AnonFunc of Signature<TypeName option, TypeName option>
+    | AnonFunc of Signature<TypeName option>
     | BoolLit of bool
     | CtorCall of
         {| Arguments: Expression list
@@ -155,7 +153,7 @@ type MethodModifiers =
           Purity = IsMutator }
 
 type Method =
-    { Method: Signature<TypeName>
+    { Method: Signature<TypeName option>
       MethodName: GenericName
       Modifiers: MethodModifiers
       SelfIdentifier: IdentifierStr option }
@@ -174,7 +172,7 @@ type Property =
       ValueType: TypeName option }
 
 type AMethod =
-    { Method: Signature<unit, TypeName, TypeName>
+    { Method: Signature<unit, TypeName>
       MethodName: GenericName }
 
 type AbstractPropAccessors =
@@ -188,7 +186,7 @@ type AProperty =
       ValueType: TypeName }
 
 type StaticFunction =
-    { Function: Signature<TypeName>
+    { Function: Signature<TypeName option>
       FunctionName: GenericName }
 
 type AbstractMember =

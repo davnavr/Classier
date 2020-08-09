@@ -166,7 +166,7 @@ let tests =
                     "1.2345D"
                     "\"hello world\" |> System.Console.WriteLine"
                     "1 + 2"
-                    "(a, b, c) => {\n    return c;\n}"
+                    "(a: int, b: float, c: string[]) => {\n    return c;\n}"
                 ]
                 |> Seq.map (fun source ->
                     test source {
@@ -262,5 +262,57 @@ let tests =
                 |> ParserAssert.isFailure
                 |> string
                 |> Assert.strContains "entry point already exists")
+
+        testStr
+            Parser.statement
+            "let can declare local functions"
+            (fun parse ->
+                let efunc =
+                    let pmap =
+                        List.map (fun (name, ptype) ->
+                            let pname =
+                                name
+                                |> Identifier.create
+                                |> Option.get
+                                |> Some
+                            Param.create (TypeName ptype) pname)
+                    let name =
+                        VarPattern(Identifier.create "myLocal" |> Option.get, None)
+                    let func =
+                        { Body =
+                            List.zip
+                                [
+                                    Position("let can declare local functions", 76L, 2L, 24L)
+                                ]
+                                [
+                                    let temp =
+                                        Identifier.create
+                                        >> Option.get
+                                        >> Identifier.ofStr
+                                    let one =
+                                        MemberAccess(temp "arg1" |> IdentifierRef, temp "length")
+                                    let two = temp "arg2" |> IdentifierRef
+                                    InfixOp(InfixOp(one, "+", two), "+", temp "arg3" |> IdentifierRef)
+                                    |> Return
+                                ]
+                          Parameters =
+                            [
+                                [ "arg1", Primitive PrimitiveType.String; "arg2", Primitive PrimitiveType.Int ]
+                                [ "arg3", Primitive PrimitiveType.Int ]
+                            ]
+                            |> List.map pmap
+                          ReturnType = None }
+                        |> AnonFunc
+                    LetDecl(name, func)
+                """let myLocal (arg1: string, arg2: int) (arg3: int) {
+                       arg1.length + arg2 + arg3
+                   }"""
+                |> parse
+                |> ParserAssert.isSuccess
+                |> fst
+                |> snd
+                |> Assert.equal efunc)
+
+            // TODO: Test 'var' without value
     ]
     |> testList "parser tests"
