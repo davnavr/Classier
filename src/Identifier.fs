@@ -1,10 +1,11 @@
-﻿module Classier.NET.Compiler.Identifier
+﻿namespace Classier.NET.Compiler
 
 open System
 open System.Text.RegularExpressions
 
 [<StructuralComparison; StructuralEquality>]
 type IdentifierStr =
+    private
     | IdentifierStr of string
 
     override this.ToString() =
@@ -36,50 +37,66 @@ type FullIdentifier<'Generic> =
             String.Join('.', ids)
             |> sprintf "%O.%s" head
 
-let private nameRegex = "^[A-Za-z][A-Za-z_0-9]*$" |> Regex
+[<RequireQualifiedAccess>]
+module IdentifierStr =
+    let private nameRegex =
+        "^[A-Za-z][A-Za-z_0-9]*$" |> Regex
 
-let defaultSelfId = IdentifierStr "this"
+    let private createHelper ok err str =
+        match str with
+        | Regex.Matches nameRegex ->
+            IdentifierStr str |> ok
+        | _ -> err str
+    let create =
+        createHelper
+            id
+            (sprintf "'%s' is an invalid identifier" >> invalidArg "str")
+    let tryCreate =
+        createHelper Some (fun _ -> None)
 
-let create str =
-    match str with
-    | Regex.Matches nameRegex ->
-        str
-        |> IdentifierStr
-        |> Some
-    | _ -> None
+[<RequireQualifiedAccess>]
+module Identifier =
+    let ofStr str =
+        { Name = str
+          Generics = List.empty }
 
-let ofStr str =
-    { Name = str
-      Generics = List.empty }
+    let create str =
+        IdentifierStr.create str |> ofStr
 
-let ofStrSeq strs =
-    Seq.tryHead strs
-    |> Option.map
-        (fun head ->
-            let rest =
-                strs
-                |> Seq.map ofStr
-                |> Seq.toList
-            FullIdentifier(ofStr head, rest))
+    let map gmapper idf =
+        { Name = idf.Name
+          Generics = List.map gmapper idf.Generics }
 
-let mapGenerics gmapper id =
-    { Name = id.Name
-      Generics =
-          List.map gmapper id.Generics }
+    let umap<'g> = map (fun (_: 'g) -> ())
 
-let noGenerics<'Generic> = mapGenerics (fun (_: 'Generic) -> ())
+    let toFull idf = FullIdentifier(idf, List.empty)
 
-// TODO: Come up with a better name, or have different modules for functions that work with either a identifier or a full identifier.
-let toFull id = FullIdentifier(id, List.empty)
+[<RequireQualifiedAccess>]
+module FullIdentifier =
+    let ofStrs strs =
+        Seq.tryHead strs
+        |> Option.map
+            (fun head ->
+                let rest =
+                    strs
+                    |> Seq.map Identifier.ofStr
+                    |> Seq.toList
+                FullIdentifier(Identifier.ofStr head, rest))
 
-let fullAsList (FullIdentifier (head, tail)) =
-    head :: tail
+    let map gmapper (FullIdentifier(head, tail)) =
+        let nhead =
+            Identifier.map gmapper head
+        let ntail =
+            List.map (Identifier.map gmapper) tail
+        FullIdentifier(nhead, ntail)
 
-let (|NamespaceName|_|) name =
-    let nlist = fullAsList name
-    let strs() = List.map (fun id -> id.Name) nlist
-    List.forall
-        (fun id -> List.isEmpty id.Generics)
-        nlist
-    |> Bool.toOpt
-    |> Option.map strs
+    let toList (FullIdentifier (head, tail)) = head :: tail
+
+    let (|Namespace|_|) name =
+        let nlist = toList name
+        let strs() = List.map (fun id -> id.Name) nlist
+        List.forall
+            (fun idf -> List.isEmpty idf.Generics)
+            nlist
+        |> Bool.toOpt
+        |> Option.map strs

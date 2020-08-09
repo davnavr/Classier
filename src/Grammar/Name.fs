@@ -1,7 +1,6 @@
 ﻿module Classier.NET.Compiler.Grammar.Name
 
 open Classier.NET.Compiler
-open Classier.NET.Compiler.Identifier
 
 let simple pos (str: IdentifierStr) =
     { Identifier = str

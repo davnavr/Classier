@@ -3,7 +3,6 @@
 open System.Collections.Immutable
 
 open Classier.NET.Compiler
-open Classier.NET.Compiler.Identifier
 
 open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Grammar.Ast
@@ -23,7 +22,7 @@ module Usings =
 
     let private add (pos, uname) gtable (Usings usings) =
         match uname with
-        | NamespaceName strs ->
+        | FullIdentifier.Namespace strs ->
             result {
                 let! uset =
                     ImmSortedDict.tryGetValue

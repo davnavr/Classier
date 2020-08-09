@@ -4,7 +4,6 @@ module rec Classier.NET.Compiler.Grammar.Ast
 open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
-open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
 type TypeParam =

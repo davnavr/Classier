@@ -5,7 +5,6 @@ open System.Collections.Immutable
 
 open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
-open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.Generic
 
 open Classier.NET.Compiler.Extern

@@ -8,7 +8,7 @@ let private memberSet tname mname mparams =
     let mcompare (_: Access, m1) (_, m2) =
         let ctype =
             tname
-            >> Identifier.noGenerics
+            >> Identifier.umap
             >> Some
         let oload =
             function

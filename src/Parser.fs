@@ -7,7 +7,6 @@ open FParsec
 
 open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
-open Classier.NET.Compiler.Identifier
 open Classier.NET.Compiler.TypeSystem
 
 open Classier.NET.Compiler.Grammar
@@ -248,7 +247,7 @@ let genericArgs =
 let identifierStr =
     asciiLetter
     .>>. manyChars (asciiLetter <|> pchar '_' <|> digit)
-    |>> (String.Concat >> IdentifierStr)
+    |>> (String.Concat >> IdentifierStr.create)
 let identifier =
     identifierStr
     .>> space

@@ -6,8 +6,7 @@ open Classier.NET.Compiler
 
 let inline private cname intf1 intf2 =
     let inline iname intf =
-        ((^a) : (member InterfaceName : _) (intf))
-        |> Identifier.noGenerics
+        ((^a) : (member InterfaceName : _) (intf)) |> Identifier.umap
     compare (iname intf1) (iname intf2)
 
 let empty: InterfaceSet =

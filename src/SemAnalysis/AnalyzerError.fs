@@ -1,7 +1,6 @@
 ﻿namespace Classier.NET.Compiler.SemAnalysis
 
 open Classier.NET.Compiler
-open Classier.NET.Compiler.Identifier
 
 open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Grammar

@@ -141,10 +141,7 @@ let tests =
                         While (BoolLit false, List.empty)
 
                         { Against =
-                            Identifier.create "thing"
-                            |> Option.get
-                            |> Identifier.ofStr
-                            |> IdentifierRef
+                            Identifier.create "thing" |> IdentifierRef
                           Cases = [ Expression.emptyCase ] }
                         |> MatchExpr
                         |> IgnoredExpr
@@ -212,12 +209,10 @@ let tests =
             (fun parse ->
                 let tidentifier names =
                     names
-                    |> Seq.map
-                        (Identifier.create >> Option.get)
-                    |> Identifier.ofStrSeq
+                    |> Seq.map IdentifierStr.create
+                    |> FullIdentifier.ofStrs
                     |> Option.get
                     |> Type.Named
-
                 [
                     Primitive PrimitiveType.String |> ArrayType
 
@@ -272,12 +267,11 @@ let tests =
                         List.map (fun (name, ptype) ->
                             let pname =
                                 name
-                                |> Identifier.create
-                                |> Option.get
+                                |> IdentifierStr.create
                                 |> Some
                             Param.create (TypeName ptype) pname)
                     let name =
-                        VarPattern(Identifier.create "myLocal" |> Option.get, None)
+                        VarPattern(IdentifierStr.create "myLocal", None)
                     let func =
                         { Body =
                             List.zip
@@ -285,15 +279,13 @@ let tests =
                                     Position("let can declare local functions", 76L, 2L, 24L)
                                 ]
                                 [
-                                    let temp =
-                                        Identifier.create
-                                        >> Option.get
-                                        >> Identifier.ofStr
-                                    let one =
-                                        MemberAccess(temp "arg1" |> IdentifierRef, temp "length")
-                                    let two = temp "arg2" |> IdentifierRef
-                                    InfixOp(InfixOp(one, "+", two), "+", temp "arg3" |> IdentifierRef)
-                                    |> Return
+                                    let one = Identifier.create "arg1" |> IdentifierRef
+                                    let two = Identifier.create "arg2" |> IdentifierRef
+                                    let three = Identifier.create "arg3" |> IdentifierRef
+                                    let n1 = MemberAccess(one, Identifier.create "length")
+                                    let n2 = InfixOp(n1, "+", two)
+
+                                    InfixOp(n2, "+", three) |> Return
                                 ]
                           Parameters =
                             [
@@ -319,9 +311,7 @@ let tests =
             (fun parse ->
                 let edecl =
                     let name =
-                        "myMutable"
-                        |> Identifier.create
-                        |> Option.get
+                        IdentifierStr.create "myMutable"
                     let vtype =
                         Primitive PrimitiveType.Double
                         |> TypeName
@@ -339,10 +329,13 @@ let tests =
             "namespace test"
             (fun parse ->
                 [
+                    let tons =
+                        List.map IdentifierStr.create >> Namespace
+
                     "// empty", Namespace List.empty
-                    "namespace hello;", Namespace List.empty // TODO: Expected should not be empty for these three.
-                    "namespace System.Collections ;", Namespace List.empty
-                    "namespace some.random.long.namespace;", Namespace List.empty
+                    "namespace hello;", tons [ "hello" ]
+                    "namespace System.Collections ;", tons [ "System"; "Collections" ]
+                    "namespace some.random.long.namespace;", tons [ "some"; "random"; "long"; "namespace" ]
                 ]
                 |> Seq.mapi (fun i (ns, exp) ->
                     test (string i) {
@@ -351,7 +344,7 @@ let tests =
                                 """
                                 %s
 
-                                public class Hello { }
+                                public class Hello;
                                 """
                                 ns
                             |> parse
