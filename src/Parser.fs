@@ -1387,8 +1387,9 @@ let compilationUnit: Parser<CompilationUnit, State> =
         skipString "namespace"
         >>. space1
         |> attempt
-        >>. sepBy1 identifierStr (separator period)
-        .>> space
+        >>. sepBy1
+            (identifierStr .>> space)
+            (attempt period .>> space)
         .>> semicolon
         |> optList
         <?> "namespace declaration"

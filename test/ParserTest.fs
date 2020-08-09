@@ -264,7 +264,7 @@ let tests =
                 |> Assert.strContains "entry point already exists")
 
         testStr
-            Parser.statement
+            (Parser.statement .>> eof)
             "let can declare local functions"
             (fun parse ->
                 let efunc =
@@ -314,7 +314,7 @@ let tests =
                 |> Assert.equal efunc)
 
         testStr
-            Parser.statement
+            (Parser.statement .>> eof)
             "var can be used without a value"
             (fun parse ->
                 let edecl =
@@ -333,5 +333,34 @@ let tests =
                 |> fst
                 |> snd
                 |> Assert.equal edecl)
+
+        parseStr
+            Parser.compilationUnit
+            "namespace test"
+            (fun parse ->
+                [
+                    "// empty", Namespace List.empty
+                    "namespace hello;", Namespace List.empty // TODO: Expected should not be empty for these three.
+                    "namespace System.Collections ;", Namespace List.empty
+                    "namespace some.random.long.namespace;", Namespace List.empty
+                ]
+                |> Seq.mapi (fun i (ns, exp) ->
+                    test (string i) {
+                        let (cu, _) =
+                            sprintf
+                                """
+                                %s
+
+                                public class Hello { }
+                                """
+                                ns
+                            |> parse
+                            |> ParserAssert.isSuccess
+                        Assert.equal
+                            exp
+                            cu.Namespace
+                        |> ignore
+                    })
+                |> testList "correct namespace is parsed")
     ]
     |> testList "parser tests"
