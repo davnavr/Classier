@@ -313,6 +313,25 @@ let tests =
                 |> snd
                 |> Assert.equal efunc)
 
-            // TODO: Test 'var' without value
+        testStr
+            Parser.statement
+            "var can be used without a value"
+            (fun parse ->
+                let edecl =
+                    let name =
+                        "myMutable"
+                        |> Identifier.create
+                        |> Option.get
+                    let vtype =
+                        Primitive PrimitiveType.Double
+                        |> TypeName
+                        |> Some
+                    VarDecl(VarPattern(name, vtype), None)
+                "var myMutable: double;"
+                |> parse
+                |> ParserAssert.isSuccess
+                |> fst
+                |> snd
+                |> Assert.equal edecl)
     ]
     |> testList "parser tests"

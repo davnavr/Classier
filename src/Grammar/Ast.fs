@@ -40,16 +40,14 @@ type Pattern =
     | TuplePattern of InfParam list
     | VarPattern of IdentifierStr * TypeName option
 
-type Local = Pattern * Expression
-
 type PStatement = FParsec.Position * Statement
 type Statement =
     | Empty
     /// An expression whose result is evaluated then discarded.
     | IgnoredExpr of Expression
-    | LetDecl of Local
+    | LetDecl of Pattern * Expression
     | Return of Expression
-    | VarDecl of Local
+    | VarDecl of Pattern * Expression option
     | While of Expression * PStatement list
 
 type EntryPoint =

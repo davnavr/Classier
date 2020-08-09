@@ -436,6 +436,7 @@ do
                                 (paramTupleList typeAnnExp .>> space)
                                 (typeAnnOpt .>> space)
                                 (statementBlock <?> "local function body")
+                            .>> optional semicolon
                             |>> fun (parameters, retType, body) ->
                                 { Body = body
                                   Parameters = parameters
@@ -446,7 +447,21 @@ do
                     | _ -> vvalue
                     |>> fun value -> LetDecl(p, value)
 
-                // TODO: Add 'var'
+                keyword "var"
+                >>. pattern
+                .>> space
+                >>= fun p ->
+                    let mvalue = vvalue |>> Some
+                    match p with
+                    | VarPattern (_, vtype) when Option.isSome vtype ->
+                        [
+                            mvalue
+                            semicolon >>% None
+                        ]
+                        |> choice
+                    | _ -> mvalue
+                    |>> fun value -> VarDecl(p, value)
+                <?> "mutable variable"
 
                 skipString "while"
                 >>. space
