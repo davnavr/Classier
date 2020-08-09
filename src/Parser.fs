@@ -584,7 +584,7 @@ let functionBody =
         ]
         "function body"
 
-let methodDef amthd cmthd modfs =
+let private methodDef amthd cmthd modfs =
     validateModifiers
         modfs
         (fun (prev, isAbstract) modf ->
@@ -596,13 +596,17 @@ let methodDef amthd cmthd modfs =
                 | MethodImpl.Virtual ->
                     badModfier "An 'abstract' method implies that it can be overriden, making the 'virtual' modifier redundant"
                 | _ -> Result.Ok (prev, true)
-            | "mutator" -> Result.Ok ({ prev with Purity = IsMutator }, isAbstract)
+            | "mutator" ->
+                if isAbstract then
+                    badModfier "An 'abstract' method cannot be a 'mutator' since it does not have a body"
+                else
+                    Result.Ok ({ prev with Purity = IsMutator }, false)
             | "override" ->
                 match prev.ImplKind with
                 | MethodImpl.Virtual ->
                     badModfier "A 'virtual' method makes the 'override' modifier redundant, since it already can be overriden"
                 | _ ->
-                    Result.Ok ({ prev with ImplKind = MethodImpl.Override }, false)
+                    Result.Ok ({ prev with ImplKind = MethodImpl.Override }, isAbstract)
             | "sealed" ->
                 match prev.ImplKind with
                 | MethodImpl.Default ->
@@ -656,7 +660,7 @@ let methodDef amthd cmthd modfs =
                 |> amthd
     <?> "method definition"
     |> attempt
-let propDef aprop cprop modfs =
+let private propDef aprop cprop modfs =
     validateModifiers
         modfs
         (fun (isabst, ispure) modf ->

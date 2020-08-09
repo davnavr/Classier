@@ -355,5 +355,38 @@ let tests =
                         |> ignore
                     })
                 |> testList "correct namespace is parsed")
+
+        testStr
+            Parser.compilationUnit
+            "modifiers can be in any order"
+            (fun parse ->
+                """
+                public class MethodModifiers {
+                    abstract override def everyone(): ();
+                    override abstract def says() : bool;
+                    override mutator def hello(): int { }
+                    mutator override def world(): long { }
+                    override sealed def but(): (long, int) { return (4L, 5); }
+                    override sealed mutator def never(): float { 3.141592 }
+                    override mutator sealed def how(are: int): int { are <- 3; are + 7 }
+                    mutator override sealed def you(world: MethodModifiers) { world }
+                }
+                """
+                |> parse
+                |> ParserAssert.isSuccess)
+
+        testStr
+            Parser.compilationUnit
+            "abstract method have virtual modifier"
+            (fun parse ->
+                """
+                public class Bad {
+                    abstract virtual def myBadMethod();
+                }
+                """
+                |> parse
+                |> ParserAssert.isFailure
+                |> string
+                |> Assert.strContains "implies that the method is 'virtual'")
     ]
     |> testList "parser tests"
