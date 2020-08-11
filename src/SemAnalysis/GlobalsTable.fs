@@ -9,13 +9,15 @@ open Classier.NET.Compiler.IR
 
 [<RequireQualifiedAccess>]
 module GlobalsTable =
-    type private Symbol<'Table> =
+    type Symbol<'Table> =
         | NamespaceSymbol of IdentifierStr * 'Table
         | TypeSymbol of DefinedOrExtern<GenGlobalType, EGlobalType>
 
     type Table =
         private
         | Table of ImmutableSortedSet<Symbol<Table>>
+
+    type Symbol = Symbol<Table>
 
     let empty =
         let cgtypes type1 type2 =

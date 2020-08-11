@@ -9,6 +9,7 @@ open Classier.NET.Compiler.IR
 type AnalyzerError =
     | BadEntryPointSignature of EntryPoint
     | BadUseStatement of FParsec.Position * FullIdentifier<TypeName>
+    | DuplicateGlobalSymbol of GlobalsTable.Symbol * existing: GlobalsTable.Symbol
     | DuplicateGlobalType of TypeDef * DefinedOrExtern<GenGlobalType, EGlobalType>
     | DuplicateClassMember of GenClass * TypeOrMember<Class, InstanceMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>

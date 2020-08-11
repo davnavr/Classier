@@ -79,15 +79,17 @@ module ImmList =
     let (|Empty|_|) (list: ImmutableList<_>) =
         Bool.toOpt list.IsEmpty
 
+    let exists predicate (list: ImmutableList<_>) =
+        new System.Predicate<_> (predicate) |> list.Exists
+
     let map mapping (list: ImmutableList<_>) =
         new System.Func<_, _>(mapping) |> list.ConvertAll
 
     let inline add item (list: ImmutableList<_>) = list.Add item
     let inline addRange items (list: ImmutableList<_>) = list.AddRange items
     let inline ofSeq (value: seq<_>) = ImmutableList.CreateRange value
+    let inline setItem index item (list: ImmutableList<_>) = list.SetItem(index, item)
     let inline singleton item = ImmutableList.Create(item = item)
-
-    let setItem index item (list: ImmutableList<_>) = list.SetItem(index, item)
 
 [<RequireQualifiedAccess>]
 module ImmSortedDict =

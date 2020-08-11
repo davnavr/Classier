@@ -10,32 +10,34 @@ open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.SemAnalysis
 
+let private parseMany name sources =
+    sources
+    |> Seq.indexed
+    |> Seq.fold
+        (fun (acc, state) (i, source) ->
+            match acc with
+            | Result.Ok list ->
+                let result =
+                    runParserOnString
+                        Parser.compilationUnit
+                        Parser.defaultState
+                        (sprintf "%s%i" name i)
+                        source
+                match result with
+                | Success(cu, nstate, _) ->
+                    let nacc =
+                        list
+                        |> ImmList.add cu
+                        |> Result.Ok
+                    nacc, nstate
+                | Failure(msg, _, _) ->
+                    Result.Error msg, state
+            | Result.Error _ -> acc, state)
+        (Result.Ok ImmutableList.Empty, Parser.defaultState)
+
 let testStrs name gtable sources f =
     test name {
-        let (result, state) =
-            sources
-            |> Seq.indexed
-            |> Seq.fold
-                (fun (acc, state) (i, source) ->
-                    match acc with
-                    | Result.Ok list ->
-                        let result =
-                            runParserOnString
-                                Parser.compilationUnit
-                                Parser.defaultState
-                                (sprintf "%s%i" name i)
-                                source
-                        match result with
-                        | Success(cu, nstate, _) ->
-                            let nacc =
-                                list
-                                |> ImmList.add cu
-                                |> Result.Ok
-                            nacc, nstate
-                        | Failure(msg, _, _) ->
-                            Result.Error msg, state
-                    | Result.Error _ -> acc, state)
-                (Result.Ok ImmutableList.Empty, Parser.defaultState)
+        let (result, state) = parseMany name sources
         Analyze.output
             (Assert.isOk result, state.EntryPoint)
             (gtable GlobalsTable.empty)
@@ -147,5 +149,32 @@ let tests =
             (fun output ->
                 let epoint = Option.get output.EntryPoint
                 Assert.notEmpty epoint.Body.Statements)
+
+        testCase
+            "namespace and type cannot have the same name"
+            (fun() ->
+                let (result, state) =
+                    [
+                        """
+                        namespace MyBadName;
+
+                        class MyClass;
+                        """
+                        """
+                        class MyBadName { }
+                        """
+                    ]
+                    |> parseMany "duplicate name"
+                Analyze.output
+                    (Result.get result, state.EntryPoint)
+                    GlobalsTable.empty
+                |> Assert.isError
+                |> ImmList.exists
+                    (function
+                    | DuplicateGlobalSymbol _ -> true
+                    | _ -> false)
+                |> Assert.isTrue "Contains duplication error message"
+                |> ignore)
+
     ]
     |> testList "analysis tests"
