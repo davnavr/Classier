@@ -15,7 +15,7 @@ open Classier.NET.Compiler.IR
 type private Analysis =
     { EntryPoint: GenEntryPoint option
       Errors: ImmutableList<AnalyzerError>
-      GlobalTable: GlobalsTable
+      GlobalTable: Globals.Table
       GlobalTypes: ImmutableList<GenGlobalType * CompilationUnit>
       Usings: ImmutableSortedDictionary<CompilationUnit, Usings> }
 
@@ -72,7 +72,7 @@ let private globals cunits anl =
                         GenGlobalModule
                         mdle
             let result =
-                GlobalsTable.addType
+                Globals.addType
                     (Defined gtype)
                     cunit.Namespace
                     state.GlobalTable
@@ -83,7 +83,7 @@ let private globals cunits anl =
                     GlobalTypes = state.GlobalTypes.Add (gtype, cunit) }
             | Result.Error dup ->
                 Analyzer.error
-                    (DuplicateGlobalType (tdef, dup))
+                    (DuplicateGlobalSymbol(gtype, dup))
                     state)
         anl
 
@@ -225,7 +225,7 @@ let rec private gexpr expr ltable gtable = // TODO: Clean up this mess of a func
         | _ -> failwithf "Unsupported target of function call '%A'" target
     | Ast.IdentifierRef name ->
         match name.Generics with
-        | [] when GlobalsTable.hasGlobalNs name.Name gtable ->
+        | [] when Globals.hasGlobalNs name.Name gtable ->
             Namespace [ name.Name ] |> NamespaceRef
         | _ -> failwithf "Code to handle identifier '%O' is not yet implemented" name
     | Ast.MemberAccess(target, mber) ->
@@ -234,7 +234,7 @@ let rec private gexpr expr ltable gtable = // TODO: Clean up this mess of a func
         | NamespaceRef ns ->
             let gtype =
                 gtable
-                |> GlobalsTable.nstypes ns
+                |> Globals.nstypes ns
                 |> Seq.tryFind (fun other ->
                     let oname =
                         match other with

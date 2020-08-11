@@ -40,7 +40,7 @@ let testStrs name gtable sources f =
         let (result, state) = parseMany name sources
         Analyze.output
             (Assert.isOk result, state.EntryPoint)
-            (gtable GlobalsTable.empty)
+            (gtable Globals.emptyTable)
         |> Assert.isOk
         |> f
         |> ignore
@@ -74,6 +74,30 @@ let tests =
                 """
             ]
             (fun _ -> ()) // TODO: Find something to check in this test.
+
+        testStrs
+            "types from all files are parsed"
+            id
+            [
+                """
+                class Class1;
+                """
+                """
+                internal class Class2 { }
+                """
+                """
+                public module List { }
+                """
+                """
+                namespace Working;
+
+                public class Maybe();
+                """
+            ]
+            (fun output ->
+                output.GlobalTypes
+                |> Seq.length
+                |> Assert.equal 4)
 
         testStrs
             "valid types are returned as result"
@@ -167,7 +191,7 @@ let tests =
                     |> parseMany "duplicate name"
                 Analyze.output
                     (Result.get result, state.EntryPoint)
-                    GlobalsTable.empty
+                    Globals.emptyTable
                 |> Assert.isError
                 |> ImmList.exists
                     (function

@@ -32,7 +32,7 @@ module TempStandardLib =
                 |> SortedSet.singleton }
             |> EGlobalModule
             |> Extern
-        GlobalsTable.addType
+        Globals.addType
             console
             system
             gtable
@@ -51,7 +51,7 @@ let main args = // TODO: Handle arguments correctly. Need to have an argument th
         let analysis =
             Analyze.output
                 (cunits, epoint)
-                (TempStandardLib.table GlobalsTable.empty) // TODO: How to allow additions of extern types to the globals table?
+                (TempStandardLib.table Globals.emptyTable) // TODO: How to allow additions of extern types to the globals table?
         match analysis with
         | Result.Ok output ->
             use fileout = new StreamWriter(File.OpenWrite (Array.last args))
