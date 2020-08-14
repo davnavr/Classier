@@ -1015,16 +1015,17 @@ do
             | Some opkind ->
                 tuple4
                     (opName .>> space)
-                    (paramTuple typeAnnExp .>> space)
+                    (paramTupleList typeAnnExp .>> space)
                     (typeAnnOpt .>> space)
                     functionBody
                 <?> "operator definition"
                 |>> fun (name, opnds, retType, body) ->
-                    { Body = body
-                      Kind = opkind
-                      Operands = opnds
-                      ReturnType = retType
-                      Symbol = name }
+                    { Kind = opkind
+                      Symbol = name
+                      Signature =
+                        { Body = body
+                          Parameters = opnds
+                          ReturnType = retType }}
                     |> Operator
                     |> TypeOrMember.Member
     moduleBodyRef :=
