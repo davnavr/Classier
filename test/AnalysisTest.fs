@@ -6,7 +6,6 @@ open FParsec
 
 open Fuchu
 
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.IR
 open Classier.NET.Compiler.SemAnalysis
 
@@ -200,5 +199,32 @@ let tests =
                 |> Assert.isTrue "Contains duplication error message"
                 |> ignore)
 
+        testStrs
+            "nested type in a nested type is processed"
+            id
+            [
+                """
+                module Table {
+                    module Inner {
+                        class Symbol(name: string);
+                    }
+                }
+                """
+            ]
+            (fun output ->
+                let m1 =
+                    match Seq.head output.GlobalTypes with
+                    | GenGlobalModule mdle -> Some mdle
+                    | _ -> None
+                    |> Option.get
+                let m2 =
+                    match m1.Members.Item 0 with
+                    | (_, TypeOrMember.Type ntype) ->
+                        match ntype with
+                        | GenNestedModule mdle -> Some mdle
+                        | _ -> None
+                    | _ -> None
+                    |> Option.get
+                Assert.notEmpty m2.Members)
     ]
     |> testList "analysis tests"

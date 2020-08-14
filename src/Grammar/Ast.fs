@@ -109,7 +109,7 @@ type OperatorKind =
     | Infix
     | Prefix
 
-type OperatorStr =
+type OperatorStr = // TODO: Move this to Grammar.Operator module and make it have a private ctor.
     | OperatorStr of string
 
     override this.ToString() =
@@ -117,11 +117,9 @@ type OperatorStr =
         str
 
 type Operator =
-    { Body: PStatement list
-      Kind: OperatorKind
-      Operands: ExpParam list
-      ReturnType: TypeName option
-      Symbol: OperatorStr }
+    { Kind: OperatorKind
+      Symbol: OperatorStr
+      Signature: Signature<TypeName option> }
 
 type MutatorModf =
     | IsMutator
@@ -155,7 +153,7 @@ type Method =
       Modifiers: MethodModifiers
       SelfIdentifier: IdentifierStr option }
 
-type PropAccessors =
+type PropAccessors = // TODO: Allow different access modifiers for accessors.
     | AutoGet
     | AutoGetSet
     | Get of PStatement list

@@ -22,14 +22,13 @@ type GenParam =
 type GenParamTuple = ImmutableList<GenParam>
 type GenParamList = ImmutableList<GenParamTuple>
 
-// TODO: Is namespace information needed for these types?
-type ResolvedInterface = Namespace * DefinedOrExtern<GenInterface, EInterface>
+type ResolvedInterface = DefinedOrExtern<GenInterface, EInterface>
 type ResolvedClass = DefinedOrExtern<GenClass, EClass>
 
 type GenName = Identifier<GenericParam<ResolvedInterface, ResolvedClass>>
 
-type GenSignature =
-    { Body: GenBody<ResolvedType>
+type GenSignature<'Body> =
+    { Body: 'Body
       Parameters: GenParamList
       ReturnType: ResolvedType }
 
@@ -52,42 +51,80 @@ type GenStatement =
     | Empty
     | IgnoredExpr of GenExpression
 
-type GenBody<'ReturnType> =
-    { Statements: ImmutableList<GenStatement * Ast.PStatement>
-      ReturnType: 'ReturnType }
+type GenBody = ImmutableList<GenStatement * Ast.PStatement>
 
 type GenPrimaryCtor =
-    { Body: GenBody<unit>
+    { Body: GenBody
       Parameters: GenParamTuple
+      ParentClass: GenClass
       Syntax: Ast.PrimaryCtor }
 
 type PrimaryCtorCall =
     | PrimaryCtorCall of ImmutableList<GenExpression>
 
-type GenCtor =
+type GenCtor<'GenClass> =
     { Parameters: GenParamTuple
+      ParentClass: 'GenClass
       SelfCall: PrimaryCtorCall
       Syntax: Ast.Ctor }
 
-type GenMethod =
-    | AbstractMthd
-    | ConcreteMthd
+type GenMethod<'Parent, 'Body, 'Syntax> =
+    { MethodName: GenName
+      Parent: 'Parent
+      Signature: GenSignature<'Body>
+      Syntax: 'Syntax }
+
+type GenAbstractMethod<'Parent> = GenMethod<'Parent, unit, Ast.AMethod>
+type GenConcreteMethod<'Parent> = GenMethod<'Parent, GenBody, Ast.Method>
+
+type GenMethod<'Parent> =
+    | GenAbstractMethod of GenAbstractMethod<'Parent>
+    | GenConcreteMethod of GenConcreteMethod<'Parent>
+
+type GenPropertyAccessors = unit
+
+type GenProperty<'Parent, 'Body, 'Syntax> =
+    { Accessors: GenPropertyAccessors
+      Parent: 'Parent
+      PropName: GenName
+      Syntax: Ast.Property
+      ValueType: ResolvedType }
+
+type GenAbstractProperty<'Parent> = GenProperty<'Parent, unit, Ast.AProperty>
+type GenConcreteProperty<'Parent> = GenProperty<'Parent, GenBody, Ast.Property>
+
+type GenProperty<'Parent> =
+    | GenAbstractProperty of GenAbstractProperty<'Parent>
+    | GenConcreteProperty of GenConcreteProperty<'Parent>
 
 type GenFunction =
     { FunctionName: GenName
-      Signature: GenSignature
+      ParentModule: GenModule
+      Signature: GenSignature<GenBody>
       Syntax: Ast.StaticFunction }
+
+type GenOperatorKind =
+    | InfixOp of GenSignature<GenBody>
+    | PrefixOp of
+        {| Body: GenBody
+           Operand: GenParam
+           ReturnType: ResolvedType |}
+
+type GenOperator =
+    { OperatorKind: GenOperatorKind
+      ParentModule: GenModule
+      Syntax: Ast.Operator }
 
 type MemberSet<'Type, 'Member> =
     ImmutableSortedSet<Access * TypeOrMember<'Type, 'Member>>
 
-type GenInterfaceMember =
-    | InterfaceMthd
-    | InterfaceProp
+type GenInterfaceMember<'GenInterface> =
+    | InterfaceMthd of GenAbstractMethod<'GenInterface>
+    | InterfaceProp of GenAbstractProperty<'GenInterface>
 
 type GenInterface<'Parent> =
     { InterfaceName: GenName
-      Members: InterfaceMembers
+      Members: MemberSet<GenNestedInterface, GenInterfaceMember<GenInterface<'Parent>>>
       Parent: 'Parent
       SuperInterfaces: InterfaceSet
       Syntax: Ast.Interface }
@@ -105,18 +142,17 @@ type GenInterface =
 type GenNestedInterface = GenInterface<GenInterface>
 type GenGlobalInterface = GenInterface<Namespace>
 
-type InterfaceMembers = MemberSet<GenNestedInterface, GenInterfaceMember>
 type InterfaceSet = ImmutableSortedSet<ResolvedInterface>
 
-type GenClassMember =
-    | ClassCtor of GenCtor
-    | ClassMthd of GenMethod
-    | ClassProp
+type GenClassMember<'GenClass> =
+    | ClassCtor of GenCtor<'GenClass>
+    | ClassMthd of GenMethod<'GenClass>
+    | ClassProp of GenProperty<'GenClass>
 
 type GenClass<'Parent> =
     { ClassName: GenName
       Interfaces: InterfaceSet
-      Members: ClassMembers
+      Members: MemberSet<GenNestedClass, GenClassMember<GenClass<'Parent>>>
       Parent: 'Parent
       PrimaryCtor: GenPrimaryCtor
       SuperClass: DefinedOrExtern<GenClass, EClass> option
@@ -135,14 +171,12 @@ type GenClass =
 type GenNestedClass = GenClass<GenClass>
 type GenGlobalClass = GenClass<Namespace>
 
-type ClassMembers = MemberSet<GenNestedClass, GenClassMember>
-
 type GenModuleMember =
     | ModuleFunc of GenFunction
-    | ModuleOper
+    | ModuleOper of GenOperator
 
 type GenModule<'Parent> =
-    { Members: ModuleMembers
+    { Members: MemberSet<GenNestedType<GenModule>, GenModuleMember>
       ModuleName: IdentifierStr
       Parent: 'Parent
       Syntax: Ast.Module }
@@ -154,8 +188,6 @@ type GenModule =
 
 type GenNestedModule = GenModule<GenModule>
 type GenGlobalModule = GenModule<Namespace>
-
-type ModuleMembers = MemberSet<GenNestedType<GenModule>, GenModuleMember>
 
 type GenType =
     | GenClass of GenClass
@@ -172,13 +204,14 @@ type GenGlobalType =
     | GenGlobalInterface of GenGlobalInterface
     | GenGlobalModule of GenGlobalModule
 
-type EntryPointReturn =
-    | ExitCode
+type ExitCode =
+    | Explicit
     | ImplicitZero
 
 type GenEntryPoint =
-    { Parameters: GenParamTuple
-      Body: GenBody<EntryPointReturn>
+    { ExitCode: ExitCode
+      Parameters: GenParamTuple
+      Body: GenBody
       Syntax: Ast.EntryPoint }
 
 type GenOutput =
