@@ -44,7 +44,7 @@ type GenExpression =
     | ComplexExpr of ComplexExpression
     | GlobalTypeRef of Namespace * DefinedOrExtern<GenGlobalType, EGlobalType> // TODO: Should every type and member (EGlobalClass, GenNestedInterface, GenCtor, etc.), have its own Ref case here?
     | TempEFunctionRef of Namespace * EGlobalModule * EFunction
-    | NamespaceRef of Namespace
+    | NamespaceRef of Namespace // TODO: Remove NamespaceRef, it should not be an expression and doesn't have a type.
     | StrLit of string
 
 type GenStatement =

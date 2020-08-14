@@ -1,4 +1,5 @@
 ﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+[<RequireQualifiedAccess>]
 module internal Classier.NET.Compiler.IR.GenName
 
 open Classier.NET.Compiler

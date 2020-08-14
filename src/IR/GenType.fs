@@ -1,4 +1,5 @@
 ﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+[<RequireQualifiedAccess>]
 module Classier.NET.Compiler.IR.GenType
 
 open System.Collections.Immutable
