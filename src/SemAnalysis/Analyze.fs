@@ -208,65 +208,6 @@ let private tresolution cunits anl =
 let rec private gexpr expr ltable gtable = // TODO: Clean up this mess of a function.
     match expr with
     | Ast.BoolLit value -> BoolLit value
-    | Ast.FuncCall fcall -> // TODO: Make just enough code to make a call to Console.WriteLine work.
-        let target = gexpr fcall.Target ltable gtable
-        let call t e =
-            { Arguments =
-                Seq.map
-                    (fun arg -> gexpr arg ltable gtable)
-                    fcall.Arguments
-                |> ImmList.ofSeq
-              Target = t }
-            |> e
-            |> ComplexExpr
-        match target with
-        | TempEFunctionRef(ns, mdle, func) ->
-            call (ns, mdle, func) TempEFunctionCall
-        | _ -> failwithf "Unsupported target of function call '%A'" target
-    | Ast.IdentifierRef name ->
-        match name.Generics with
-        | [] when Globals.hasGlobalNs name.Name gtable ->
-            Namespace [ name.Name ] |> NamespaceRef
-        | _ -> failwithf "Code to handle identifier '%O' is not yet implemented" name
-    | Ast.MemberAccess(target, mber) ->
-        let texpr = gexpr target ltable gtable
-        match texpr with
-        | NamespaceRef ns ->
-            let gtype =
-                gtable
-                |> Globals.nstypes ns
-                |> Seq.tryFind (fun other ->
-                    let oname =
-                        match other with
-                        | Defined gtype -> (GenType.gname gtype).Name
-                        | Extern etype -> (EType.gname etype).Name
-                    // TODO: Handle any generic parameters or arguments here.
-                    oname = mber.Name)
-            match gtype with
-            | Some gtype -> GlobalTypeRef(ns, gtype)
-            | None -> failwithf "The global type '%O' does not exist" mber.Name
-        | GlobalTypeRef(ns, gtype) ->
-            match gtype with
-            | Defined _ -> failwithf "Defined global type %A" gtype
-            | Extern etype ->
-                match etype with
-                | EGlobalModule mdle ->
-                    let mfunc = // NOTE: Only functions are considered
-                        mdle.Members
-                        |> Seq.choose
-                            (function
-                            | TypeOrMember.Type n -> None
-                            | TypeOrMember.Member mdef ->
-                                match mdef with
-                                | EFunction func -> Some func
-                                | _ -> None)
-                        |> Seq.tryFind (fun func -> func.FunctionName.Name = mber.Name) // NOTE: Generics aren't even processed yet!
-                    match mfunc with
-                    | Some mfunc -> TempEFunctionRef(ns, mdle, mfunc)
-                    | None ->
-                        failwithf "A function with the name '%O' in '%O' could not be found" mber mdle.ModuleName
-                | _ -> failwithf "Global extern type %A" etype
-        | _ -> failwithf "Code to handle member '%A' of '%A' does not have an implementation" mber target
     | Ast.StrLit str -> StrLit str
     | _ -> failwithf "Unsupported expression '%A'" expr
 
