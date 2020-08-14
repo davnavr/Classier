@@ -37,7 +37,7 @@ let private memberSet tname mname mparams =
         mcompare
         ImmutableSortedSet.Empty
 
-let emptyClass =
+let emptyClass: MemberSet<_, _> =
     memberSet
         (fun (cdef: GenNestedClass) -> cdef.ClassName)
         (function
@@ -47,7 +47,7 @@ let emptyClass =
             | ClassCtor _
             | _ -> List.empty)
 
-let emptyInterface =
+let emptyInterface: MemberSet<_, _> =
     memberSet
         (fun (idef: GenNestedInterface) -> idef.InterfaceName)
         (function
@@ -57,7 +57,7 @@ let emptyInterface =
             | InterfaceMthd _
             | _ -> List.empty)
 
-let emptyModule: ImmutableSortedSet<_ * TypeOrMember<GenNestedType<GenModule>, _>> =
+let emptyModule: MemberSet<GenNestedType<GenModule>, _> =
     memberSet
         GenType.nname
         (function

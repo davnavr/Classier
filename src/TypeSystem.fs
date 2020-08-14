@@ -52,7 +52,7 @@ type Type<'Named> =
            ReturnType: Type<'Named> |}
     | Named of 'Named
     | Primitive of PrimitiveType
-    | Tuple of Type<'Named> * Type<'Named> list
+    | Tuple of Type<'Named> * Type<'Named> list // TODO: Add a * Type<'Named> to ensure that tuple types have two or more items
 
     override this.ToString() =
         match this with

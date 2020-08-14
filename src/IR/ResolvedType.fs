@@ -20,3 +20,20 @@ let ofExpr =
                 |> ResolvedType.Named
                 |> acc
     inner id
+
+let rec isA tbase tderived =
+    match (tbase, tderived) with
+    | (ArrayType ibase, ArrayType iderived) ->
+        isA ibase iderived
+    | (Named tbase, Named tderived) ->
+        invalidOp "bad"
+    | (Primitive p1, Primitive p2) -> p1 = p2
+    | (Tuple (bhead, btail), Tuple(thead, ttail)) ->
+        let rec inner btail ttail =
+            match (btail, ttail) with
+            | (bt :: bnext, tt :: tnext) when isA bt tt ->
+                inner bnext tnext
+            | ([], []) -> true
+            | _ -> false
+        isA bhead thead && inner btail ttail
+    | _ -> false

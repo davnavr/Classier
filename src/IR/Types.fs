@@ -12,7 +12,7 @@ open Classier.NET.Compiler.Extern
 module Ast = Classier.NET.Compiler.Grammar.Ast
 
 type ResolvedType =
-    TypeSystem.Type<DefinedOrExtern<GenType, EType>>
+    TypeSystem.Type<DefinedOrExtern<GenType, EType>> // TODO: Should Classes and Interfaces be separated from Modules?
 
 type GenParam =
     { Name: IdentifierStr option
@@ -38,13 +38,9 @@ type CallExpression<'Target> =
 
 type ComplexExpression =
     | CtorCall of CallExpression<ResolvedClass>
-    | TempEFunctionCall of CallExpression<Namespace * EGlobalModule * EFunction>
 type GenExpression =
     | BoolLit of bool
     | ComplexExpr of ComplexExpression
-    | GlobalTypeRef of Namespace * DefinedOrExtern<GenGlobalType, EGlobalType> // TODO: Should every type and member (EGlobalClass, GenNestedInterface, GenCtor, etc.), have its own Ref case here?
-    | TempEFunctionRef of Namespace * EGlobalModule * EFunction
-    | NamespaceRef of Namespace // TODO: Remove NamespaceRef, it should not be an expression and doesn't have a type.
     | StrLit of string
 
 type GenStatement =
@@ -62,9 +58,9 @@ type GenPrimaryCtor =
 type PrimaryCtorCall =
     | PrimaryCtorCall of ImmutableList<GenExpression>
 
-type GenCtor<'GenClass> =
+type GenCtor =
     { Parameters: GenParamTuple
-      ParentClass: 'GenClass
+      ParentClass: GenClass
       SelfCall: PrimaryCtorCall
       Syntax: Ast.Ctor }
 
@@ -118,13 +114,13 @@ type GenOperator =
 type MemberSet<'Type, 'Member> =
     ImmutableSortedSet<Access * TypeOrMember<'Type, 'Member>>
 
-type GenInterfaceMember<'GenInterface> =
-    | InterfaceMthd of GenAbstractMethod<'GenInterface>
-    | InterfaceProp of GenAbstractProperty<'GenInterface>
+type GenInterfaceMember =
+    | InterfaceMthd of GenAbstractMethod<GenInterface>
+    | InterfaceProp of GenAbstractProperty<GenInterface>
 
 type GenInterface<'Parent> =
     { InterfaceName: GenName
-      Members: MemberSet<GenNestedInterface, GenInterfaceMember<GenInterface<'Parent>>>
+      Members: MemberSet<GenNestedInterface, GenInterfaceMember>
       Parent: 'Parent
       SuperInterfaces: InterfaceSet
       Syntax: Ast.Interface }
@@ -144,15 +140,15 @@ type GenGlobalInterface = GenInterface<Namespace>
 
 type InterfaceSet = ImmutableSortedSet<ResolvedInterface>
 
-type GenClassMember<'GenClass> =
-    | ClassCtor of GenCtor<'GenClass>
-    | ClassMthd of GenMethod<'GenClass>
-    | ClassProp of GenProperty<'GenClass>
+type GenClassMember =
+    | ClassCtor of GenCtor
+    | ClassMthd of GenMethod<GenClass>
+    | ClassProp of GenProperty<GenClass>
 
 type GenClass<'Parent> =
     { ClassName: GenName
       Interfaces: InterfaceSet
-      Members: MemberSet<GenNestedClass, GenClassMember<GenClass<'Parent>>>
+      Members: MemberSet<GenNestedClass, GenClassMember>
       Parent: 'Parent
       PrimaryCtor: GenPrimaryCtor
       SuperClass: DefinedOrExtern<GenClass, EClass> option
