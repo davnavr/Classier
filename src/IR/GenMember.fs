@@ -7,7 +7,7 @@ open Classier.NET.Compiler.Grammar.Ast
 let inline internal syntax mber =
     (^a : (member Syntax : _) mber)
 
-let classm =
+let classm parent =
     function
     | Abstract mabs ->
         invalidOp "bad"
@@ -23,6 +23,7 @@ let classm =
                       Syntax = param
                       Type = Primitive PrimitiveType.Unit })
                 |> ImmutableList.CreateRange
+              ParentClass = parent
               SelfCall = PrimaryCtorCall ImmutableList.Empty
               Syntax = ctor }
             |> ClassCtor

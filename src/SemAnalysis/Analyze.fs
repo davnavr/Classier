@@ -270,19 +270,19 @@ let rec private gexpr expr ltable gtable = // TODO: Clean up this mess of a func
     | Ast.StrLit str -> StrLit str
     | _ -> failwithf "Unsupported expression '%A'" expr
 
-let private gbody body ltable usings ret gtable =
+let private gbody body ltable usings gtable =
     let (_, _, result) =
         List.fold
-            (fun (table, err, gen) (pos, st) ->
-                match st with
-                | Ast.IgnoredExpr expr ->
+            (fun (table, err, gen) pst ->
+                match pst with
+                | (_, Ast.IgnoredExpr expr) ->
                     let nbody =
-                        gexpr expr table gtable
-                        |> IgnoredExpr
-                        |> GenBody.addTo gen (pos, st)
+                        ImmList.add
+                            (gexpr expr table gtable |> IgnoredExpr, pst)
+                            gen
                     (table, err, nbody)
-                | _ -> failwithf "Unsupported statement '%A'" st)
-            (ltable, ImmutableList.Empty, GenBody.empty ret)
+                | (_, st) -> failwithf "Unsupported statement '%A'" st)
+            (ltable, ImmutableList.Empty, ImmutableList.Empty)
             body
     // TODO: Don't ignore errors when generating body.
     result
@@ -308,12 +308,13 @@ let private entryPoint (epoint: EntryPoint option) anl =
             match ltable with
             | Result.Ok ltable ->
                 let gen =
-                    { Parameters =
+                    { ExitCode = ImplicitZero // TODO: Allow explicit return
+                      Parameters =
                         GenParam.ofExpParam
                             args
                             (fun _ -> argtype())
                         |> ImmList.singleton
-                      Body = gbody epoint.Body ltable () ImplicitZero anl.GlobalTable
+                      Body = gbody epoint.Body ltable () anl.GlobalTable
                       Syntax = epoint }
                 { anl with Analysis.EntryPoint = Some gen }
             | Result.Error err ->

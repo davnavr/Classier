@@ -28,7 +28,6 @@
     <Compile Include="Extern\EType.fs" />
     <Compile Include="IR\Types.fs" />
     <Compile Include="IR\ResolvedType.fs" />
-    <Compile Include="IR\GenBody.fs" />
     <Compile Include="IR\GenParam.fs" />
     <Compile Include="IR\GenName.fs" />
     <Compile Include="IR\GenMember.fs" />

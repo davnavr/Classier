@@ -3,7 +3,9 @@
 module Classier.NET.Compiler.IR.GenType
 
 open System.Collections.Immutable
+
 open Classier.NET.Compiler
+
 open Classier.NET.Compiler.Grammar.Ast
 
 let private mglobal clss intf modl gtype =
@@ -18,8 +20,8 @@ let gname =
         (fun intf -> intf.InterfaceName)
         (fun mdle -> Identifier.ofStr mdle.ModuleName)
 
-let nname ntype =
-    match ntype with
+let nname =
+    function
     | GenNestedClass nclass -> nclass.ClassName
     | GenNestedInterface nintf -> nintf.InterfaceName
     | GenNestedModule nmdle -> Identifier.ofStr nmdle.ModuleName
@@ -31,15 +33,26 @@ let gsyntax =
         (GenMember.syntax >> Module)
 
 let clss parent members syntax =
+    let info =
+        { ClassName =
+            GenName.ofIdentifier syntax.ClassName.Identifier
+          Interfaces = InterfaceSet.empty
+          Members = members
+          Parent = parent
+          PrimaryCtor = invalidOp "bad"
+          SuperClass = None
+          Syntax = syntax }
+    let pctor =
+        { Body = ImmutableList.Empty // TODO: How will members reference parent type if they have to be in the Members set of the parent? How to solve recursion?
+          ParentClass = invalidOp "badder"
+          Parameters = ImmutableList.Empty
+          Syntax = syntax.PrimaryCtor }
     { ClassName =
         GenName.ofIdentifier syntax.ClassName.Identifier
       Interfaces = InterfaceSet.empty
       Members = members
       Parent = parent
-      PrimaryCtor =
-        { Body = GenBody.empty()
-          Parameters = ImmutableList.Empty
-          Syntax = syntax.PrimaryCtor }
+      PrimaryCtor = invalidOp "bad"
       SuperClass = None
       Syntax = syntax }
 

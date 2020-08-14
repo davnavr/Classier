@@ -36,8 +36,14 @@ type CallExpression<'Target> =
     { Arguments: ImmutableList<GenExpression>
       Target: 'Target }
 
+type MemberAccess<'Target, 'Member> =
+    { Member: 'Member
+      Target: 'Target }
+
 type ComplexExpression =
     | CtorCall of CallExpression<ResolvedClass>
+    | ClassMemberAccess of MemberAccess<GenExpression, GenClassMember>
+    | ModuleMemberAccess of MemberAccess<GenModule, GenModuleMember>
 type GenExpression =
     | BoolLit of bool
     | ComplexExpr of ComplexExpression
