@@ -69,6 +69,8 @@ module Identifier =
 
     let umap<'g> = map (fun (_: 'g) -> ())
 
+    let ncompare idf1 idf2 = compare (umap idf1) (umap idf2)
+
     let toFull idf = FullIdentifier(idf, List.empty)
 
 [<RequireQualifiedAccess>]

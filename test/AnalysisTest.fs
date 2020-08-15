@@ -34,13 +34,12 @@ let private parseMany name sources =
             | Result.Error _ -> acc, state)
         (Result.Ok ImmutableList.Empty, Parser.defaultState)
 
-let testStrs name gtable sources f =
+let testStrs name sources f =
     test name {
         let (result, state) = parseMany name sources
-        Analyze.output
-            (Assert.isOk result, state.EntryPoint)
-            (gtable Globals.emptyTable)
-        |> Assert.isOk
+        (Result.get result, state.EntryPoint)
+        |> Analyze.output
+        |> Result.get
         |> f
         |> ignore
     }
@@ -49,7 +48,6 @@ let tests =
     [
         testStrs
             "global usings are validated"
-            id
             [
                 """
                 namespace my.fancy.space;
@@ -76,7 +74,6 @@ let tests =
 
         testStrs
             "types from all files are parsed"
-            id
             [
                 """
                 class Class1;
@@ -100,7 +97,6 @@ let tests =
 
         testStrs
             "valid types are returned as result"
-            id
             [
                 """
                 class Classy {
@@ -126,7 +122,6 @@ let tests =
 
         testStrs
             "empty nested interface is included"
-            id
             [
                 """
                 module Parent {
@@ -149,19 +144,17 @@ let tests =
 
         testStrs
             "entry point exists"
-            id
             [
                 "main (args: string[]) { }"
             ]
             (fun output ->
                 let epoint = Option.get output.EntryPoint
                 Assert.equal
-                    EntryPointReturn.ImplicitZero
-                    epoint.Body.ReturnType)
+                    ExitCode.ImplicitZero
+                    epoint.ExitCode)
 
         testStrs
             "hello world is a valid program"
-            Program.TempStandardLib.table
             [
                 """
                 main (args: string[]) {
@@ -171,7 +164,7 @@ let tests =
             ]
             (fun output ->
                 let epoint = Option.get output.EntryPoint
-                Assert.notEmpty epoint.Body.Statements)
+                Assert.notEmpty epoint.Body)
 
         testCase
             "namespace and type cannot have the same name"
@@ -188,9 +181,8 @@ let tests =
                         """
                     ]
                     |> parseMany "duplicate name"
-                Analyze.output
-                    (Result.get result, state.EntryPoint)
-                    Globals.emptyTable
+                (Result.get result, state.EntryPoint)
+                |> Analyze.output
                 |> Assert.isError
                 |> ImmList.exists
                     (function
@@ -201,7 +193,6 @@ let tests =
 
         testStrs
             "nested type in a nested type is processed"
-            id
             [
                 """
                 module Table {

@@ -7,12 +7,9 @@ open Classier.NET.Compiler
 open Classier.NET.Compiler.AccessControl
 open Classier.NET.Compiler.Generic
 
-open Classier.NET.Compiler.Extern
-
 module Ast = Classier.NET.Compiler.Grammar.Ast
 
-type ResolvedType =
-    TypeSystem.Type<DefinedOrExtern<GenType, EType>> // TODO: Should Classes and Interfaces be separated from Modules?
+type ResolvedType = TypeSystem.Type<GenType> // TODO: Should Classes and Interfaces be separated from Modules?
 
 type GenParam =
     { Name: IdentifierStr option
@@ -22,10 +19,7 @@ type GenParam =
 type GenParamTuple = ImmutableList<GenParam>
 type GenParamList = ImmutableList<GenParamTuple>
 
-type ResolvedInterface = DefinedOrExtern<GenInterface, EInterface>
-type ResolvedClass = DefinedOrExtern<GenClass, EClass>
-
-type GenName = Identifier<GenericParam<ResolvedInterface, ResolvedClass>>
+type GenName = Identifier<GenericParam<GenInterface, GenClass>>
 
 type GenSignature<'Body> =
     { Body: 'Body
@@ -41,7 +35,7 @@ type MemberAccess<'Target, 'Member> =
       Target: 'Target }
 
 type ComplexExpression =
-    | CtorCall of CallExpression<ResolvedClass>
+    | CtorCall of CallExpression<GenClass>
     | ClassMemberAccess of MemberAccess<GenExpression, GenClassMember>
     | ModuleMemberAccess of MemberAccess<GenModule, GenModuleMember>
 type GenExpression =
@@ -144,7 +138,7 @@ type GenInterface =
 type GenNestedInterface = GenInterface<GenInterface>
 type GenGlobalInterface = GenInterface<Namespace>
 
-type InterfaceSet = ImmutableSortedSet<ResolvedInterface>
+type InterfaceSet = ImmutableSortedSet<GenInterface>
 
 type GenClassMember =
     | ClassCtor of GenCtor
@@ -157,7 +151,7 @@ type GenClass<'Parent> =
       Members: MemberSet<GenNestedClass, GenClassMember>
       Parent: 'Parent
       PrimaryCtor: GenPrimaryCtor
-      SuperClass: DefinedOrExtern<GenClass, EClass> option
+      SuperClass: GenClass option
       Syntax: Ast.Class }
 
 [<RequireQualifiedAccess>]

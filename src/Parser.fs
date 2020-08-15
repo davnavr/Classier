@@ -1028,19 +1028,8 @@ do
                           ReturnType = retType }}
                     |> Operator
                     |> TypeOrMember.Member
-    moduleBodyRef :=
-        memberBlock
-            "module body"
-            Access.Private
-            [
-                functionDef
-                operatorDef
-            ]
-            [
-                classDef (Class >> TypeOrMember.Type)
-                interfaceDef (Interface >> TypeOrMember.Type)
-                moduleDef (Module >> TypeOrMember.Type)
-            ]
+    //moduleBodyRef :=
+    ()
 
 let private optionalEnd =
     updateUserState
@@ -1459,7 +1448,7 @@ let compilationUnit: Parser<CompilationUnit, State> =
         { Namespace = Namespace ns
           Usings = uses
           Source = pos.StreamName
-          Types = types }
+          Declarations = types }
 
 let parseFiles enc paths =
     let parseFile state path =

@@ -4,7 +4,6 @@ open System.Collections.Immutable
 
 open Classier.NET.Compiler
 
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Grammar.Ast
 open Classier.NET.Compiler.IR
 
@@ -12,7 +11,7 @@ open Classier.NET.Compiler.IR
 module Usings =
     type private Use =
         | UseNamespace of Namespace
-        | UseTypeMembers of DefinedOrExtern<GenType, EType>
+        | UseTypeMembers of GenType
     
     type Usings =
         private

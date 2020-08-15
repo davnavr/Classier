@@ -5,12 +5,11 @@ open System.Collections.Immutable
 
 open Classier.NET.Compiler
 
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.IR
 
 type Symbol<'Table> =
     | NamespaceSymbol of IdentifierStr * 'Table
-    | TypeSymbol of DefinedOrExtern<GenGlobalType, EGlobalType>
+    | TypeSymbol of GenGlobalType
 
 type Table =
     private
@@ -19,44 +18,6 @@ type Table =
 type Symbol = Symbol<Table>
 
 let emptyTable =
-    let tname =
-        function
-        | Defined def ->
-            GenType.gname def |> Identifier.umap
-        | Extern ext ->
-            EType.gname ext |> Identifier.umap
-    let cgtypes type1 type2 =
-        let cname =
-            compare
-                (tname type1)
-                (tname type2)
-        match cname with
-        | 0 ->
-            match (type1, type2) with
-            | (Defined def, Extern ext)
-            | (Extern ext, Defined def) ->
-                let value =
-                    match type1 with
-                    | Defined _ -> 1
-                    | _ -> -1
-                match (def, ext) with
-                | (GenGlobalModule _, EGlobalModule _) -> 0
-                | (GenGlobalModule _, _) -> value
-                | (_, EGlobalModule _) -> value * -1
-                | _ -> 0
-            | (Defined def1, Defined def2) ->
-                match (def1, def2) with
-                | (GenGlobalModule _, GenGlobalModule _) -> 0
-                | (_, GenGlobalModule _) -> -1
-                | (GenGlobalModule _, _) -> 1
-                | _ -> 0
-            | (Extern ext1, Extern ext2) ->
-                match (ext1, ext2) with
-                | (EGlobalModule _, EGlobalModule _) -> 0
-                | (_, EGlobalModule _) -> -1
-                | (EGlobalModule _, _) -> 1
-                | _ -> 0
-        | _ -> cname
     SortedSet.withComparer
         (fun s1 s2 ->
             match (s1, s2) with
@@ -64,17 +25,23 @@ let emptyTable =
                 compare ns1 ns2
             | (NamespaceSymbol(ns, _), TypeSymbol t)
             | (TypeSymbol t, NamespaceSymbol(ns, _)) ->
-                let value =
-                    match s1 with
-                    | NamespaceSymbol _ -> -1
-                    | TypeSymbol _ -> 1
                 let cname =
-                    compare
-                        (Identifier.ofStr ns)
-                        (tname t)
-                cname * value
+                    Identifier.ncompare (Identifier.ofStr ns) (GenType.gname t)
+                match (cname, s1) with
+                | (0, _) -> 0
+                | (_, NamespaceSymbol _) -> 1
+                | (_, TypeSymbol _) -> -1
             | (TypeSymbol t1, TypeSymbol t2) ->
-                cgtypes t1 t2)
+                match (t1, t2) with
+                | (GenGlobalModule mdle1, GenGlobalModule mdle2) ->
+                    compare mdle1.ModuleName mdle2.ModuleName
+                | (GenGlobalModule _, _)
+                | (_, GenGlobalModule _) ->
+                    match t1 with
+                    | GenGlobalModule _ -> 1
+                    | _ -> -1
+                | _ ->
+                    Identifier.ncompare (GenType.gname t1) (GenType.gname t2))
         ImmutableSortedSet.Empty
     |> Table
 

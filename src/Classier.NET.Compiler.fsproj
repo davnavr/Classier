@@ -22,10 +22,8 @@
     <Compile Include="Grammar\Expression.fs" />
     <Compile Include="Grammar\Operator.fs" />
     <Compile Include="Grammar\Member.fs" />
-    <Compile Include="Grammar\TypeDef.fs" />
+    <Compile Include="Grammar\Decl.fs" />
     <Compile Include="Parser.fs" />
-    <Compile Include="Extern\Types.fs" />
-    <Compile Include="Extern\EType.fs" />
     <Compile Include="IR\Types.fs" />
     <Compile Include="IR\ResolvedType.fs" />
     <Compile Include="IR\GenParam.fs" />

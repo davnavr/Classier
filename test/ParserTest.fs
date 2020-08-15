@@ -68,10 +68,10 @@ let tests =
                     """
                     |> parse
                     |> ParserAssert.isSuccess
-                cu.Types
+                cu.Declarations
                 |> Seq.map (fun (_, tdef) ->
                     tdef
-                    |> TypeDef.name
+                    |> Decl.name
                     |> string)
                 |> List.ofSeq
                 |> Assert.equal
@@ -192,7 +192,7 @@ let tests =
                     |> parse
                     |> ParserAssert.isSuccess
                 let fclass =
-                    cu.Types
+                    cu.Declarations
                     |> List.head
                     |> snd
                     |> function

@@ -3,7 +3,6 @@
 module Classier.NET.Compiler.IR.ResolvedType
 
 open Classier.NET.Compiler
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.TypeSystem
 
 let ofExpr =
@@ -16,7 +15,7 @@ let ofExpr =
             match expr with
             | CtorCall ctor ->
                 ctor.Target
-                |> DefinedOrExtern.map GenClass EClass
+                |> GenClass
                 |> ResolvedType.Named
                 |> acc
     inner id

@@ -200,6 +200,9 @@ type InstanceMember =
 type StaticMember =
     | Function of StaticFunction
     | Operator of Operator
+    | NestedClass of Class
+    | NestedInterface of Interface
+    | NestedModule of Module
 
 type MemberName =
     | IdentifierName of GenericName
@@ -244,15 +247,16 @@ type Interface =
 
 type Module =
     { ModuleName: SimpleName
-      Members: MemberList<TypeDef, StaticMember> }
+      Members: (Access * StaticMember) list }
 
-type TypeDef =
+/// Represents a type or member
+type Decl =
     | Class of Class
     | Interface of Interface
     | Module of Module
 
 type CompilationUnit =
-    { Namespace: Namespace
+    { Declarations: (GlobalAccess * Decl) list
+      Namespace: Namespace
       Usings: (FParsec.Position * FullIdentifier<TypeName>) list
-      Source: string
-      Types: (GlobalAccess * TypeDef) list }
+      Source: string }

@@ -1,5 +1,5 @@
 ﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Classier.NET.Compiler.Grammar.TypeDef
+module Classier.NET.Compiler.Grammar.Decl
 
 let name tdef =
     match tdef with

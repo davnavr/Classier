@@ -8,7 +8,6 @@ open System.Collections.Immutable
 open Classier.NET.Compiler
 open Classier.NET.Compiler.TypeSystem
 
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 
@@ -42,7 +41,7 @@ let private globals cunits anl =
     let ctypes (cunit: CompilationUnit) =
         Seq.map
             (fun (_, tdef) -> cunit, tdef)
-            cunit.Types
+            cunit.Declarations
     cunits
     |> Seq.collect ctypes
     |> Seq.fold
@@ -73,7 +72,7 @@ let private globals cunits anl =
                         mdle
             let result =
                 Globals.addType
-                    (Defined gtype)
+                    gtype
                     cunit.Namespace
                     state.GlobalTable
             match result with
@@ -166,24 +165,7 @@ let private ntypes anl =
                 |> nested
                     GenGlobalInterface
                     gintf
-            | GenGlobalModule gmdle ->
-                ntype
-                    (fun (mdle: GenGlobalModule) -> mdle.Syntax.Members)
-                    (fun nested parent ->
-                        match nested with // TODO: Add the nested types inside of the nested classes, interfaces, and modules of a module.
-                        | Class nested ->
-                            GenType.clss (GenModule.Global parent) MemberSet.emptyClass nested |> GenNestedClass, Seq.empty
-                        | Interface nested ->
-                            GenType.intf (GenModule.Global parent) MemberSet.emptyInterface nested |> GenNestedInterface, Seq.empty
-                        | Module nested ->
-                            GenType.mdle (GenModule.Global parent) MemberSet.emptyModule nested |> GenNestedModule, Seq.empty)
-                    (fun mdle -> mdle.Members)
-                    (fun nmembers parent -> { parent with Members = nmembers })
-                    (fun parent dup ->
-                        DuplicateModuleMember(GenModule.Global parent, TypeOrMember.Type dup))
-                |> nested
-                    GenGlobalModule
-                    gmdle)
+            | GenGlobalModule gmdle -> invalidOp "module members")
         anl
 
 let private tresolution cunits anl =
@@ -268,9 +250,9 @@ let private entryPoint (epoint: EntryPoint option) anl =
                 anl
     | None -> anl
 
-let output (cunits, epoint) table =
+let output (cunits, epoint) =
     let rtypes =
-        Analyzer.init table
+        Analyzer.init Globals.emptyTable
         |> globals cunits
         |> ntypes
         |> tresolution cunits

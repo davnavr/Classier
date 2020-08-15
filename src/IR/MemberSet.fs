@@ -1,4 +1,5 @@
-﻿module Classier.NET.Compiler.IR.MemberSet
+﻿[<RequireQualifiedAccess>]
+module Classier.NET.Compiler.IR.MemberSet
 
 open System.Collections.Immutable
 open Classier.NET.Compiler

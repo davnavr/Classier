@@ -2,7 +2,6 @@
 
 open Classier.NET.Compiler
 
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 
@@ -12,7 +11,7 @@ type AnalyzerError =
     | DuplicateGlobalSymbol of GenGlobalType * existing: Globals.Symbol
     | DuplicateClassMember of GenClass * TypeOrMember<Class, InstanceMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>
-    | DuplicateModuleMember of GenModule * TypeOrMember<TypeDef, StaticMember>
+    | DuplicateModuleMember of GenModule * TypeOrMember<Decl, StaticMember>
     | FeatureNotImplemented of feature: string
     | InternalAnalyzerError of msg: string
     | LocalsTableError of LocalsTable.Error

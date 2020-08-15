@@ -7,18 +7,6 @@ type TypeOrMember<'Type, 'Member> =
     | Type of 'Type
     | Member of 'Member
 
-[<NoComparison; StructuralEquality>]
-type DefinedOrExtern<'Defined, 'Extern> =
-    | Defined of 'Defined
-    | Extern of 'Extern
-
-[<RequireQualifiedAccess>]
-module DefinedOrExtern =
-    let map def ext =
-        function
-        | Defined d -> def d |> Defined
-        | Extern e -> ext e |> Extern
-
 module Bool =
     let toOpt b =
         if b
