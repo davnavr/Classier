@@ -348,9 +348,10 @@ do
                 <?> "tuple"
                 |>> function
                 | [] -> Primitive PrimitiveType.Unit
-                | head :: tail ->
+                | [ TypeName item ] -> item
+                | i1 :: i2 :: rest ->
                     let mapper (TypeName tname) = tname
-                    Tuple(mapper head, List.map mapper tail)
+                    Tuple(mapper i1, mapper i2, List.map mapper rest)
             ]
         |>> TypeName
     let modifiedType (f: TypeName -> _ -> _) p prev =
@@ -1028,8 +1029,8 @@ do
                           ReturnType = retType }}
                     |> Operator
                     |> TypeOrMember.Member
-    //moduleBodyRef :=
-    ()
+    moduleBodyRef :=
+        fail "bad"
 
 let private optionalEnd =
     updateUserState

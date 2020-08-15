@@ -27,12 +27,12 @@ let rec isA tbase tderived =
     | (Named tbase, Named tderived) ->
         invalidOp "bad"
     | (Primitive p1, Primitive p2) -> p1 = p2
-    | (Tuple (bhead, btail), Tuple(thead, ttail)) ->
-        let rec inner btail ttail =
-            match (btail, ttail) with
+    | (Tuple (b1, b2, brest), Tuple(t1, t2, trest)) ->
+        let rec inner brest trest =
+            match (brest, trest) with
             | (bt :: bnext, tt :: tnext) when isA bt tt ->
                 inner bnext tnext
             | ([], []) -> true
             | _ -> false
-        isA bhead thead && inner btail ttail
+        isA b1 t1 && isA b2 t2 && inner brest trest
     | _ -> false

@@ -249,7 +249,7 @@ type Module =
     { ModuleName: SimpleName
       Members: (Access * StaticMember) list }
 
-/// Represents a type or member
+/// Represents a type or module
 type Decl =
     | Class of Class
     | Interface of Interface
