@@ -166,7 +166,7 @@ type Property =
       Value: Expression option
       ValueType: TypeName option }
 
-type AMethod =
+type AbstractMethod =
     { Method: Signature<unit, TypeName>
       MethodName: GenericName }
 
@@ -174,7 +174,7 @@ type AbstractPropAccessors =
     | AbstractGet
     | AbstractGetSet
 
-type AProperty =
+type AbstractProperty =
     { Accessors: AbstractPropAccessors
       PropName: SimpleName
       Purity: MutatorModf
@@ -185,19 +185,19 @@ type StaticFunction =
       FunctionName: GenericName }
 
 type AbstractMember =
-    | AMethod of AMethod
-    | AProperty of AProperty
+    | AbstractMethod of AbstractMethod
+    | AbstractProperty of AbstractProperty
 
 type ConcreteMember =
     | Constructor of Ctor
     | Method of Method
     | Property of Property
 
-type InstanceMember =
+type ClassMember =
     | Abstract of AbstractMember
     | Concrete of ConcreteMember
 
-type StaticMember =
+type ModuleMember =
     | Function of StaticFunction
     | Operator of Operator
     | NestedClass of Class
@@ -232,7 +232,7 @@ type Class =
       Body: PStatement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier<TypeName> list
-      Members: MemberList<Class, InstanceMember>
+      Members: MemberList<Class, ClassMember>
       PrimaryCtor: PrimaryCtor
       SelfIdentifier: IdentifierStr option
       SuperClass: FullIdentifier<TypeName> option }
@@ -246,14 +246,55 @@ type Interface =
       SuperInterfaces: FullIdentifier<TypeName> list }
 
 type Module =
-    { ModuleName: SimpleName
-      Members: (Access * StaticMember) list }
+    { Members: (Access * ModuleMember) list
+      ModuleName: SimpleName }
 
-/// Represents a type or module
-type Decl =
+[<RequireQualifiedAccess>]
+type ExternClassMember =
+    | Ctor of parameters: ExpParam list
+    | Method of AbstractMethod
+    | Property of AbstractProperty
+
+type ExternClass =
+    { ClassName: GenericName
+      Inheritance: ClassInheritance
+      Interfaces: FullIdentifier<TypeName> list
+      Members: (GlobalAccess * TypeOrMember<ExternClass, ExternClassMember>) list
+      SuperClass: FullIdentifier<TypeName> option }
+
+[<RequireQualifiedAccess>]
+type ExternInterfaceMember =
+    | Method of AbstractMethod
+    | Property of AbstractProperty
+
+type ExternInterface =
+    { InterfaceName: GenericName
+      Members: TypeOrMember<ExternInterface, ExternInterfaceMember> list
+      SuperInterfaces: FullIdentifier<TypeName> list }
+
+type ExternModuleMember =
+    | ExternFunction of
+        {| Function: Signature<unit, TypeName>
+           FunctionName: GenericName |}
+
+type ExternModule =
+    { Members: TypeOrMember<ExternDecl, ExternModuleMember> list
+      ModuleName: SimpleName }
+
+type ExternDecl =
+    | ExternClass of ExternClass
+    | ExternInterface of ExternInterface
+    | ExternModule
+
+type DefinedDecl =
     | Class of Class
     | Interface of Interface
     | Module of Module
+
+/// Represents a type or module
+type Decl =
+    | Defined of DefinedDecl
+    | Extern of ExternDecl
 
 type CompilationUnit =
     { Declarations: (GlobalAccess * Decl) list

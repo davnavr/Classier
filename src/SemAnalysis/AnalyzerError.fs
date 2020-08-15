@@ -9,9 +9,9 @@ type AnalyzerError =
     | BadEntryPointSignature of EntryPoint
     | BadUseStatement of FParsec.Position * FullIdentifier<TypeName>
     | DuplicateGlobalSymbol of GenGlobalType * existing: Globals.Symbol
-    | DuplicateClassMember of GenClass * TypeOrMember<Class, InstanceMember>
+    | DuplicateClassMember of GenClass * TypeOrMember<Class, ClassMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>
-    | DuplicateModuleMember of GenModule * TypeOrMember<Decl, StaticMember>
+    | DuplicateModuleMember of GenModule * TypeOrMember<Decl, ModuleMember>
     | FeatureNotImplemented of feature: string
     | InternalAnalyzerError of msg: string
     | LocalsTableError of LocalsTable.Error

@@ -15,8 +15,8 @@ let foldInstance amthd aprop ctor mthd prop mdef =
     match mdef with
     | Abstract adef ->
         match adef with
-        | AMethod mdef -> amthd mdef
-        | AProperty pdef -> aprop pdef
+        | AbstractMethod mdef -> amthd mdef
+        | AbstractProperty pdef -> aprop pdef
     | Concrete cdef ->
         match cdef with
         | Constructor c -> ctor c
@@ -40,12 +40,12 @@ let instanceSig mdef =
     match mdef with
     | Abstract adef ->
         match adef with
-        | AMethod mthd ->
+        | AbstractMethod mthd ->
             mthd.Method.Parameters
             |> Seq.map Param.toExpStr
             |> String.concat " "
             |> sprintf "%O%s" mthd.MethodName
-        | AProperty prop -> string prop.PropName
+        | AbstractProperty prop -> string prop.PropName
     | Concrete cdef ->
         match cdef with
         | Constructor ctor ->

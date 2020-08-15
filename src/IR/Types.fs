@@ -70,7 +70,7 @@ type GenMethod<'Parent, 'Body, 'Syntax> =
       Signature: GenSignature<'Body>
       Syntax: 'Syntax }
 
-type GenAbstractMethod<'Parent> = GenMethod<'Parent, unit, Ast.AMethod>
+type GenAbstractMethod<'Parent> = GenMethod<'Parent, unit, Ast.AbstractMethod>
 type GenConcreteMethod<'Parent> = GenMethod<'Parent, GenBody, Ast.Method>
 
 type GenMethod<'Parent> =
@@ -86,7 +86,7 @@ type GenProperty<'Parent, 'Body, 'Syntax> =
       Syntax: Ast.Property
       ValueType: ResolvedType }
 
-type GenAbstractProperty<'Parent> = GenProperty<'Parent, unit, Ast.AProperty>
+type GenAbstractProperty<'Parent> = GenProperty<'Parent, unit, Ast.AbstractProperty>
 type GenConcreteProperty<'Parent> = GenProperty<'Parent, GenBody, Ast.Property>
 
 type GenProperty<'Parent> =

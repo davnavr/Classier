@@ -157,6 +157,14 @@ let tests =
             "hello world is a valid program"
             [
                 """
+                namespace System;
+
+                extern module Console {
+                    def WriteLine(value: string): ();
+                }
+                """
+
+                """
                 main (args: string[]) {
                     System.Console.WriteLine("Hello World!");
                 }

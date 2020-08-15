@@ -836,11 +836,11 @@ do
     let members =
         [
             methodDef
-                (AMethod >> TypeOrMember.Member)
+                (AbstractMethod >> TypeOrMember.Member)
                 None
 
             propDef
-                (AProperty >> TypeOrMember.Member)
+                (AbstractProperty >> TypeOrMember.Member)
                 None
         ]
         |> Seq.map
@@ -943,17 +943,17 @@ do
             |> attempt
             >>% (ImmutableList.Empty, ImmutableList.Empty)
 
-            memberBody
+            memberBody // TODO: Make sure abstract members are only allowed when a class is abstract.
                 "class body"
                 [
                     ctorDef
 
                     methodDef
-                        (AMethod >> Abstract >> TypeOrMember.Member)
+                        (AbstractMethod >> Abstract >> TypeOrMember.Member)
                         (Method >> Concrete >> TypeOrMember.Member |> Some)
 
                     propDef
-                        (AProperty >> Abstract >> TypeOrMember.Member)
+                        (AbstractProperty >> Abstract >> TypeOrMember.Member)
                         (Property >> Concrete >> TypeOrMember.Member |> Some)
                 ]
                 [ classDef TypeOrMember.Type ]
@@ -989,7 +989,6 @@ do
                   ReturnType = retType }
               FunctionName = name }
             |> Function
-            |> TypeOrMember.Member
     let opName =
         Operator.operatorChars
         |> anyOf
@@ -1028,9 +1027,19 @@ do
                           Parameters = opnds
                           ReturnType = retType }}
                     |> Operator
-                    |> TypeOrMember.Member
     moduleBodyRef :=
-        fail "bad"
+        memberBlock
+            "module body"
+            Access.Private
+            [
+                functionDef
+                operatorDef
+            ]
+            [
+                classDef NestedClass
+                interfaceDef NestedInterface
+                moduleDef NestedModule
+            ]
 
 let private optionalEnd =
     updateUserState
