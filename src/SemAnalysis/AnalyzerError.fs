@@ -11,7 +11,7 @@ type AnalyzerError =
     | DuplicateGlobalSymbol of GenGlobalType * existing: Globals.Symbol
     | DuplicateClassMember of GenClass * TypeOrMember<Class, ClassMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>
-    | DuplicateModuleMember of GenModule * TypeOrMember<Decl, ModuleMember>
+    | DuplicateModuleMember of GenModule * TypeOrMember<Declaration, ModuleMember>
     | FeatureNotImplemented of feature: string
     | InternalAnalyzerError of msg: string
     | LocalsTableError of LocalsTable.Error

@@ -125,6 +125,14 @@ let globalAccess =
         "internal", GlobalInternal
     ]
     |> accessModifier GlobalInternal GlobalPublic
+let publicAccess =
+    accessModifier
+        PublicAccess.Protected
+        PublicAccess.Public
+        [
+            "public", PublicAccess.Public
+            "protected", PublicAccess.Protected
+        ]
 
 let typeName, private typeNameRef = createParserForwardedToRef<TypeName, _>()
 let typeNameOpt =
@@ -191,6 +199,10 @@ let modifiers =
         | Result.Ok resultList -> Reply resultList
         | Result.Error err -> Reply(Error, messageError err))
     <?> "modifiers"
+let private withModifiers ps =
+    modifiers
+    >>= fun modfs ->
+        Seq.map (fun p -> p modfs) ps |> choice
 let private validateModifiers modfs validator initial =
     let results =
         Seq.fold
@@ -828,7 +840,7 @@ let interfaceDef idef modfs =
         interfaceBody
     <?> "interface definition"
     |>> fun (name, ilist, members) ->
-        { InterfaceName = name
+        { Interface.InterfaceName = name
           Members = members
           SuperInterfaces = ilist }
         |> idef
@@ -850,31 +862,32 @@ do
                     |> rest.Add
                     |> def)
     interfaceBodyRef :=
-        memberBlock
+        memberBlock // TODO: Maybe use memberDef instead, since it does not have access modifiers.
             "interface body"
             Access.Internal
             members
             [ interfaceDef TypeOrMember.Type ]
 
 let private classBody, private classBodyRef = createParserForwardedToRef<_ * _, _>()
+let private classModf modfs =
+    validateModifiers
+        modfs
+        (fun (inheritKind) modf ->
+            match (inheritKind, modf) with
+            | (MustInherit, "inheritable")
+            | (CanInherit, "abstract") ->
+                badModfier "An abstract class already implies that it is 'inheritable'"
+            | (_, "inheritable") -> Result.Ok CanInherit
+            | (_, "abstract") -> Result.Ok MustInherit
+            | _ -> Result.Error None)
+        (Sealed)
+
 let classDef cdef modfs =
     let classDef =
         keyword "data"
         >>% DataClass
         <|>% NormalClass
         .>> keyword "class"
-    let classModf =
-        validateModifiers
-            modfs
-            (fun (inheritKind) modf ->
-                match (inheritKind, modf) with
-                | (MustInherit, "inheritable")
-                | (CanInherit, "abstract") ->
-                    badModfier "An abstract class already implies that it is 'inheritable'"
-                | (_, "inheritable") -> Result.Ok CanInherit
-                | (_, "abstract") -> Result.Ok MustInherit
-                | _ -> Result.Error None)
-            (Sealed)
     let classCtor =
         memberAccess Access.Private
         .>> space
@@ -895,7 +908,7 @@ let classDef cdef modfs =
             | None -> None, List.empty
     tuple8
         classDef
-        classModf
+        (classModf modfs)
         genericName
         classCtor
         selfIdAs
@@ -969,7 +982,7 @@ let moduleDef mdef modfs =
         moduleBody
     <?> "module definition"
     |>> fun (name, members) ->
-        { ModuleName = name
+        { Module.ModuleName = name
           Members = members }
         |> mdef
 do
@@ -1384,6 +1397,131 @@ do
 
     expressionRef.TermParser <- simpleExpression
 
+let private externDecl =
+    let eclassbody, eclassbodyref = createParserForwardedToRef()
+    let eintfbody, eintfbodyref = createParserForwardedToRef()
+    let emdlebody, emdlebodyref = createParserForwardedToRef()
+
+    let eclass clss modfs =
+        keyword "class"
+        |> attempt
+        >>. tuple5
+            (classModf modfs)
+            genericName
+            (extends .>> space |> opt)
+            (implementsOpt .>> space)
+            eclassbody
+        <?> "external class"
+        |>> fun (inh, name, cbase, cintfs, cmembers) ->
+            { ClassName = name
+              Inheritance = inh
+              Interfaces = cintfs
+              Members = cmembers
+              SuperClass = cbase }
+            |> clss
+    let einterface intf modfs =
+        keyword "interface"
+        |> attempt
+        >>. noModifiers modfs
+        >>. tuple3
+            genericName
+            (implementsOpt .>> space)
+            eintfbody
+        <?> "external interface"
+        |>> fun (name, sintfs, imembers) ->
+            { InterfaceName = name
+              Members = imembers
+              SuperInterfaces = sintfs }
+            |> intf
+    let emodule mdle modfs =
+        keyword "module"
+        |> attempt
+        >>. noModifiers modfs
+        >>. simpleName
+        .>> space
+        .>>. emdlebody
+        <?> "external module"
+        |>> fun (name, mmembers) ->
+            { ModuleName = name
+              Members = mmembers }
+            |> mdle
+    do
+        let externMembers members ntypes =
+            memberDef
+                members
+                ntypes
+            .>> space
+            |> many
+            |> block
+        eclassbodyref :=
+            publicAccess
+            .>>. memberDef
+                [
+                    fun modfs ->
+                        keyword "new"
+                        |> attempt
+                        >>. noModifiers modfs
+                        >>. paramTuple typeAnnExp
+                        .>> space
+                        .>> semicolon
+                        <?> "constructor"
+                        |>> (ExternClassMember.Ctor >> TypeOrMember.Member)
+
+                    methodDef
+                        (ExternClassMember.Method >> TypeOrMember.Member)
+                        None
+
+                    propDef
+                        (ExternClassMember.Property >> TypeOrMember.Member)
+                        None
+                ]
+                [
+                    eclass TypeOrMember.Type
+                ]
+            .>> space
+            |> many
+            |> block
+        eintfbodyref :=
+            externMembers
+                [
+                    methodDef
+                        (ExternInterfaceMember.Method >> TypeOrMember.Member)
+                        None
+                    
+                    propDef
+                        (ExternInterfaceMember.Property >> TypeOrMember.Member)
+                        None
+                ]
+                [
+                    einterface TypeOrMember.Type
+                ]
+        emdlebodyref :=
+            externMembers
+                [
+                    fun modfs ->
+                        methodDef
+                            (fun func ->
+                                {| Function = func.Method
+                                   FunctionName = func.MethodName |}
+                                |> ExternFunction)
+                            None
+                            modfs
+                        <?> "function"
+                ]
+                [
+                    eclass (ExternClass >> NestedDecl)
+                    einterface (ExternInterface >> NestedDecl)
+                    emodule (ExternModule >> NestedDecl)
+                ]
+    keyword "extern"
+    |> attempt
+    >>. withModifiers
+        [
+            einterface ExternInterface
+            eclass ExternClass
+            emodule ExternModule
+        ]
+
 let compilationUnit: Parser<CompilationUnit, State> =
     let namespaceDecl =
         skipString "namespace"
@@ -1408,15 +1546,12 @@ let compilationUnit: Parser<CompilationUnit, State> =
         |> many
     let definitions =
         let typeDef =
-            modifiers
-            >>= fun modfs ->
+            withModifiers
                 [
                     classDef Class
                     interfaceDef Interface
                     moduleDef Module
                 ]
-                |> Seq.map (fun def -> def modfs)
-                |> choice
         let entrypoint =
             getUserState
             >>= fun state ->
@@ -1438,9 +1573,11 @@ let compilationUnit: Parser<CompilationUnit, State> =
                             |> Some
                         setUserState { state with EntryPoint = entrypoint }
         [
+            externDecl |>> (Declaration.Extern >> Some)
+
             globalAccess
             .>>. typeDef
-            |>> Some
+            |>> (Declaration.Defined >> Some)
 
             entrypoint >>% None
         ]

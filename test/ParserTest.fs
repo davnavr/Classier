@@ -74,7 +74,7 @@ let tests =
 
         testStr
             Parser.compilationUnit
-            "types and modules in compilation unit"
+            "defined types and modules in compilation unit have correct names"
             (fun parse ->
                 let (cu, _) =
                     """
@@ -97,10 +97,7 @@ let tests =
                     |> parse
                     |> ParserAssert.isSuccess
                 cu.Declarations
-                |> Seq.map (fun (_, tdef) ->
-                    tdef
-                    |> Decl.name
-                    |> string)
+                |> Seq.map (Declaration.name >> string)
                 |> List.ofSeq
                 |> Assert.equal
                     [
@@ -215,9 +212,8 @@ let tests =
                 let fclass =
                     cu.Declarations
                     |> List.head
-                    |> snd
                     |> function
-                    | Class cdef -> cdef
+                    | Declaration.Defined(_, Class cdef) -> cdef
                     | _ -> Assert.fail "The class was unexpectedly missing"
                 fclass.SelfIdentifier
                 |> Assert.isSome
@@ -424,7 +420,7 @@ let tests =
                 extern module Math {
                     def Min(val1: int, val2: int): int;
                 }
-                """
+                """ // TODO: Test class and interface properties.
                 |> parse
                 |> ParserAssert.isSuccess
                 |> fst)

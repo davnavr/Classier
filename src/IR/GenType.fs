@@ -32,7 +32,7 @@ let gsyntax =
         (GenMember.syntax >> Interface)
         (GenMember.syntax >> Module)
 
-let clss parent members syntax =
+let clss parent members (syntax: Class) =
     let info =
         { ClassName =
             GenName.ofIdentifier syntax.ClassName.Identifier
@@ -56,7 +56,7 @@ let clss parent members syntax =
       SuperClass = None
       Syntax = syntax }
 
-let intf parent members syntax =
+let intf parent members (syntax: Interface) =
     { InterfaceName =
         GenName.ofIdentifier syntax.InterfaceName.Identifier
       Members = members
@@ -64,7 +64,7 @@ let intf parent members syntax =
       SuperInterfaces = InterfaceSet.empty
       Syntax = syntax }
 
-let mdle parent members syntax =
+let mdle parent members (syntax: Module) =
     { Members = members
       ModuleName = syntax.ModuleName.Identifier
       Parent = parent

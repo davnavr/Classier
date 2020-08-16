@@ -40,36 +40,40 @@ module private Analyzer =
 let private globals cunits anl =
     let ctypes (cunit: CompilationUnit) =
         Seq.map
-            (fun (_, tdef) -> cunit, tdef)
+            (fun decl -> cunit, decl)
             cunit.Declarations
     cunits
     |> Seq.collect ctypes
     |> Seq.fold
-        (fun state (cunit, tdef) ->
+        (fun state (cunit, decl) ->
             let tcreate fsyntax mset gtype def =
                 def
                 |> fsyntax cunit.Namespace mset
                 |> gtype
             let gtype =
-                match tdef with
-                | Class cdef ->
-                    tcreate
-                        GenType.clss
-                        MemberSet.emptyClass
-                        GenGlobalClass
-                        cdef
-                | Interface intf ->
-                    tcreate
-                        GenType.intf
-                        MemberSet.emptyInterface
-                        GenGlobalInterface
-                        intf
-                | Module mdle ->
-                    tcreate
-                        GenType.mdle
-                        MemberSet.emptyModule
-                        GenGlobalModule
-                        mdle
+                match decl with
+                | Declaration.Defined(_, ddecl) ->
+                    match ddecl with
+                    | Class cdef ->
+                        tcreate
+                            GenType.clss
+                            MemberSet.emptyClass
+                            GenGlobalClass
+                            cdef
+                    | Interface intf ->
+                        tcreate
+                            GenType.intf
+                            MemberSet.emptyInterface
+                            GenGlobalInterface
+                            intf
+                    | Module mdle ->
+                        tcreate
+                            GenType.mdle
+                            MemberSet.emptyModule
+                            GenGlobalModule
+                            mdle
+                | Declaration.Extern ->
+                    failwith "No extern types yet"
             let result =
                 Globals.addType
                     gtype

@@ -22,7 +22,7 @@
     <Compile Include="Grammar\Expression.fs" />
     <Compile Include="Grammar\Operator.fs" />
     <Compile Include="Grammar\Member.fs" />
-    <Compile Include="Grammar\Decl.fs" />
+    <Compile Include="Grammar\Declaration.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="IR\Types.fs" />
     <Compile Include="IR\ResolvedType.fs" />

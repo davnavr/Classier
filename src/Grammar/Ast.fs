@@ -259,7 +259,7 @@ type ExternClass =
     { ClassName: GenericName
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier<TypeName> list
-      Members: (GlobalAccess * TypeOrMember<ExternClass, ExternClassMember>) list
+      Members: (PublicAccess * TypeOrMember<ExternClass, ExternClassMember>) list
       SuperClass: FullIdentifier<TypeName> option }
 
 [<RequireQualifiedAccess>]
@@ -276,15 +276,16 @@ type ExternModuleMember =
     | ExternFunction of
         {| Function: Signature<unit, TypeName>
            FunctionName: GenericName |}
+    | NestedDecl of ExternDecl
 
 type ExternModule =
-    { Members: TypeOrMember<ExternDecl, ExternModuleMember> list
+    { Members: ExternModuleMember list
       ModuleName: SimpleName }
 
 type ExternDecl =
     | ExternClass of ExternClass
     | ExternInterface of ExternInterface
-    | ExternModule
+    | ExternModule of ExternModule
 
 type DefinedDecl =
     | Class of Class
@@ -292,12 +293,13 @@ type DefinedDecl =
     | Module of Module
 
 /// Represents a type or module
-type Decl =
-    | Defined of DefinedDecl
+[<RequireQualifiedAccess>]
+type Declaration =
+    | Defined of (GlobalAccess * DefinedDecl)
     | Extern of ExternDecl
 
 type CompilationUnit =
-    { Declarations: (GlobalAccess * Decl) list
+    { Declarations: Declaration list
       Namespace: Namespace
       Usings: (FParsec.Position * FullIdentifier<TypeName>) list
       Source: string }
