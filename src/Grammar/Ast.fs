@@ -272,10 +272,12 @@ type ExternInterface =
       Members: TypeOrMember<ExternInterface, ExternInterfaceMember> list
       SuperInterfaces: FullIdentifier<TypeName> list }
 
+type ExternFunction =
+    { Function: Signature<unit, TypeName>
+      FunctionName: GenericName }
+
 type ExternModuleMember =
-    | ExternFunction of
-        {| Function: Signature<unit, TypeName>
-           FunctionName: GenericName |}
+    | ExternFunction of ExternFunction
     | NestedDecl of ExternDecl
 
 type ExternModule =

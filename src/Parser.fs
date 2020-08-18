@@ -996,7 +996,7 @@ do
         |> attempt
         <?> "function definition"
         |>> fun (name, fparams, retType, body) ->
-            { Function =
+            { StaticFunction.Function =
                 { Body = body
                   Parameters = fparams
                   ReturnType = retType }
@@ -1501,8 +1501,8 @@ let private externDecl =
                     fun modfs ->
                         methodDef
                             (fun func ->
-                                {| Function = func.Method
-                                   FunctionName = func.MethodName |}
+                                { Function = func.Method
+                                  FunctionName = func.MethodName }
                                 |> ExternFunction)
                             None
                             modfs

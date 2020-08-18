@@ -15,7 +15,7 @@ let private icompare i1 i2 =
     | (GenInterface.Global _, GenInterface.Nested)
     | (GenInterface.Nested _, GenInterface.Nested _) -> 1
 
-let empty: InterfaceSet =
+let empty: GenInterfaceSet =
     SortedSet.withComparer
         icompare
         ImmutableSortedSet.Empty

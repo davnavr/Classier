@@ -15,7 +15,7 @@ type private Analysis =
     { EntryPoint: GenEntryPoint option
       Errors: ImmutableList<AnalyzerError>
       GlobalTable: Globals.Table
-      GlobalTypes: ImmutableList<GenGlobalType * CompilationUnit>
+      GlobalTypes: ImmutableList<GenGlobalDecl * CompilationUnit>
       Usings: ImmutableSortedDictionary<CompilationUnit, Usings> }
 
 module private Analyzer =
@@ -169,7 +169,9 @@ let private ntypes anl =
                 |> nested
                     GenGlobalInterface
                     gintf
-            | GenGlobalModule gmdle -> invalidOp "module members")
+            | GenGlobalModule gmdle ->
+                // TODO: Process nested types in module.
+                state)
         anl
 
 let private tresolution cunits anl =

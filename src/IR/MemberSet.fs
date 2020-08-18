@@ -58,7 +58,7 @@ let emptyInterface: MemberSet<_, _> =
             | InterfaceMthd _
             | _ -> List.empty)
 
-let emptyModule: MemberSet<GenNestedType<GenModule>, _> =
+let emptyModule: MemberSet<GenNestedDecl<GenModule>, _> =
     memberSet
         GenType.nname
         (function

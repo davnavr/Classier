@@ -11,7 +11,7 @@ open Classier.NET.Compiler.IR
 module Usings =
     type private Use =
         | UseNamespace of Namespace
-        | UseTypeMembers of GenType
+        | UseTypeMembers of NamedType
     
     type Usings =
         private

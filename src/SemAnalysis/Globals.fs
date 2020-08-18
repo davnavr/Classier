@@ -9,7 +9,7 @@ open Classier.NET.Compiler.IR
 
 type Symbol<'Table> =
     | NamespaceSymbol of IdentifierStr * 'Table
-    | TypeSymbol of GenGlobalType
+    | TypeSymbol of GenGlobalDecl
 
 type Table =
     private

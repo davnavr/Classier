@@ -33,26 +33,13 @@ let gsyntax =
         (GenMember.syntax >> Module)
 
 let clss parent members (syntax: Class) =
-    let info =
-        { ClassName =
-            GenName.ofIdentifier syntax.ClassName.Identifier
-          Interfaces = InterfaceSet.empty
-          Members = members
-          Parent = parent
-          PrimaryCtor = invalidOp "bad ctor"
-          SuperClass = None
-          Syntax = syntax }
-    let pctor =
-        { Body = ImmutableList.Empty // TODO: How will members reference parent type if they have to be in the Members set of the parent? How to solve recursion?
-          ParentClass = invalidOp "bad parent class"
-          Parameters = ImmutableList.Empty
-          Syntax = syntax.PrimaryCtor }
+    // TODO: How to get primary ctor to reference the class?
     { ClassName =
         GenName.ofIdentifier syntax.ClassName.Identifier
       Interfaces = InterfaceSet.empty
       Members = members
       Parent = parent
-      PrimaryCtor = invalidOp "bad ctor again"
+      PrimaryCtor = Unchecked.defaultof<GenPrimaryCtor>
       SuperClass = None
       Syntax = syntax }
 
