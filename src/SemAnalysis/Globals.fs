@@ -26,7 +26,7 @@ let emptyTable =
             | (NamespaceSymbol(ns, _), TypeSymbol t)
             | (TypeSymbol t, NamespaceSymbol(ns, _)) ->
                 let cname =
-                    Identifier.ncompare (Identifier.ofStr ns) (GenType.gname t)
+                    Identifier.ncompare (Identifier.ofStr ns) (GenDecl.gname t)
                 match (cname, s1) with
                 | (0, _) -> 0
                 | (_, NamespaceSymbol _) -> 1
@@ -41,7 +41,7 @@ let emptyTable =
                     | GenGlobalModule _ -> 1
                     | _ -> -1
                 | _ ->
-                    Identifier.ncompare (GenType.gname t1) (GenType.gname t2))
+                    Identifier.ncompare (GenDecl.gname t1) (GenDecl.gname t2))
         ImmutableSortedSet.Empty
     |> Table
 

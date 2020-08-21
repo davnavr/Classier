@@ -180,7 +180,7 @@ type GenInterface =
 type GenModuleMember =
     | ModuleFunc of GenFunction<GenModule, GenBody, Ast.StaticFunction>
     | ModuleOper of GenOperator
-    | NestedModule of GenNestedModule
+    | NestedDecl of GenNestedDecl<GenModule>
 
 type GenModule<'Parent> =
     { Members: MemberSet<GenModuleMember>
@@ -216,8 +216,8 @@ type RefClass =
 type RefInterfaceMember = unit
 
 type RefInterface<'Parent> =
-    { InterfaceName: ImmutableSortedSet<RefInterfaceMember>
-      Members: MemberSet<unit>
+    { InterfaceName: RefName
+      Members: ImmutableSortedSet<RefInterfaceMember>
       Parent: 'Parent
       SuperInterfaces: RefInterfaceSet
       Syntax: Ast.ExternInterface }
@@ -226,6 +226,7 @@ type RefNestedInterface = RefInterface<RefInterface>
 type RefGlobalInterface = RefInterface<Namespace>
 
 type RefInterface =
+    | Nested of RefNestedInterface
     | Global of RefGlobalInterface
 
 type RefModuleMember =

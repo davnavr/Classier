@@ -3,7 +3,7 @@
 open System.Collections.Immutable
 
 [<RequireQualifiedAccess>]
-type TypeOrMember<'Type, 'Member> =
+type TypeOrMember<'Type, 'Member> = // TODO: Remove this type?
     | Type of 'Type
     | Member of 'Member
 

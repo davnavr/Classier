@@ -91,7 +91,7 @@ let tests =
                 """
             ]
             (fun output ->
-                output.GlobalTypes
+                output.GlobalDecls
                 |> Seq.length
                 |> Assert.equal 4)
 
@@ -110,8 +110,8 @@ let tests =
                 """
             ]
             (fun result ->
-                result.GlobalTypes
-                |> Seq.map (GenType.gname >> string)
+                result.GlobalDecls
+                |> Seq.map (GenDecl.gname >> string)
                 |> List.ofSeq
                 |> Assert.equal
                     [
@@ -131,14 +131,14 @@ let tests =
             ]
             (fun output ->
                 let parent =
-                    match Assert.head output.GlobalTypes with
+                    match Assert.head output.GlobalDecls with
                     | GenGlobalModule mdle -> mdle
                     | _ ->
                         Assert.fail "The parent module does not exist"
                 match Assert.head parent.Members with
-                | (_, TypeOrMember.Type ntype) -> ntype
+                | (_, NestedDecl ndecl) -> ndecl
                 | _ -> Assert.fail "Expected the nested child type."
-                |> GenType.nname
+                |> GenDecl.nname
                 |> string
                 |> Assert.equal "Child")
 
@@ -211,19 +211,14 @@ let tests =
                 """
             ]
             (fun output ->
-                let m1 =
-                    match Seq.head output.GlobalTypes with
-                    | GenGlobalModule mdle -> Some mdle
+                match Seq.head output.GlobalDecls with
+                | GenGlobalModule { Members = members } ->
+                    match members.Item 0 with
+                    | (_, NestedDecl (GenNestedModule { Members = nmembers })) ->
+                        Some nmembers
                     | _ -> None
-                    |> Option.get
-                let m2 =
-                    match m1.Members.Item 0 with
-                    | (_, TypeOrMember.Type ntype) ->
-                        match ntype with
-                        | GenNestedModule mdle -> Some mdle
-                        | _ -> None
-                    | _ -> None
-                    |> Option.get
-                Assert.notEmpty m2.Members)
+                | _ -> None
+                |> Option.get
+                |> Assert.notEmpty)
     ]
     |> testList "analysis tests"

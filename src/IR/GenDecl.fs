@@ -1,6 +1,6 @@
 ﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 [<RequireQualifiedAccess>]
-module Classier.NET.Compiler.IR.GenType
+module Classier.NET.Compiler.IR.GenDecl
 
 open System.Collections.Immutable
 
@@ -44,7 +44,7 @@ let clss parent members (syntax: Class) =
       Syntax = syntax }
 
 let intf parent members (syntax: Interface) =
-    { InterfaceName =
+    { GenInterface.InterfaceName =
         GenName.ofIdentifier syntax.InterfaceName.Identifier
       Members = members
       Parent = parent
@@ -52,7 +52,7 @@ let intf parent members (syntax: Interface) =
       Syntax = syntax }
 
 let mdle parent members (syntax: Module) =
-    { Members = members
+    { GenModule.Members = members
       ModuleName = syntax.ModuleName.Identifier
       Parent = parent
       Syntax = syntax }

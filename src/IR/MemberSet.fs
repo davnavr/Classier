@@ -9,7 +9,7 @@ let private memberSet tname mname mparams =
     let mcompare (_: Access, m1) (_, m2) =
         let ctype =
             tname
-            >> Identifier.umap
+            >> Identifier.simplify
             >> Some
         let oload =
             function
@@ -38,31 +38,8 @@ let private memberSet tname mname mparams =
         mcompare
         ImmutableSortedSet.Empty
 
-let emptyClass: MemberSet<_, _> =
-    memberSet
-        (fun (cdef: GenNestedClass) -> cdef.ClassName)
-        (function
-        | _ -> None)
-        (fun mdef ->
-            match mdef with
-            | ClassCtor _
-            | _ -> List.empty)
+let emptyClass: MemberSet<GenClassMember> = invalidOp "bad"
 
-let emptyInterface: MemberSet<_, _> =
-    memberSet
-        (fun (idef: GenNestedInterface) -> idef.InterfaceName)
-        (function
-        | _ -> None)
-        (fun mdef ->
-            match mdef with
-            | InterfaceMthd _
-            | _ -> List.empty)
+let emptyInterface: MemberSet<GenInterfaceMember> = invalidOp "bad"
 
-let emptyModule: MemberSet<GenNestedDecl<GenModule>, _> =
-    memberSet
-        GenType.nname
-        (function
-        | _ -> None)
-        (function
-        | ModuleFunc _
-        | _ -> List.empty)
+let emptyModule: MemberSet<GenModuleMember> = invalidOp "bad"

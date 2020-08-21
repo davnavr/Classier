@@ -30,12 +30,13 @@
     <Compile Include="IR\GenName.fs" />
     <Compile Include="IR\GenMember.fs" />
     <Compile Include="IR\InterfaceSet.fs" />
-    <Compile Include="IR\GenType.fs" />
+    <Compile Include="IR\GenDecl.fs" />
     <Compile Include="IR\MemberSet.fs" />
     <Compile Include="SemAnalysis\Globals.fs" />
     <Compile Include="SemAnalysis\Usings.fs" />
     <Compile Include="SemAnalysis\LocalsTable.fs" />
     <Compile Include="SemAnalysis\AnalyzerError.fs" />
+    <Compile Include="SemAnalysis\Analysis.fs" />
     <Compile Include="SemAnalysis\Analyze.fs" />
     <Compile Include="Print.fs" />
     <Compile Include="Program.fs" />

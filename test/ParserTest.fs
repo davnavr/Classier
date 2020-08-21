@@ -342,13 +342,13 @@ let tests =
             "namespace test"
             (fun parse ->
                 [
-                    let tons =
+                    let nsname =
                         List.map IdentifierStr.create >> Namespace
 
                     "// empty", Namespace List.empty
-                    "namespace hello;", tons [ "hello" ]
-                    "namespace System.Collections ;", tons [ "System"; "Collections" ]
-                    "namespace some.random.long.namespace;", tons [ "some"; "random"; "long"; "namespace" ]
+                    "namespace hello;", nsname [ "hello" ]
+                    "namespace System.Collections ;", nsname [ "System"; "Collections" ]
+                    "namespace some.random.long.namespace;", nsname [ "some"; "random"; "long"; "namespace" ]
                 ]
                 |> Seq.mapi (fun i (ns, exp) ->
                     test (string i) {
