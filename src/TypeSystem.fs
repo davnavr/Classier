@@ -1,6 +1,5 @@
 ﻿module Classier.NET.Compiler.TypeSystem
 
-open System
 open System.Collections.Generic
 open System.Collections.Immutable
 
@@ -9,7 +8,7 @@ open System.Collections.Immutable
 [<RequireQualifiedAccess>]
 type PrimitiveType =
     | Boolean
-    | Null
+    | Null // TODO: Remove null, since it should not be a type.
     | String
     | Unit
     // Integral
@@ -52,7 +51,7 @@ type Type<'Named> =
            ReturnType: Type<'Named> |}
     | Named of 'Named
     | Primitive of PrimitiveType
-    | Tuple of Type<'Named> * Type<'Named> list
+    | Tuple of Type<'Named> * Type<'Named> * Type<'Named> list
 
     override this.ToString() =
         match this with
@@ -60,4 +59,8 @@ type Type<'Named> =
         | FuncType f -> sprintf "%O => %O" f.ParamType f.ReturnType
         | Named ntype -> ntype.ToString()
         | Primitive p -> string p
-        | Tuple (head, tail) -> sprintf "(%s)" (String.Join(", ", head :: tail))
+        | Tuple (i1, i2, rest) ->
+            i1 :: i2 :: rest
+            |> Seq.map (sprintf "%O")
+            |> String.concat ", "
+            |> sprintf "(%s)"

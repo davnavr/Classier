@@ -109,7 +109,7 @@ type OperatorKind =
     | Infix
     | Prefix
 
-type OperatorStr =
+type OperatorStr = // TODO: Move this to Grammar.Operator module and make it have a private ctor.
     | OperatorStr of string
 
     override this.ToString() =
@@ -117,11 +117,9 @@ type OperatorStr =
         str
 
 type Operator =
-    { Body: PStatement list
-      Kind: OperatorKind
-      Operands: ExpParam list
-      ReturnType: TypeName option
-      Symbol: OperatorStr }
+    { Kind: OperatorKind
+      Symbol: OperatorStr
+      Signature: Signature<TypeName option> }
 
 type MutatorModf =
     | IsMutator
@@ -155,7 +153,7 @@ type Method =
       Modifiers: MethodModifiers
       SelfIdentifier: IdentifierStr option }
 
-type PropAccessors =
+type PropAccessors = // TODO: Allow different access modifiers for accessors.
     | AutoGet
     | AutoGetSet
     | Get of PStatement list
@@ -168,7 +166,7 @@ type Property =
       Value: Expression option
       ValueType: TypeName option }
 
-type AMethod =
+type AbstractMethod =
     { Method: Signature<unit, TypeName>
       MethodName: GenericName }
 
@@ -176,7 +174,7 @@ type AbstractPropAccessors =
     | AbstractGet
     | AbstractGetSet
 
-type AProperty =
+type AbstractProperty =
     { Accessors: AbstractPropAccessors
       PropName: SimpleName
       Purity: MutatorModf
@@ -187,21 +185,24 @@ type StaticFunction =
       FunctionName: GenericName }
 
 type AbstractMember =
-    | AMethod of AMethod
-    | AProperty of AProperty
+    | AbstractMethod of AbstractMethod
+    | AbstractProperty of AbstractProperty
 
 type ConcreteMember =
     | Constructor of Ctor
     | Method of Method
     | Property of Property
 
-type InstanceMember =
+type ClassMember =
     | Abstract of AbstractMember
     | Concrete of ConcreteMember
 
-type StaticMember =
+type ModuleMember =
     | Function of StaticFunction
     | Operator of Operator
+    | NestedClass of Class
+    | NestedInterface of Interface
+    | NestedModule of Module
 
 type MemberName =
     | IdentifierName of GenericName
@@ -231,7 +232,7 @@ type Class =
       Body: PStatement list
       Inheritance: ClassInheritance
       Interfaces: FullIdentifier<TypeName> list
-      Members: MemberList<Class, InstanceMember>
+      Members: MemberList<Class, ClassMember>
       PrimaryCtor: PrimaryCtor
       SelfIdentifier: IdentifierStr option
       SuperClass: FullIdentifier<TypeName> option }
@@ -245,16 +246,62 @@ type Interface =
       SuperInterfaces: FullIdentifier<TypeName> list }
 
 type Module =
-    { ModuleName: SimpleName
-      Members: MemberList<TypeDef, StaticMember> }
+    { Members: (Access * ModuleMember) list
+      ModuleName: SimpleName }
 
-type TypeDef =
+[<RequireQualifiedAccess>]
+type ExternClassMember =
+    | Ctor of parameters: ExpParam list
+    | Method of AbstractMethod
+    | Property of AbstractProperty
+
+type ExternClass =
+    { ClassName: GenericName
+      Inheritance: ClassInheritance
+      Interfaces: FullIdentifier<TypeName> list
+      Members: (PublicAccess * TypeOrMember<ExternClass, ExternClassMember>) list
+      SuperClass: FullIdentifier<TypeName> option }
+
+[<RequireQualifiedAccess>]
+type ExternInterfaceMember =
+    | Method of AbstractMethod
+    | Property of AbstractProperty
+
+type ExternInterface =
+    { InterfaceName: GenericName
+      Members: TypeOrMember<ExternInterface, ExternInterfaceMember> list
+      SuperInterfaces: FullIdentifier<TypeName> list }
+
+type ExternFunction =
+    { Function: Signature<unit, TypeName>
+      FunctionName: GenericName }
+
+type ExternModuleMember =
+    | ExternFunction of ExternFunction
+    | NestedDecl of ExternDecl
+
+type ExternModule =
+    { Members: ExternModuleMember list
+      ModuleName: SimpleName }
+
+type ExternDecl =
+    | ExternClass of ExternClass
+    | ExternInterface of ExternInterface
+    | ExternModule of ExternModule
+
+type DefinedDecl =
     | Class of Class
     | Interface of Interface
     | Module of Module
 
+/// Represents a type or module
+[<RequireQualifiedAccess>]
+type Declaration =
+    | Defined of (GlobalAccess * DefinedDecl)
+    | Extern of ExternDecl
+
 type CompilationUnit =
-    { Namespace: Namespace
+    { Declarations: Declaration list
+      Namespace: Namespace
       Usings: (FParsec.Position * FullIdentifier<TypeName>) list
-      Source: string
-      Types: (GlobalAccess * TypeDef) list }
+      Source: string }

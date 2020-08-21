@@ -5,6 +5,12 @@ type GlobalAccess =
     | GlobalPublic
     | GlobalInternal
 
+[<RequireQualifiedAccess>]
+[<StructuralComparison; StructuralEquality>]
+type PublicAccess =
+    | Public
+    | Protected
+
 [<StructuralComparison; StructuralEquality>]
 type Access =
     | Public

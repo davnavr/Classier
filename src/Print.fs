@@ -54,28 +54,7 @@ let pposition (pos: FParsec.Position) =
 
 let rec pexpr (expr: GenExpression) = // TODO: FInd a better way to make this recursive
     match expr with
-    | ComplexExpr cexpr ->
-        match cexpr with
-        | TempEFunctionCall call ->
-            let (ns, mdle, func) = call.Target
-            let qns =
-                match ns with
-                | Namespace.Global -> ""
-                | _ -> sprintf "%O." ns
-            print {
-                strf
-                    "global:%s%O.%O"
-                    qns
-                    mdle.ModuleName.Name // NOTE: Generics are not printed for name of module or function
-                    func.FunctionName.Name
-                |> line
-
-                call.Arguments
-                |> Seq.map pexpr
-                |> many
-                |> paren
-            }
-        | _ -> strl "#error Bad complex expression"
+    | BoolLit b -> strf "%b" b
     | StrLit s ->
         print {
             str "\""
@@ -84,9 +63,9 @@ let rec pexpr (expr: GenExpression) = // TODO: FInd a better way to make this re
         }
     | _ -> strl "#error Bad expression"
 
-let pbody (body: GenBody<_>) indent =
+let pbody (body: GenBody) indent =
     print {
-        for (st, (pos, syntax)) in body.Statements do
+        for (st, (pos, syntax)) in body do
             pposition pos
             match st with
             | Empty -> strl ";"

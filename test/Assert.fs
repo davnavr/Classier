@@ -6,20 +6,28 @@ open System.Collections
 let inline fail msg = msg |> Fuchu.AssertException |> raise
 let inline failf format = Printf.ksprintf fail format
 
-let isOk result =
-    match result with
-    | Result.Ok ok -> ok
-    | Result.Error err ->
-        failf "The value was an error: %O" err
 let isSome opt =
     match opt with
     | Some value -> value
     | None ->
         fail "The value was unexpectedly None"
-let isTrue msg =
+let isTrue msg value =
+    if not value then
+        fail msg
+let it check msg it =
+    if check it
+    then it
+    else fail msg
+
+let isOk =
     function
-    | true -> ()
-    | false -> fail msg
+    | Result.Ok ok -> ok
+    | Result.Error err ->
+        failf "The value was an error: %O" err
+let isError =
+    function
+    | Result.Error err -> err
+    | Result.Ok r -> failf "Unexpected success: %O" r
 
 let equal (exp: 'T when 'T: equality) act =
     let format (item: obj) =
@@ -55,10 +63,7 @@ let notEmpty col =
     then fail "The collection was unexpectedly empty"
     else col
 
-let strContains sub str =
-    let msg =
-        sprintf
-            "The substring '%s' in string '%s' could not be found"
-            sub
-            str
-    isTrue msg (str.Contains sub)
+let strContains (sub: string) (str: string) =
+    if str.Contains sub
+    then str
+    else failf "The substring '%s' in string '%s' could not be found" sub str

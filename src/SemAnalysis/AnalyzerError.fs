@@ -2,17 +2,16 @@
 
 open Classier.NET.Compiler
 
-open Classier.NET.Compiler.Extern
 open Classier.NET.Compiler.Grammar
 open Classier.NET.Compiler.IR
 
 type AnalyzerError =
     | BadEntryPointSignature of EntryPoint
     | BadUseStatement of FParsec.Position * FullIdentifier<TypeName>
-    | DuplicateGlobalType of TypeDef * DefinedOrExtern<GenGlobalType, EGlobalType>
-    | DuplicateClassMember of GenClass * TypeOrMember<Class, InstanceMember>
+    | DuplicateGlobalSymbol of GenGlobalDecl * existing: Globals.Symbol
+    | DuplicateClassMember of GenClass * TypeOrMember<Class, ClassMember>
     | DuplicateInterfaceMember of GenInterface * TypeOrMember<Interface, AbstractMember>
-    | DuplicateModuleMember of GenModule * TypeOrMember<TypeDef, StaticMember>
+    | DuplicateModuleMember of GenModule * TypeOrMember<Declaration, ModuleMember>
     | FeatureNotImplemented of feature: string
     | InternalAnalyzerError of msg: string
     | LocalsTableError of LocalsTable.Error

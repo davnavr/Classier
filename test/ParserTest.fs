@@ -14,7 +14,6 @@ let parseStr parser name f =
         Parser.defaultState
         name
     |> f
-
 let testStr parser name f =
     test name {
         parseStr
@@ -23,6 +22,36 @@ let testStr parser name f =
             f
         |> ignore
     }
+
+let strEqual parser name str map expected =
+    testStr
+        parser
+        name
+        (fun parse ->
+            str
+            |> parse
+            |> ParserAssert.isSuccess
+            |> fst
+            |> map
+            |> Assert.equal expected)
+let strSuccess parser name str =
+    testStr
+        parser
+        name
+        (fun parse ->
+            str
+            |> parse
+            |> ParserAssert.isSuccess)
+let strFailure parser name str errsub =
+    testStr
+        parser
+        name
+        (fun parse ->
+            str
+            |> parse
+            |> ParserAssert.isFailure
+            |> string
+            |> Assert.strContains errsub)
 
 let tests =
     [
@@ -41,12 +70,11 @@ let tests =
                     """
                     |> parse
                     |> ParserAssert.isSuccess
-                state.EntryPoint
-                |> Assert.isSome)
+                Assert.isSome state.EntryPoint)
 
         testStr
             Parser.compilationUnit
-            "types and modules in compilation unit"
+            "defined types and modules in compilation unit have correct names"
             (fun parse ->
                 let (cu, _) =
                     """
@@ -68,11 +96,8 @@ let tests =
                     """
                     |> parse
                     |> ParserAssert.isSuccess
-                cu.Types
-                |> Seq.map (fun (_, tdef) ->
-                    tdef
-                    |> TypeDef.name
-                    |> string)
+                cu.Declarations
+                |> Seq.map (Declaration.name >> string)
                 |> List.ofSeq
                 |> Assert.equal
                     [
@@ -84,70 +109,63 @@ let tests =
                         "Class4<T, U>"
                     ])
 
-        testStr
+        strEqual
             Parser.statementBlock
             "block statements don't need semicolon"
-            (fun parse ->
-                let (statements, _) =
-                    """{
-                        3.14159265; // This ignored expression needs a semicolon.
-                        if (true) {
-                        }
-                        else {
-                        }
+            """{
+                3.14159265; // This ignored expression needs a semicolon.
+                if (true) {
+                }
+                else {
+                }
 
-                        try {
-                        }
-                        catch {
-                            _ => { };
-                        }
-                        finally {
-                        }
+                try {
+                }
+                catch {
+                    _ => { };
+                }
+                finally {
+                }
 
-                        while (false) {
-                        }
+                while (false) {
+                }
 
-                        match (thing) {
-                            _ => { };
-                        }
+                match (thing) {
+                    _ => { };
+                }
 
-                        "Hello"
-                    }"""
-                    |> parse
-                    |> ParserAssert.isSuccess
-                statements
-                |> Seq.map snd
-                |> List.ofSeq
-                |> Assert.equal
-                    [
-                        { FracDigits = "14159265"
-                          IntDigits = "3" }
-                        |> NumericLit.FPoint
-                        |> NumLit
-                        |> IgnoredExpr
+                "Hello"
+            }"""
+            (List.map snd)
+            [
+                { FracDigits = "14159265"
+                  IntDigits = "3" }
+                |> NumericLit.FPoint
+                |> NumLit
+                |> IgnoredExpr
+                  
+                { Choice1 = List.empty
+                  Choice2 = List.empty
+                  Condition = BoolLit true }
+                |> IfExpr
+                |> IgnoredExpr
+                  
+                { Finally = List.empty
+                  Handlers = [ Expression.emptyCase ]
+                  TryBody = List.empty }
+                |> TryExpr
+                |> IgnoredExpr
+                  
+                While (BoolLit false, List.empty)
+                  
+                { Against =
+                    Identifier.create "thing" |> IdentifierRef
+                  Cases = [ Expression.emptyCase ] }
+                |> MatchExpr
+                |> IgnoredExpr
 
-                        { Choice1 = List.empty
-                          Choice2 = List.empty
-                          Condition = BoolLit true }
-                        |> IfExpr
-                        |> IgnoredExpr
-
-                        { Finally = List.empty
-                          Handlers = [ Expression.emptyCase ]
-                          TryBody = List.empty }
-                        |> TryExpr
-                        |> IgnoredExpr
-
-                        While (BoolLit false, List.empty)
-
-                        { Against =
-                            Identifier.create "thing" |> IdentifierRef
-                          Cases = [ Expression.emptyCase ] }
-                        |> MatchExpr
-                        |> IgnoredExpr
-
-                        StrLit "Hello" |> Return
-                    ])
+                StrLit "Hello" |> Return
+            ]
 
         parseStr
             (Parser.expression .>> eof)
@@ -192,11 +210,10 @@ let tests =
                     |> parse
                     |> ParserAssert.isSuccess
                 let fclass =
-                    cu.Types
+                    cu.Declarations
                     |> List.head
-                    |> snd
                     |> function
-                    | Class cdef -> cdef
+                    | Declaration.Defined(_, Class cdef) -> cdef
                     | _ -> Assert.fail "The class was unexpectedly missing"
                 fclass.SelfIdentifier
                 |> Assert.isSome
@@ -227,7 +244,7 @@ let tests =
 
                     tidentifier [ "System"; "Object" ]
 
-                    Tuple(Primitive PrimitiveType.Int, [ Primitive PrimitiveType.Float ])
+                    Tuple(Primitive PrimitiveType.Int, Primitive PrimitiveType.Float, List.empty)
                 ]
                 |> Seq.map (fun exp ->
                     let ename = string exp
@@ -240,23 +257,19 @@ let tests =
                     }))
         |> testList "simple type name is valid"
 
-        testStr
+        strFailure
             Parser.compilationUnit
             "more than one entry point is not allowed"
-            (fun parse ->
-                """
-                main() {
-                    "One" |> System.Console.WriteLine;
-                }
+            """
+            main() {
+                "One" |> System.Console.WriteLine;
+            }
 
-                main() {
-                    "Tw\u00D0"
-                }
-                """
-                |> parse
-                |> ParserAssert.isFailure
-                |> string
-                |> Assert.strContains "entry point already exists")
+            main() {
+                "Tw\u00D0"
+            }
+            """
+            "entry point already exists"
 
         testStr
             (Parser.statement .>> eof)
@@ -329,13 +342,13 @@ let tests =
             "namespace test"
             (fun parse ->
                 [
-                    let tons =
+                    let nsname =
                         List.map IdentifierStr.create >> Namespace
 
                     "// empty", Namespace List.empty
-                    "namespace hello;", tons [ "hello" ]
-                    "namespace System.Collections ;", tons [ "System"; "Collections" ]
-                    "namespace some.random.long.namespace;", tons [ "some"; "random"; "long"; "namespace" ]
+                    "namespace hello;", nsname [ "hello" ]
+                    "namespace System.Collections ;", nsname [ "System"; "Collections" ]
+                    "namespace some.random.long.namespace;", nsname [ "some"; "random"; "long"; "namespace" ]
                 ]
                 |> Seq.mapi (fun i (ns, exp) ->
                     test (string i) {
@@ -356,37 +369,60 @@ let tests =
                     })
                 |> testList "correct namespace is parsed")
 
-        testStr
+        strSuccess
             Parser.compilationUnit
             "modifiers can be in any order"
-            (fun parse ->
-                """
-                public class MethodModifiers {
-                    abstract override def everyone(): ();
-                    override abstract def says() : bool;
-                    override mutator def hello(): int { }
-                    mutator override def world(): long { }
-                    override sealed def but(): (long, int) { return (4L, 5); }
-                    override sealed mutator def never(): float { 3.141592 }
-                    override mutator sealed def how(are: int): int { are <- 3; are + 7 }
-                    mutator override sealed def you(world: MethodModifiers) { world }
-                }
-                """
-                |> parse
-                |> ParserAssert.isSuccess)
+            """
+            public abstract class MethodModifiers {
+                abstract override def everyone(): ();
+                override abstract def says() : bool;
+                override mutator def hello(): int { }
+                mutator override def world(): long { }
+                override sealed def but(): (long, int) { return (4L, 5); }
+                override sealed mutator def never(): float { 3.141592 }
+                override mutator sealed def how(are: int): int { are <- 3; are + 7 }
+                mutator override sealed def you(world: MethodModifiers) { world }
+            }
+            """
+
+        strFailure
+            Parser.compilationUnit
+            "abstract method cannot have virtual modifier"
+            """
+            public abstract class Bad {
+                abstract virtual def myBadMethod();
+            }
+            """
+            "implies that the method is 'virtual'"
 
         testStr
             Parser.compilationUnit
-            "abstract method have virtual modifier"
+            "extern types and members are valid"
             (fun parse ->
                 """
-                public class Bad {
-                    abstract virtual def myBadMethod();
+                namespace System;
+
+                extern class Random {
+                    def new();
+                    def new(Seed: int);
+                    virtual def Next(maxValue: int): int;
+                    virtual def Next(minValue: int, maxValue: int): int;
                 }
-                """
+
+                extern abstract class Attribute {
+                    protected def new();
+                }
+
+                extern interface IDisposable {
+                    def Dispose(): ();
+                }
+
+                extern module Math {
+                    def Min(val1: int, val2: int): int;
+                }
+                """ // TODO: Test class and interface properties.
                 |> parse
-                |> ParserAssert.isFailure
-                |> string
-                |> Assert.strContains "implies that the method is 'virtual'")
+                |> ParserAssert.isSuccess
+                |> fst)
     ]
     |> testList "parser tests"

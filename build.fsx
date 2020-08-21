@@ -57,7 +57,7 @@ Target.create "Lint Bootstrap" (fun _ ->
 )
 
 Target.create "Test Bootstrap" (fun _ ->
-    runProj "./test/Classier.NET.Compiler.Tests.fsproj" []
+    runProj "./test/Classier.NET.Compiler.Tests.fsproj" [ "/m" ]
 )
 
 Target.create "Build Samples" (fun _ ->

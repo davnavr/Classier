@@ -67,7 +67,10 @@ module Identifier =
         { Name = idf.Name
           Generics = List.map gmapper idf.Generics }
 
-    let umap<'g> = map (fun (_: 'g) -> ())
+    let simplify idf = map (fun _ -> ()) idf
+    let (|Simplify|) idf = simplify idf
+
+    let ncompare idf1 idf2 = compare (simplify idf1) (simplify idf2)
 
     let toFull idf = FullIdentifier(idf, List.empty)
 
